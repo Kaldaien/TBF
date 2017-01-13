@@ -59,6 +59,8 @@ namespace tbf
       static CommandProcessor* pCommProc;
     };
 
+    extern bool               fullscreen;
+
     extern uint32_t           width;
     extern uint32_t           height;
 
@@ -150,18 +152,20 @@ struct game_state_t {
                                      (((data_t *)base_addr)->Loading1 & 0x1); }
 
   bool hasFixedAspect (void) {
-    if (((data_t *)base_addr)->OpeningMovie ||
-        ((data_t *)base_addr)->Title        ||
-        ((data_t *)base_addr)->Menu         ||
-        in_skit)
-      return true;
     return false;
+    //if (((data_t *)base_addr)->OpeningMovie ||
+        //((data_t *)base_addr)->Title        ||
+        //((data_t *)base_addr)->Menu         ||
+        //in_skit)
+      //return true;
+    //return false;
   }
   bool needsFixedMouseCoords(void) {
-    return (((data_t *)base_addr)->GamePause    ||
-            ((data_t *)base_addr)->Menu         ||
-            ((data_t *)base_addr)->BattlePause  ||
-            ((data_t *)base_addr)->Title);
+    return false;
+    //return (((data_t *)base_addr)->GamePause    ||
+            //((data_t *)base_addr)->Menu         ||
+            //((data_t *)base_addr)->BattlePause  ||
+            //((data_t *)base_addr)->Title);
   }
 } static game_state;
 
@@ -174,6 +178,12 @@ typedef HRESULT (STDMETHODCALLTYPE *EndScene_pfn)(
 );
 
 #include <d3d9.h>
+
+typedef D3DPRESENT_PARAMETERS* (__stdcall *SK_SetPresentParamsD3D9_pfn)
+(
+  IDirect3DDevice9      *pDevice,
+  D3DPRESENT_PARAMETERS *pParams
+);
 
 typedef HRESULT (STDMETHODCALLTYPE *DrawPrimitive_pfn)
 (

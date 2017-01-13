@@ -73,6 +73,11 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetName>tbfix</TargetName>
+    <OutDir>C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria Demo\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria Demo\</OutDir>
+    <TargetName>tbfix</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -194,9 +199,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="include\command.h" />
     <ClInclude Include="include\config.h" />
     <ClInclude Include="include\DLL_VERSION.H" />
@@ -204,6 +206,7 @@
     <ClInclude Include="include\general_io.h" />
     <ClInclude Include="include\hook.h" />
     <ClInclude Include="include\ini.h" />
+    <ClInclude Include="include\input.h" />
     <ClInclude Include="include\log.h" />
     <ClInclude Include="include\parameter.h" />
     <ClInclude Include="include\render.h" />
@@ -231,10 +234,13 @@
       </PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\hook.cpp" />
+    <ClCompile Include="src\input.cpp" />
     <ClCompile Include="src\ini.cpp" />
+    <ClCompile Include="src\textures.cpp" />
     <Text Include="include\keyboard.h" />
     <ClCompile Include="src\log.cpp" />
     <ClCompile Include="src\parameter.cpp" />
+    <ClCompile Include="src\render.cpp" />
     <ClCompile Include="src\scanner.cpp" />
     <ClCompile Include="src\sound.cpp" />
     <ClCompile Include="src\general_io.cpp" />

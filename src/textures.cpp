@@ -90,7 +90,6 @@ iSK_Logger* tex_log;
 // Textures that are missing mipmaps
 std::set <IDirect3DBaseTexture9 *> incomplete_textures;
 
-tbf::RenderFix::frame_texture_t tbf::RenderFix::cutscene_frame;
 tbf::RenderFix::pad_buttons_t   tbf::RenderFix::pad_buttons;
 
 // D3DXSaveSurfaceToFile issues a StretchRect, but we don't want to log that...
@@ -613,18 +612,6 @@ D3D9SetTexture_Detour (
     return D3D9SetTexture_Original (This, Sampler, pTexture);
   }
 
-  //
-  // Hacky way of detecting the fullscreen frame border
-  //
-  if (Sampler == 0) {
-    if (pTexture == tbf::RenderFix::cutscene_frame.tex_corner ||
-        pTexture == tbf::RenderFix::cutscene_frame.tex_side)
-      tbf::RenderFix::cutscene_frame.in_use = true;
-    else
-      tbf::RenderFix::cutscene_frame.in_use = false;
-  }
-
-
   //if (tbf::RenderFix::tracer.log) {
     //dll_log->Log ( L"[FrameTrace] SetTexture      - Sampler: %lu, pTexture: %ph",
                      //Sampler, pTexture );
@@ -640,7 +627,7 @@ D3D9SetTexture_Detour (
 
     textures_used.insert (pSKTex->tex_crc32);
 
-    QueryPerformanceCounter_Original (&pSKTex->last_used);
+    QueryPerformanceCounter/*_Original*/ (&pSKTex->last_used);
 
     //
     // This is how blocking is implemented -- only do it when a texture that needs
@@ -719,8 +706,9 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
   //
   // Model Shadows
   //
-  if (Width == Height && (Width == 64 || Width == 128) &&
+  if (Width == Height && (Width == 64 || Width == 128 || Width == 256) &&
                           Usage == D3DUSAGE_RENDERTARGET) {
+    //tex_log->Log (L"[Shadow Mgr] (Model Resolution: (%lu x %lu)", Width, Height);
     // Assert (Levels == 1)
     //
     //   If Levels is not 1, then we've kind of screwed up because now we don't
@@ -735,16 +723,19 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
   //
   // Post-Processing (512x256) - FIXME damnit!
   //
-  if (Width  == 512 &&
-      Height == 256 && Usage == D3DUSAGE_RENDERTARGET) {
+  if ( Width  == 512 &&
+       Height == 256 && Usage == D3DUSAGE_RENDERTARGET ) {
     if (config.render.postproc_ratio > 0.0f) {
-      Width  = tbf::RenderFix::width  * config.render.postproc_ratio;
-      Height = tbf::RenderFix::height * config.render.postproc_ratio;
+      Width  = (UINT)(tbf::RenderFix::width  * config.render.postproc_ratio);
+      Height = (UINT)(tbf::RenderFix::height * config.render.postproc_ratio);
+
+      tex_log->Log (L"[ PostProc ] (Post-Resolution: (%lu x %lu)", Width, Height);
     }
   }
 
  if (Usage == D3DUSAGE_DEPTHSTENCIL) {
     if (Width == Height && (Height == 512 || Height == 1024 || Height == 2048)) {
+      //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu)", Width, Height);
       uint32_t shift = config.render.env_shadow_rescale;
 
       Width  <<= shift;
@@ -1199,8 +1190,8 @@ public:
     return (! results_.empty ());
   }
 
-  int queueLength (void) {
-    int num = 0;
+  size_t queueLength (void) {
+    size_t num = 0;
 
     EnterCriticalSection (&cs_jobs);
     {
@@ -1447,7 +1438,7 @@ InjectTexture (tbf_tex_load_s* load)
   D3DXIMAGE_INFO img_info = { 0 };
 
   bool           streamed;
-  size_t         size = 0;
+  DWORD          size = 0;
   HRESULT        hr = E_FAIL;
 
   streamed =
@@ -1550,7 +1541,7 @@ TBFix_LoadQueuedTextures (void)
     if (streaming > 1)
       mod_text += 's';
 
-    int queue_len = resample_pool->queueLength ();
+    size_t queue_len = resample_pool->queueLength ();
 
     if (queue_len) {
       sprintf (szFormatted, " (%lu queued)", queue_len);
@@ -1591,7 +1582,7 @@ TBFix_LoadQueuedTextures (void)
     tbf_tex_load_s* load =
       *it;
 
-    QueryPerformanceCounter_Original (&load->end);
+    QueryPerformanceCounter/*_Original*/ (&load->end);
 
     if (true) {
       tex_log->Log ( L"[%s] Finished %s texture %08x (%5.2f MiB in %9.4f ms)",
@@ -1611,8 +1602,8 @@ TBFix_LoadQueuedTextures (void)
       tbf::RenderFix::tex_mgr.getTexture (load->checksum);
 
     if (pTex != nullptr) {
-      pTex->load_time = 1000.0f * (double)(load->end.QuadPart - load->start.QuadPart) /
-                                      (double)load->freq.QuadPart;
+      pTex->load_time = (float)(1000.0 * (double)(load->end.QuadPart - load->start.QuadPart) /
+                                           (double)load->freq.QuadPart);
     }
 
     ISKTextureD3D9* pSKTex =
@@ -1622,7 +1613,7 @@ TBFix_LoadQueuedTextures (void)
       tex_log->Log (L"[ Tex. Mgr ] >> Original texture no longer referenced, discarding new one!");
       load->pSrc->Release ();
     } else {
-      QueryPerformanceCounter_Original (&pSKTex->last_used);
+      QueryPerformanceCounter/*_Original*/ (&pSKTex->last_used);
 
       pSKTex->pTexOverride  = load->pSrc;
       pSKTex->override_size = load->SrcDataSize;
@@ -1718,38 +1709,6 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     resample_blacklist.insert (0xfa3d03df);
     resample_blacklist.insert (0x545908bb);
 
-    // Do Not Resample Face and Eyes
-    resample_blacklist.insert (0x0f924b8e);
-    resample_blacklist.insert (0xc11ee548);
-    resample_blacklist.insert (0xde2284ae);
-    resample_blacklist.insert (0xe6908541);
-    resample_blacklist.insert (0x09b7b43a);
-
-    // ROSE:
-    resample_blacklist.insert (0x02c01e2a);
-    resample_blacklist.insert (0x1564504e);
-    resample_blacklist.insert (0x307466c4);
-    resample_blacklist.insert (0xea8c3c76);
-
-    // MIKLEO:
-    resample_blacklist.insert (0x682835d2);
-    resample_blacklist.insert (0x9f184556);
-    resample_blacklist.insert (0xa6a8bd7e);
-    resample_blacklist.insert (0xc106abf3);
-    resample_blacklist.insert (0xe9b98d4e);
-
-    // EDNA:
-    resample_blacklist.insert (0x47f4e5e3);
-    resample_blacklist.insert (0x53aa4ebd);
-    resample_blacklist.insert (0xacaa8f7b);
-    resample_blacklist.insert (0xb91c89e5);
-
-    // ZAVEID:
-    resample_blacklist.insert (0x342c284f);
-    resample_blacklist.insert (0x637b52f8);
-    resample_blacklist.insert (0x8668d212);
-    resample_blacklist.insert (0x9511723e);
-
     resample_blacklist_init = true;
   }
 
@@ -1761,7 +1720,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   if (freq.QuadPart == 0LL)
     QueryPerformanceFrequency (&freq);
 
-  QueryPerformanceCounter_Original (&start);
+  QueryPerformanceCounter/*_Original*/ (&start);
 
   uint32_t checksum =
     crc32 (0, pSrcData, SrcDataSize);
@@ -1876,28 +1835,27 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   if (SUCCEEDED (hr)) {
     new ISKTextureD3D9 (ppTexture, SrcDataSize, checksum);
 
-    if (checksum == tbf::RenderFix::cutscene_frame.crc32_side)
-      tbf::RenderFix::cutscene_frame.tex_side = *ppTexture;
-
-    if (checksum == tbf::RenderFix::cutscene_frame.crc32_corner)
-      tbf::RenderFix::cutscene_frame.tex_corner = *ppTexture;
-
-    if (checksum == tbf::RenderFix::pad_buttons.crc32_ps3) {
-      tbf::RenderFix::pad_buttons.tex_ps3 = *ppTexture;
+    if (checksum == tbf::RenderFix::pad_buttons.crc32_ps4) {
+      tbf::RenderFix::pad_buttons.tex_ps4 = *ppTexture;
     }
 
-    if (checksum == tbf::RenderFix::pad_buttons.crc32_xbox) {
-      tbf::RenderFix::pad_buttons.tex_xbox = *ppTexture;
+    if (checksum == tbf::RenderFix::pad_buttons.crc32_xboxone) {
+      tbf::RenderFix::pad_buttons.tex_xboxone = *ppTexture;
 
-      if (GetFileAttributesW (L"custom_buttons.dds") != INVALID_FILE_ATTRIBUTES) {
+      wchar_t wszFile [MAX_PATH + 2] = { L'\0' };
+
+      _swprintf ( wszFile,
+                    L"TBFix_Res\\Gamepads\\%s\\Buttons.dds",
+                      config.input.gamepad.texture_set.c_str () );
+
+      if (GetFileAttributesW (wszFile) != INVALID_FILE_ATTRIBUTES) {
         tex_log->LogEx (true, L"[Inject Tex] Injecting custom gamepad buttons... ");
 
         load_op           = new tbf_tex_load_s;
         load_op->pDevice  = pDevice;
         load_op->checksum = checksum;
         load_op->type     = tbf_tex_load_s::Immediate;
-
-        wcscpy (load_op->wszFilename, L"custom_buttons.dds");
+        wcsncpy (load_op->wszFilename, wszFile, MAX_PATH);
 
         if (load_op->type == tbf_tex_load_s::Stream) {
           if ((! remap_stream))
@@ -1917,7 +1875,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
                                  load_op->type == tbf_tex_load_s::Immediate ) ) {
       load_op->SrcDataSize =
         injectable_textures.count (checksum) == 0 ?
-          0 : injectable_textures [checksum].size;
+          0 : (UINT)injectable_textures [checksum].size;
 
       load_op->pDest = *ppTexture;
       EnterCriticalSection        (&cs_tex_stream);
@@ -1961,7 +1919,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     //
     else if (load_op != nullptr && load_op->type == tsf_tex_load_s::Immediate) {
       QueryPerformanceFrequency        (&load_op->freq);
-      QueryPerformanceCounter_Original (&load_op->start);
+      QueryPerformanceCounter/*_Original*/ (&load_op->start);
 
       EnterCriticalSection (&cs_tex_inject);
       inject_tids.insert   (GetCurrentThreadId ());
@@ -1975,7 +1933,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
       inject_tids.erase    (GetCurrentThreadId ());
       LeaveCriticalSection (&cs_tex_inject);
 
-      QueryPerformanceCounter_Original (&load_op->end);
+      QueryPerformanceCounter/*_Original*/ (&load_op->end);
 
       if (SUCCEEDED (hr)) {
         tex_log->Log ( L"[Inject Tex] Finished synchronous texture %08x (%5.2f MiB in %9.4f ms)",
@@ -2026,7 +1984,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     load_op = nullptr;
   }
 
-  QueryPerformanceCounter_Original (&end);
+  QueryPerformanceCounter/*_Original*/ (&end);
 
   if (SUCCEEDED (hr)) {
     if (config.textures.cache && checksum != 0x00) {
@@ -2039,7 +1997,9 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
       pTex->d3d9_tex->AddRef ();
       pTex->refs++;
 
-      pTex->load_time = 1000.0f * (double)(end.QuadPart - start.QuadPart) / (double)freq.QuadPart;
+      pTex->load_time = (float)( 1000.0 *
+                          (double)(end.QuadPart - start.QuadPart) /
+                          (double)freq.QuadPart );
 
       tbf::RenderFix::tex_mgr.addTexture (checksum, pTex, SrcDataSize);
     }
@@ -2491,7 +2451,7 @@ tbf::RenderFix::TextureManager::Init (void)
       do {
         if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
           wchar_t wszSubDir [MAX_PATH];
-          _swprintf (wszSubDir, L"%s\\dump\\%s\\textures\\*", TBFIX_TEXTURE_DIR, fd.cFileName);
+          _swprintf (wszSubDir, L"%s\\dump\\textures\\%s\\*", TBFIX_TEXTURE_DIR, fd.cFileName);
 
           hSubFind = FindFirstFileW (wszSubDir, &fd_sub);
 
@@ -2693,8 +2653,8 @@ tbf::RenderFix::TextureManager::purge (void)
 
   int      released           = 0;
   int      released_injected  = 0;
-  uint64_t reclaimed          = 0;
-  uint64_t reclaimed_injected = 0;
+   int64_t reclaimed          = 0;
+   int64_t reclaimed_injected = 0;
 
   tex_log->Log (L"[ Tex. Mgr ] -- TextureManager::purge (...) -- ");
 
@@ -3015,7 +2975,7 @@ WINAPI
 ResampleTexture (tbf_tex_load_s* load)
 {
   QueryPerformanceFrequency        (&load->freq);
-  QueryPerformanceCounter_Original (&load->start);
+  QueryPerformanceCounter/*_Original*/ (&load->start);
 
   D3DXIMAGE_INFO img_info;
 
@@ -3077,15 +3037,15 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
   // Tales of Symphonia and Zestiria both pin the render thread to the last
   //   CPU... let's try to keep our worker threads OFF that CPU.
 
-  SetThreadIdealProcessor (GetCurrentThread (),      processor_num);
-  SetThreadAffinityMask   (GetCurrentThread (), 1 << processor_num);
+  SetThreadIdealProcessor (GetCurrentThread (),         processor_num);
+  SetThreadAffinityMask   (GetCurrentThread (), (1UL << processor_num) & 0xFFFFFFFF);
 
   // Ghetto sync. barrier, since Windows 7 does not support them...
   while ( InterlockedCompareExchange (
             &num_threads_init,
               config.textures.worker_threads,
                 config.textures.worker_threads
-          ) < config.textures.worker_threads ) {
+          ) < (ULONG)config.textures.worker_threads ) {
     Sleep (15);
   }
 
@@ -3117,12 +3077,12 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
           InterlockedIncrement   (&resampling);
 
           QueryPerformanceFrequency        (&pStream->freq);
-          QueryPerformanceCounter_Original (&pStream->start);
+          QueryPerformanceCounter/*_Original*/ (&pStream->start);
 
           HRESULT hr =
             ResampleTexture (pStream);//InjectTexture (pStream);
 
-          QueryPerformanceCounter_Original (&pStream->end);
+          QueryPerformanceCounter/*_Original*/ (&pStream->end);
 
           InterlockedDecrement   (&resampling);
 
@@ -3135,12 +3095,12 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
           InterlockedExchangeAdd (&streaming_bytes, pStream->SrcDataSize);
 
           QueryPerformanceFrequency        (&pStream->freq);
-          QueryPerformanceCounter_Original (&pStream->start);
+          QueryPerformanceCounter/*_Original*/ (&pStream->start);
 
           HRESULT hr =
             InjectTexture (pStream);
 
-          QueryPerformanceCounter_Original (&pStream->end);
+          QueryPerformanceCounter/*_Original*/ (&pStream->end);
 
           InterlockedExchangeSubtract (&streaming_bytes, pStream->SrcDataSize);
           InterlockedDecrement        (&streaming);

@@ -67,25 +67,31 @@ struct tbf_config_t
   } lua;
 
   struct {
-    float    fovy               = 0.785398f;
-    float    aspect_ratio       = 1.777778f;
-    DWORD    aspect_addr        = 0x00D56494;//0x00D52398;
-    DWORD    fovy_addr          = 0x00D56498;//0x00D5239C;
-    bool     blackbar_videos    = true;  // OBSOLETE
-    bool     aspect_correction  = true;
-    int32_t  shadow_rescale     = -2;
-    float    postproc_ratio     =  1.0f;
-    bool     clear_blackbars    = true;
-    int32_t  env_shadow_rescale = 0;
+    float     fovy               = 0.785398f;
+    float     aspect_ratio       = 1.777778f;
+    uintptr_t aspect_addr        = 0x00D56494ULL;//0x00D52398;
+    uintptr_t fovy_addr          = 0x00D56498ULL;//0x00D5239C;
+    bool      blackbar_videos    = false;  // OBSOLETE
+    bool      aspect_correction  = false;
+    int32_t   shadow_rescale     = -2;
+    float     postproc_ratio     =  0.0f;
+    bool      clear_blackbars    = false;
+    int32_t   env_shadow_rescale = 0;
   } render;
 
   struct {
-    bool     dump               = false;
-    bool     remaster           = false;
-    bool     cache              = true;
-    int32_t  max_cache_in_mib   = 2048L;
-    int32_t  worker_threads     = 6;
+    bool     dump                = false;
+    bool     remaster            = true;
+    bool     cache               = true;
+    int32_t  max_cache_in_mib    = 2048L;
+    int32_t  worker_threads      = 6;
   } textures;
+
+  struct {
+    struct {
+      std::wstring texture_set   = L"XboxOne";
+    } gamepad;
+  } input;
 
   struct {
     std::wstring swap_keys = L"";

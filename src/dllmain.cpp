@@ -117,7 +117,7 @@ DllThread (LPVOID user)
     tbf::SoundFix::Init     ();
     //tbf::FileIO::Init       ();
     //tbf::SteamFix::Init     ();
-    //tbf::RenderFix::Init    ();
+    tbf::RenderFix::Init    ();
     //tbf::FrameRateFix::Init ();
     //tbf::KeyboardFix::Init  ();
 
@@ -193,7 +193,7 @@ DllMain (HMODULE hModule,
         tbf::SoundFix::Shutdown     ();
         //tbf::FileIO::Shutdown       ();
         //tbf::SteamFix::Shutdown     ();
-        //tbf::RenderFix::Shutdown    ();
+        tbf::RenderFix::Shutdown    ();
         //tbf::FrameRateFix::Shutdown ();
         //tbf::KeyboardFix::Shutdown  ();
 

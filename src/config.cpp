@@ -34,6 +34,8 @@ std::wstring DEFAULT_BK2 = L"RAW\\MOVIE\\AM_TOZ_OP_001.BK2";
 
 static
   iSK_INI*   dll_ini       = nullptr;
+static
+  iSK_INI*   gamepad_ini   = nullptr;
 tbf_config_t config;
 
 tbf::ParameterFactory g_ParameterFactory;
@@ -98,6 +100,12 @@ struct {
 } lua;
 
 struct {
+  struct {
+    tbf::ParameterStringW* texture_set;
+  } gamepad;
+} input;
+
+struct {
   tbf::ParameterStringW* intro_video;
   tbf::ParameterStringW* version;
   tbf::ParameterStringW* injector;
@@ -118,12 +126,16 @@ TBF_LoadConfig (std::wstring name)
 
   // Load INI File
   wchar_t wszFullName [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszPadName  [ MAX_PATH + 2 ] = { L'\0' };
 
   lstrcatW (wszFullName, SK_GetConfigPath ());
   lstrcatW (wszFullName,       name.c_str ());
   lstrcatW (wszFullName,             L".ini");
   dll_ini = TBF_CreateINI (wszFullName);
 
+  lstrcatW (wszPadName,  SK_GetConfigPath ());
+  lstrcatW (wszPadName, L"TBFix_Gamepad.ini");
+  gamepad_ini = TBF_CreateINI (wszPadName);
 
   bool empty = dll_ini->get_sections ().empty ();
 
@@ -172,6 +184,79 @@ TBF_LoadConfig (std::wstring name)
         L"EnableFix" );
 
 
+  textures.cache =
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Cache Textures to Speed Up Menus (and Remaster)")
+      );
+  textures.cache->register_to_ini (
+    dll_ini,
+      L"TBFIX.Textures",
+        L"Cache" );
+
+  textures.dump =
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Dump Textures as they are loaded")
+      );
+  textures.dump->register_to_ini (
+    dll_ini,
+      L"TBFIX.Textures",
+        L"Dump" );
+
+  textures.remaster =
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Various Fixes to Eliminate Texture Aliasing")
+      );
+  textures.remaster->register_to_ini (
+    dll_ini,
+      L"TBFIX.Textures",
+        L"Remaster" );
+
+  textures.cache_size = 
+    static_cast <tbf::ParameterInt *>
+      (g_ParameterFactory.create_parameter <int> (
+        L"Size of Texture Cache")
+      );
+  textures.cache_size->register_to_ini (
+    dll_ini,
+      L"TBFIX.Textures",
+        L"MaxCacheInMiB" );
+
+  textures.worker_threads = 
+    static_cast <tbf::ParameterInt *>
+      (g_ParameterFactory.create_parameter <int> (
+        L"Number of Worker Threads")
+      );
+  textures.worker_threads->register_to_ini (
+    dll_ini,
+      L"TBFIX.Textures",
+        L"WorkerThreads" );
+
+
+  render.rescale_shadows =
+    static_cast <tbf::ParameterInt *>
+      (g_ParameterFactory.create_parameter <int> (
+        L"Shadow Rescale Factor")
+      );
+  render.rescale_shadows->register_to_ini (
+    dll_ini,
+      L"TBFIX.Render",
+        L"RescaleShadows" );
+
+
+  input.gamepad.texture_set =
+    static_cast <tbf::ParameterStringW *>
+      (g_ParameterFactory.create_parameter <std::wstring> (
+        L"Gamepad Type")
+      );
+  input.gamepad.texture_set->register_to_ini (
+    gamepad_ini,
+      L"Gamepad.Type",
+        L"TextureSet" );
+
+
   sys.version =
     static_cast <tbf::ParameterStringW *>
       (g_ParameterFactory.create_parameter <std::wstring> (
@@ -210,9 +295,25 @@ TBF_LoadConfig (std::wstring name)
   audio.compatibility->load (        config.audio.compatibility );
   audio.enable_fix->load    (        config.audio.enable_fix    );
 
+  render.rescale_shadows->load     (config.render.shadow_rescale);
+
+  //textures.remaster->load       (config.textures.remaster);
+  textures.cache->load          (config.textures.cache);
+  textures.dump->load           (config.textures.dump);
+  textures.cache_size->load     (config.textures.max_cache_in_mib);
+  textures.worker_threads->load (config.textures.worker_threads);
+
   sys.version->load     (config.system.version);
-  sys.intro_video->load (config.system.intro_video);
+  //sys.intro_video->load (config.system.intro_video);
   sys.injector->load    (config.system.injector);
+
+  if (gamepad_ini->get_sections ().empty ()) {
+    TBF_SaveConfig (name, false);
+
+    gamepad_ini->parse ();
+  }
+
+  input.gamepad.texture_set->load (config.input.gamepad.texture_set);
 
   if (empty)
     return false;
@@ -228,11 +329,22 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   audio.compatibility->store (config.audio.compatibility);
   audio.enable_fix->store    (config.audio.enable_fix);
 
+  render.rescale_shadows->store     (config.render.shadow_rescale);
+
+  //textures.remaster->store       (config.textures.remaster);
+  textures.cache->store          (config.textures.cache);
+  textures.dump->store           (config.textures.dump);
+  textures.cache_size->store     (config.textures.max_cache_in_mib);
+  textures.worker_threads->store (config.textures.worker_threads);
+
+  input.gamepad.texture_set->store (config.input.gamepad.texture_set);
+
   sys.version->store             (TBF_VER_STR);
-  sys.intro_video->store         (config.system.intro_video);
+  //sys.intro_video->store         (config.system.intro_video);
   sys.injector->store            (config.system.injector);
 
   wchar_t wszFullName [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszPadName  [ MAX_PATH + 2 ] = { L'\0' };
 
   lstrcatW ( wszFullName,
                SK_GetConfigPath () );
@@ -243,10 +355,22 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   dll_ini->write (wszFullName);
 
+  lstrcatW ( wszPadName,
+               SK_GetConfigPath () );
+  lstrcatW ( wszPadName,
+               L"TBFix_Gamepad.ini" );
+
+  gamepad_ini->write (wszPadName);
+
   if (close_config) {
     if (dll_ini != nullptr) {
       delete dll_ini;
       dll_ini = nullptr;
+    }
+
+    if (gamepad_ini != nullptr) {
+      delete gamepad_ini;
+      gamepad_ini = nullptr;
     }
   }
 }

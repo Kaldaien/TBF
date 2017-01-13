@@ -88,22 +88,12 @@ namespace RenderFix {
     ISKTextureD3D9* d3d9_tex;
   };
 
-  struct frame_texture_t {
-    const uint32_t         crc32_corner = 0x6465f296;
-    const uint32_t         crc32_side   = 0xace25896;
-
-    IDirect3DBaseTexture9* tex_corner   = (IDirect3DBaseTexture9 *)1;
-    IDirect3DBaseTexture9* tex_side     = (IDirect3DBaseTexture9 *)1;
-
-    bool in_use                         = false;
-  } extern cutscene_frame;
-
   struct pad_buttons_t {
-    const uint32_t     crc32_ps3  = 0x8D7A5256;
-    const uint32_t     crc32_xbox = 0x74F5352D;
+    const uint32_t     crc32_ps4     = 0xBFDF5B6F;
+    const uint32_t     crc32_xboxone = 0x1DE50346;
 
-    IDirect3DTexture9* tex_ps3    = nullptr;
-    IDirect3DTexture9* tex_xbox   = nullptr;
+    IDirect3DTexture9* tex_ps4       = nullptr;
+    IDirect3DTexture9* tex_xboxone   = nullptr;
   } extern pad_buttons;
 
   class TextureManager {
