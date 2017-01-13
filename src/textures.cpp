@@ -1755,14 +1755,20 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   // Generate complete mipmap chains for best image quality
   //  (will increase load-time on uncached textures)
   if ((Pool == D3DPOOL_DEFAULT) && config.textures.remaster) {
-    if (Format == D3DFMT_DXT1 ||
-        Format == D3DFMT_DXT3 ||
-        Format == D3DFMT_DXT5)
-      if (Width >= 128 && Height >= 128) {
+    D3DXIMAGE_INFO info = { 0 };
+    D3DXGetImageInfoFromFileInMemory (pSrcData, SrcDataSize, &info);
+
+    D3DFORMAT fmt_real = info.Format;
+
+    if (true) {//fmt_real == D3DFMT_DXT1 ||
+        //fmt_real == D3DFMT_DXT3 ||
+        //fmt_real == D3DFMT_DXT5) {
+      if (/*info.Width >= 128 && info.Height >= 128 && */info.MipLevels == 3) {
         // Don't resample faces
         if ( resample_blacklist.count (checksum) == 0 )
           resample = true;
       }
+    }
   }
 
   HRESULT         hr           = E_FAIL;

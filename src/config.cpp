@@ -297,7 +297,7 @@ TBF_LoadConfig (std::wstring name)
 
   render.rescale_shadows->load     (config.render.shadow_rescale);
 
-  //textures.remaster->load       (config.textures.remaster);
+  textures.remaster->load       (config.textures.remaster);
   textures.cache->load          (config.textures.cache);
   textures.dump->load           (config.textures.dump);
   textures.cache_size->load     (config.textures.max_cache_in_mib);
@@ -331,7 +331,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   render.rescale_shadows->store     (config.render.shadow_rescale);
 
-  //textures.remaster->store       (config.textures.remaster);
+  textures.remaster->store       (config.textures.remaster);
   textures.cache->store          (config.textures.cache);
   textures.dump->store           (config.textures.dump);
   textures.cache_size->store     (config.textures.max_cache_in_mib);

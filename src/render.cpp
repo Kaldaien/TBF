@@ -451,6 +451,8 @@ int draw_count  = 0;
 int next_draw   = 0;
 int scene_count = 0;
 
+std::string mod_text;
+
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -531,6 +533,33 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
   }
 #endif
 
+  typedef BOOL (__stdcall *SKX_DrawExternalOSD_pfn)(const char* szAppName, const char* szText);
+
+  static HMODULE               hMod =
+    GetModuleHandle (config.system.injector.c_str ());
+  static SKX_DrawExternalOSD_pfn SKX_DrawExternalOSD
+    =
+    (SKX_DrawExternalOSD_pfn)GetProcAddress (hMod, "SKX_DrawExternalOSD");
+
+  extern bool __show_cache;
+
+  if (__show_cache) {
+    static std::string output;
+
+    output  = "Texture Cache\n";
+    output += "-------------\n";
+    output += tbf::RenderFix::tex_mgr.osdStats ();
+
+    output += mod_text;
+
+    SKX_DrawExternalOSD ("ToBFix", output.c_str ());
+
+    output   = "";
+  } else
+    SKX_DrawExternalOSD ("ToBFix", mod_text.c_str ());
+
+  mod_text = "";
+
   HRESULT hr = D3D9EndScene_Original (This);
 
   extern bool pending_loads (void);
@@ -570,8 +599,6 @@ D3D9EndFrame_Pre (void)
   return SK_BeginBufferSwap ();
 }
 
-std::string mod_text;
-
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -581,11 +608,11 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
   if (device != tbf::RenderFix::pDevice)
     return SK_EndBufferSwap (hr, device);
 
-  tbf::RenderFix::draw_state.cegui_active = false;
-
   scene_count = 0;
 
   tbf::RenderFix::dwRenderThreadID = GetCurrentThreadId ();
+
+  tbf::RenderFix::draw_state.cegui_active = false;
 
   hr = SK_EndBufferSwap (hr, device);
 
@@ -597,33 +624,6 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
 
   //if (config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
-
-  typedef BOOL (__stdcall *SKX_DrawExternalOSD_pfn)(const char* szAppName, const char* szText);
-
-  static HMODULE               hMod =
-    GetModuleHandle (config.system.injector.c_str ());
-  static SKX_DrawExternalOSD_pfn SKX_DrawExternalOSD
-    =
-    (SKX_DrawExternalOSD_pfn)GetProcAddress (hMod, "SKX_DrawExternalOSD");
-
-  extern bool __show_cache;
-
-  if (__show_cache) {
-    static std::string output;
-
-    output  = "Texture Cache\n";
-    output += "-------------\n";
-    output += tbf::RenderFix::tex_mgr.osdStats ();
-
-    output += mod_text;
-
-    SKX_DrawExternalOSD ("ToBFix", output.c_str ());
-
-    output   = "";
-  } else
-    SKX_DrawExternalOSD ("ToBFix", mod_text.c_str ());
-
-  mod_text = "";
 
   return hr;
 }
