@@ -723,8 +723,8 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
   //
   // Post-Processing (512x256) - FIXME damnit!
   //
-  if ( Width  == 512 &&
-       Height == 256 && Usage == D3DUSAGE_RENDERTARGET ) {
+  else if ( Width  == 512 &&
+            Height == 256 && Usage == D3DUSAGE_RENDERTARGET ) {
     if (config.render.postproc_ratio > 0.0f) {
       Width  = (UINT)(tbf::RenderFix::width  * config.render.postproc_ratio);
       Height = (UINT)(tbf::RenderFix::height * config.render.postproc_ratio);
@@ -733,7 +733,8 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     }
   }
 
- if (Usage == D3DUSAGE_DEPTHSTENCIL) {
+#if 0
+ else if (Usage == D3DUSAGE_DEPTHSTENCIL) {
     if (Width == Height && (Height == 512 || Height == 1024 || Height == 2048)) {
       //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu)", Width, Height);
       uint32_t shift = config.render.env_shadow_rescale;
@@ -742,6 +743,7 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       Height <<= shift;
     }
   }
+#endif
 
   int levels = Levels;
 

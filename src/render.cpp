@@ -237,6 +237,84 @@ std::unordered_map <LPVOID, uint32_t> ps_checksums;
 uint32_t vs_checksum = 0;
 uint32_t ps_checksum = 0;
 
+typedef interface ID3DXBuffer ID3DXBuffer;
+typedef interface ID3DXBuffer *LPD3DXBUFFER;
+
+// {8BA5FB08-5195-40e2-AC58-0D989C3A0102}
+DEFINE_GUID(IID_ID3DXBuffer, 
+0x8ba5fb08, 0x5195, 0x40e2, 0xac, 0x58, 0xd, 0x98, 0x9c, 0x3a, 0x1, 0x2);
+
+#undef INTERFACE
+#define INTERFACE ID3DXBuffer
+
+DECLARE_INTERFACE_(ID3DXBuffer, IUnknown)
+{
+    // IUnknown
+    STDMETHOD  (        QueryInterface)   (THIS_ REFIID iid, LPVOID *ppv) PURE;
+    STDMETHOD_ (ULONG,  AddRef)           (THIS) PURE;
+    STDMETHOD_ (ULONG,  Release)          (THIS) PURE;
+
+    // ID3DXBuffer
+    STDMETHOD_ (LPVOID, GetBufferPointer) (THIS) PURE;
+    STDMETHOD_ (DWORD,  GetBufferSize)    (THIS) PURE;
+};
+
+typedef HRESULT (WINAPI *D3DXDisassembleShader_pfn)(
+  _In_  const DWORD         *pShader,
+  _In_        BOOL            EnableColorCode,
+  _In_        LPCSTR         pComments,
+  _Out_       LPD3DXBUFFER *ppDisassembly
+);
+
+D3DXDisassembleShader_pfn D3DXDisassembleShader = nullptr;
+
+void
+SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
+                           uint32_t crc32,
+                           LPVOID   pbFunc )
+{
+  static bool dump =
+    GetFileAttributes (L"TBFix_Res\\dump\\shaders") ==
+         FILE_ATTRIBUTE_DIRECTORY;
+
+  if (dump) {
+    wchar_t wszDumpName [MAX_PATH];
+    _swprintf ( wszDumpName,
+                  L"TBFix_Res\\dump\\shaders\\%s_%08x.html",
+                    wszPrefix, crc32 );
+
+    if (D3DXDisassembleShader == nullptr)
+      D3DXDisassembleShader =
+        (D3DXDisassembleShader_pfn)
+          GetProcAddress ( tbf::RenderFix::d3dx9_43_dll,
+                             "D3DXDisassembleShader" );
+
+    if ( D3DXDisassembleShader           != nullptr &&
+         GetFileAttributes (wszDumpName) == INVALID_FILE_ATTRIBUTES ) {
+      LPD3DXBUFFER pDisasm;
+
+      HRESULT hr =
+        D3DXDisassembleShader ((DWORD *)pbFunc, TRUE, "", &pDisasm);
+
+      if (SUCCEEDED (hr)) {
+        FILE* fDump =
+          _wfopen (wszDumpName, L"wb");
+
+        if (fDump != NULL) {
+          fwrite ( pDisasm->GetBufferPointer (),
+                     pDisasm->GetBufferSize  (),
+                       1,
+                         fDump );
+          fclose (fDump);
+        }
+
+        pDisasm->Release ();
+      }
+    }
+  }
+}
+
+
 typedef HRESULT (STDMETHODCALLTYPE *SetVertexShader_pfn)
   (IDirect3DDevice9*       This,
    IDirect3DVertexShader9* pShader);
@@ -256,20 +334,28 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
   if (g_pVS != pShader) {
     if (pShader != nullptr) {
       if (vs_checksums.find (pShader) == vs_checksums.end ()) {
-        UINT len = 2048;
-        char szFunc [2048];
+        UINT len;
+        pShader->GetFunction (nullptr, &len);
 
-        pShader->GetFunction (szFunc, &len);
+        void* pbFunc = malloc (len);
 
-        vs_checksums [pShader] = crc32 (0, szFunc, len);
+        if (pbFunc != nullptr) {
+          pShader->GetFunction (pbFunc, &len);
+
+          vs_checksums [pShader] = crc32 (0, pbFunc, len);
+
+          SK_D3D9_DumpShader (L"vs", vs_checksums [pShader], pbFunc);
+
+          free (pbFunc);
+        }
       }
-      else {
-        vs_checksum = 0;
-      }
-
-      vs_checksum = vs_checksums [pShader];
+    }
+    else {
+      vs_checksum = 0;
     }
   }
+
+  vs_checksum = vs_checksums [pShader];
 
   g_pVS = pShader;
   return D3D9SetVertexShader_Original (This, pShader);
@@ -295,19 +381,27 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
   if (g_pPS != pShader) {
     if (pShader != nullptr) {
       if (ps_checksums.find (pShader) == ps_checksums.end ()) {
-        UINT len = 8191;
-        char szFunc [8192] = { 0 };
+        UINT len;
+        pShader->GetFunction (nullptr, &len);
 
-        pShader->GetFunction (szFunc, &len);
+        void* pbFunc = malloc (len);
 
-        ps_checksums [pShader] = crc32 (0, szFunc, len);
+        if (pbFunc != nullptr) {
+          pShader->GetFunction (pbFunc, &len);
+
+          ps_checksums [pShader] = crc32 (0, pbFunc, len);
+
+          SK_D3D9_DumpShader (L"ps", ps_checksums [pShader], pbFunc);
+
+          free (pbFunc);
+        }
       }
     } else {
       ps_checksum = 0;
     }
-
-    ps_checksum = ps_checksums [pShader];
   }
+
+  ps_checksum = ps_checksums [pShader];
 
   g_pPS = pShader;
   return D3D9SetPixelShader_Original (This, pShader);
@@ -738,7 +832,7 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   //
   // Adjust Post-Processing
   //
-  if (pViewport->Width  == 512 &&
+  else if (pViewport->Width  == 512 &&
       pViewport->Height == 256 && config.render.postproc_ratio > 0.0f) {
     D3DVIEWPORT9 rescaled_post_proc = *pViewport;
 
@@ -1026,6 +1120,7 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
     return D3D9SetVertexShaderConstantF_Original (This, 240, newData, 1);
   }
 
+#if 0
   //
   // Env Shadow
   //
@@ -1064,6 +1159,7 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
       return D3D9SetVertexShaderConstantF_Original (This, 240, newData, 1);
     }
   }
+#endif
 
 
   //
@@ -1115,7 +1211,7 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
       //
       // Model Shadows
       //
-      if (desc.Width == desc.Height && desc.Width > 64) {
+      if (desc.Width == desc.Height && desc.Width > 64 && desc.Height < 2048) {
         float newData [12];
 
         uint32_t shift = TBF_MakeShadowBitShift (desc.Width);
@@ -1397,6 +1493,7 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
     DEVMODE devmode = { 0 };
     devmode.dmSize  = sizeof DEVMODE;
 
+#if 0
     // We have to call this once with a value of 0, or Windows is not going to be happy...
     EnumDisplaySettings (nullptr, 0,                     &devmode);
     EnumDisplaySettings (nullptr, ENUM_CURRENT_SETTINGS, &devmode);
@@ -1472,14 +1569,15 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
                            tbf::RenderFix::height );
       }
     }
+#endif
   }
 
-  BringWindowToTop (tbf::RenderFix::hWndDevice);
-  SetActiveWindow  (tbf::RenderFix::hWndDevice);
-
   // Reset will fail without this
-  if (pparams->Windowed)
+  if (pparams->Windowed) {
+    BringWindowToTop (tbf::RenderFix::hWndDevice);
+    SetActiveWindow  (tbf::RenderFix::hWndDevice);
     pparams->FullScreen_RefreshRateInHz = 0;
+  }
 
   return SK_SetPresentParamsD3D9_Original (device, pparams);
 }
@@ -1488,6 +1586,8 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
 void
 tbf::RenderFix::Init (void)
 {
+  d3dx9_43_dll = LoadLibrary (L"D3DX9_43.DLL");
+
   tex_mgr.Init ();
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetSamplerState_Override",
