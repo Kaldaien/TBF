@@ -76,7 +76,7 @@ struct tbf_config_t
     int32_t   shadow_rescale     = -2;
     float     postproc_ratio     =  0.0f;
     bool      clear_blackbars    = false;
-    int32_t   env_shadow_rescale = 0;
+    int32_t   env_shadow_rescale =  1;
   } render;
 
   struct {

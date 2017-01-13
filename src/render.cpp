@@ -533,6 +533,12 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
   }
 #endif
 
+  extern bool pending_loads (void);
+  if (pending_loads ()) {
+    extern void TBFix_LoadQueuedTextures (void);
+    TBFix_LoadQueuedTextures ();
+  }
+
   typedef BOOL (__stdcall *SKX_DrawExternalOSD_pfn)(const char* szAppName, const char* szText);
 
   static HMODULE               hMod =
@@ -561,12 +567,6 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
   mod_text = "";
 
   HRESULT hr = D3D9EndScene_Original (This);
-
-  extern bool pending_loads (void);
-  if (pending_loads ()) {
-    extern void TBFix_LoadQueuedTextures (void);
-    TBFix_LoadQueuedTextures ();
-  }
 
   game_state.in_skit = false;
 
@@ -615,12 +615,6 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
   tbf::RenderFix::draw_state.cegui_active = false;
 
   hr = SK_EndBufferSwap (hr, device);
-
-  extern bool pending_loads (void);
-  if (pending_loads ()) {
-    extern void TBFix_LoadQueuedTextures (void);
-    TBFix_LoadQueuedTextures ();
-  }
 
   //if (config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
@@ -812,14 +806,15 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
     return D3D9SetViewport_Original (This, &rescaled_shadow);
   }
 
-#if 0
   //
   // Environmental Shadows
   //
   if (pViewport->Width == pViewport->Height && 
       (pViewport->Width ==  512 ||
        pViewport->Width == 1024 ||
-       pViewport->Width == 2048)) {
+       pViewport->Width == 2048 ||
+       pViewport->Width == 4096)) {
+    //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu)", pViewport->Width, pViewport->Height);
     D3DVIEWPORT9 rescaled_shadow = *pViewport;
 
     rescaled_shadow.Width  <<= config.render.env_shadow_rescale;
@@ -827,7 +822,6 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
 
     return D3D9SetViewport_Original (This, &rescaled_shadow);
   }
-#endif
 
   //
   // Adjust Post-Processing
@@ -1120,11 +1114,10 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
     return D3D9SetVertexShaderConstantF_Original (This, 240, newData, 1);
   }
 
-#if 0
   //
   // Env Shadow
   //
-  if (StartRegister == 240 && Vector4fCount == 1) {
+  if (StartRegister == 240 && Vector4fCount == 1 && (pConstantData [0] == -pConstantData [1])) {
     uint32_t shift;
     uint32_t dim = 0;
 
@@ -1143,9 +1136,19 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
       //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
     }
 
+    if (pConstantData [0] == -1.0f / 4096.0f) {
+      dim = 4096UL;
+      //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
+    }
+
+    if (pConstantData [0] == -1.0f / 8192.0f) {
+      dim = 8192UL;
+      //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
+    }
+
     shift = config.render.env_shadow_rescale;
 
-    float newData [4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    float newData [4] = { 0.0f, 0.0f, pConstantData [2], pConstantData [3] };
 
     newData [0] = -1.0f / (dim << shift);
     newData [1] =  1.0f / (dim << shift);
@@ -1159,7 +1162,6 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
       return D3D9SetVertexShaderConstantF_Original (This, 240, newData, 1);
     }
   }
-#endif
 
 
   //

@@ -256,7 +256,7 @@ public:
       pTex->PreLoad ();
     }
     STDMETHOD_(D3DRESOURCETYPE, GetType)(THIS) {
-      tex_log->Log ( L"[ Tex. Mgr ] ISKTextureD3D9::GetType ()" );
+      //tex_log->Log ( L"[ Tex. Mgr ] ISKTextureD3D9::GetType ()" );
 
       return pTex->GetType ();
     }
@@ -272,7 +272,7 @@ public:
       return pTex->GetLOD ();
     }
     STDMETHOD_(DWORD, GetLevelCount)(THIS) {
-      tex_log->Log ( L"[ Tex. Mgr ] ISKTextureD3D9::GetLevelCount ()" );
+      //tex_log->Log ( L"[ Tex. Mgr ] ISKTextureD3D9::GetLevelCount ()" );
 
       return pTex->GetLevelCount ();
     }
@@ -293,15 +293,15 @@ public:
       pTex->GenerateMipSubLevels ();
     }
     STDMETHOD(GetLevelDesc)(THIS_ UINT Level,D3DSURFACE_DESC *pDesc) {
-      tex_log->Log ( L"[ Tex. Mgr ] ISKTextureD3D9::GetLevelDesc (%lu, %ph)",
-                      Level,
-                        pDesc );
+      //tex_log->Log ( L"[ Tex. Mgr ] ISKTextureD3D9::GetLevelDesc (%lu, %ph)",
+                      //Level,
+                        //pDesc );
       return pTex->GetLevelDesc (Level, pDesc);
     }
     STDMETHOD(GetSurfaceLevel)(THIS_ UINT Level,IDirect3DSurface9** ppSurfaceLevel) {
-      tex_log->Log ( L"[ Tex. Mgr ] ISKTextureD3D9::GetSurfaceLevel (%lu, %ph)",
-                       Level,
-                         ppSurfaceLevel );
+      //tex_log->Log ( L"[ Tex. Mgr ] ISKTextureD3D9::GetSurfaceLevel (%lu, %ph)",
+                       //Level,
+                         //ppSurfaceLevel );
 
       return pTex->GetSurfaceLevel (Level, ppSurfaceLevel);
     }

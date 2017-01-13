@@ -720,6 +720,15 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     Height <<= shift;
   }
 
+  else if (Width == Height && (Height == 512 || Height == 1024 || Height == 2048 || Height == 4096) &&
+                          Usage == D3DUSAGE_RENDERTARGET) {
+      //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
+      uint32_t shift = config.render.env_shadow_rescale;
+
+      Width  <<= shift;
+      Height <<= shift;
+    }
+
   //
   // Post-Processing (512x256) - FIXME damnit!
   //
@@ -733,17 +742,15 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     }
   }
 
-#if 0
- else if (Usage == D3DUSAGE_DEPTHSTENCIL) {
-    if (Width == Height && (Height == 512 || Height == 1024 || Height == 2048)) {
-      //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu)", Width, Height);
+  else if (Usage == D3DUSAGE_DEPTHSTENCIL) {
+    if (Width == Height && (Height == 512 || Height == 1024 || Height == 2048 || Height == 4096)) {
+      //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
       uint32_t shift = config.render.env_shadow_rescale;
 
       Width  <<= shift;
       Height <<= shift;
     }
   }
-#endif
 
   int levels = Levels;
 
@@ -1283,10 +1290,10 @@ CRITICAL_SECTION              cs_tex_inject;
 
 std::set <DWORD> inject_tids;
 
- LONG streaming       = 0UL;
-ULONG streaming_bytes = 0L;
+volatile  LONG streaming       = 0UL;
+volatile ULONG streaming_bytes = 0L;
 
-LONG  resampling      = 0L;
+volatile  LONG resampling      = 0L;
 
 bool
 pending_loads (void)
@@ -1532,15 +1539,15 @@ TBFix_LoadQueuedTextures (void)
   if (spin > 199)
     spin = 193;
 
-  if (resampling) {
+  if (InterlockedExchangeAdd (&resampling, 0)) {
     mod_text += spin;
 
     char szFormatted [64];
-    sprintf (szFormatted, "  Resampling: %li texture", resampling);
+    sprintf (szFormatted, "  Resampling: %li texture", InterlockedExchangeAdd (&resampling, 0));
 
     mod_text += szFormatted;
 
-    if (streaming > 1)
+    if (InterlockedExchangeAdd (&resampling, 0) > 1)
       mod_text += 's';
 
     size_t queue_len = resample_pool->queueLength ();
@@ -1553,18 +1560,18 @@ TBFix_LoadQueuedTextures (void)
     mod_text += "\n\n";
   }
 
-  if (streaming) {
+  if (InterlockedExchangeAdd (&streaming, 0)) {
     mod_text += spin;
 
     char szFormatted [64];
-    sprintf (szFormatted, "  Streaming: %li texture", streaming);
+    sprintf (szFormatted, "  Streaming: %li texture", InterlockedExchangeAdd (&streaming, 0));
 
     mod_text += szFormatted;
 
-    if (streaming > 1)
+    if (InterlockedExchangeAdd (&streaming, 0) > 1)
       mod_text += 's';
 
-    sprintf (szFormatted, " [%7.2f MiB]", (double)streaming_bytes / (1024.0f * 1024.0f));
+    sprintf (szFormatted, " [%7.2f MiB]", (double)InterlockedExchangeAdd (&streaming_bytes, 0) / (1024.0f * 1024.0f));
     mod_text += szFormatted;
 
     if (textures_to_stream.size ()) {
@@ -1645,7 +1652,7 @@ TBFix_LoadQueuedTextures (void)
       __need_purge = true;
   }
 
-  if ((! streaming) && (! resampling) && (! pending_loads ())) {
+  if ((! InterlockedExchangeAdd (&streaming, 0)) && (! InterlockedExchangeAdd (&resampling, 0)) && (! pending_loads ())) {
     if (__need_purge) {
       tbf::RenderFix::tex_mgr.purge ();
       __need_purge = false;

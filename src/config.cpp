@@ -33,9 +33,12 @@ std::wstring TBF_VER_STR = TBF_VERSION_STR_W;
 std::wstring DEFAULT_BK2 = L"RAW\\MOVIE\\AM_TOZ_OP_001.BK2";
 
 static
-  iSK_INI*   dll_ini       = nullptr;
+  iSK_INI*   dll_ini     = nullptr;
 static
-  iSK_INI*   gamepad_ini   = nullptr;
+  iSK_INI*   gamepad_ini = nullptr;
+static
+  iSK_INI*   render_ini  = nullptr;
+
 tbf_config_t config;
 
 tbf::ParameterFactory g_ParameterFactory;
@@ -125,8 +128,9 @@ TBF_LoadConfig (std::wstring name)
       );
 
   // Load INI File
-  wchar_t wszFullName [ MAX_PATH + 2 ] = { L'\0' };
-  wchar_t wszPadName  [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszFullName   [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszPadName    [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszRenderName [ MAX_PATH + 2 ] = { L'\0' };
 
   lstrcatW (wszFullName, SK_GetConfigPath ());
   lstrcatW (wszFullName,       name.c_str ());
@@ -136,6 +140,10 @@ TBF_LoadConfig (std::wstring name)
   lstrcatW (wszPadName,  SK_GetConfigPath ());
   lstrcatW (wszPadName, L"TBFix_Gamepad.ini");
   gamepad_ini = TBF_CreateINI (wszPadName);
+
+  lstrcatW (wszRenderName,  SK_GetConfigPath ());
+  lstrcatW (wszRenderName, L"TBFix_Render.ini");
+  render_ini = TBF_CreateINI (wszRenderName);
 
   bool empty = dll_ini->get_sections ().empty ();
 
@@ -241,9 +249,19 @@ TBF_LoadConfig (std::wstring name)
         L"Shadow Rescale Factor")
       );
   render.rescale_shadows->register_to_ini (
-    dll_ini,
-      L"TBFIX.Render",
+    render_ini,
+      L"Shadow.Quality",
         L"RescaleShadows" );
+
+  render.rescale_env_shadows =
+    static_cast <tbf::ParameterInt *>
+      (g_ParameterFactory.create_parameter <int> (
+        L"Environmental Shadow Rescale Factor")
+      );
+  render.rescale_env_shadows->register_to_ini (
+    render_ini,
+      L"Shadow.Quality",
+        L"RescaleEnvShadows" );
 
 
   input.gamepad.texture_set =
@@ -295,8 +313,6 @@ TBF_LoadConfig (std::wstring name)
   audio.compatibility->load (        config.audio.compatibility );
   audio.enable_fix->load    (        config.audio.enable_fix    );
 
-  render.rescale_shadows->load     (config.render.shadow_rescale);
-
   textures.remaster->load       (config.textures.remaster);
   textures.cache->load          (config.textures.cache);
   textures.dump->load           (config.textures.dump);
@@ -307,13 +323,17 @@ TBF_LoadConfig (std::wstring name)
   //sys.intro_video->load (config.system.intro_video);
   sys.injector->load    (config.system.injector);
 
-  if (gamepad_ini->get_sections ().empty ()) {
+  if (gamepad_ini->get_sections ().empty () || render_ini->get_sections ().empty ()) {
     TBF_SaveConfig (name, false);
 
     gamepad_ini->parse ();
+    render_ini->parse  ();
   }
 
   input.gamepad.texture_set->load (config.input.gamepad.texture_set);
+
+  render.rescale_shadows->load     (config.render.shadow_rescale);
+  render.rescale_env_shadows->load (config.render.env_shadow_rescale);
 
   if (empty)
     return false;
@@ -330,6 +350,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   audio.enable_fix->store    (config.audio.enable_fix);
 
   render.rescale_shadows->store     (config.render.shadow_rescale);
+  render.rescale_env_shadows->store (config.render.env_shadow_rescale);
 
   textures.remaster->store       (config.textures.remaster);
   textures.cache->store          (config.textures.cache);
@@ -343,8 +364,9 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   //sys.intro_video->store         (config.system.intro_video);
   sys.injector->store            (config.system.injector);
 
-  wchar_t wszFullName [ MAX_PATH + 2 ] = { L'\0' };
-  wchar_t wszPadName  [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszFullName   [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszPadName    [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszRenderName [ MAX_PATH + 2 ] = { L'\0' };
 
   lstrcatW ( wszFullName,
                SK_GetConfigPath () );
@@ -362,6 +384,13 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   gamepad_ini->write (wszPadName);
 
+  lstrcatW ( wszRenderName,
+               SK_GetConfigPath () );
+  lstrcatW ( wszRenderName,
+               L"TBFix_Render.ini" );
+
+  render_ini->write (wszRenderName);
+
   if (close_config) {
     if (dll_ini != nullptr) {
       delete dll_ini;
@@ -371,6 +400,11 @@ TBF_SaveConfig (std::wstring name, bool close_config)
     if (gamepad_ini != nullptr) {
       delete gamepad_ini;
       gamepad_ini = nullptr;
+    }
+
+    if (render_ini != nullptr) {
+      delete render_ini;
+      render_ini = nullptr;
     }
   }
 }
