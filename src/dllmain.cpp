@@ -31,31 +31,37 @@
 #include "keyboard.h"
 #include "steam.h"
 #include "render.h"
-#include "scanner.h"
 
 #include "command.h"
-
 #include "hook.h"
 
-#include <process.h>
-
 #pragma comment (lib, "kernel32.lib")
+
+typedef HRESULT (__stdcall *SK_UpdateSoftware_pfn)   (const wchar_t* wszProduct);
+typedef bool    (__stdcall *SK_FetchVersionInfo_pfn) (const wchar_t* wszProduct);
+typedef void    (__stdcall *SKX_SetPluginName_pfn)   (const wchar_t* wszName);
+
+std::wstring injector_dll;
 
 HMODULE hDLLMod      = { 0 }; // Handle to SELF
 HMODULE hInjectorDLL = { 0 }; // Handle to Special K
 
-typedef HRESULT (__stdcall *SK_UpdateSoftware_pfn)(const wchar_t* wszProduct);
-typedef bool    (__stdcall *SK_FetchVersionInfo_pfn)(const wchar_t* wszProduct);
+SKX_SetPluginName_pfn SKX_SetPluginName = nullptr;
 
-std::wstring injector_dll;
-
-typedef void (__stdcall *SK_SetPluginName_pfn)(std::wstring name);
-SK_SetPluginName_pfn SK_SetPluginName = nullptr;
-
-unsigned int
+__declspec (dllexport)
+BOOL
 WINAPI
-DllThread (LPVOID user)
+SKPlugIn_Init (HMODULE hModSpecialK)
 {
+  hInjectorDLL = hModSpecialK;
+
+  wchar_t wszSKFileName [ MAX_PATH + 2] = { L'\0' };
+          wszSKFileName [   MAX_PATH  ] =   L'\0';
+
+  GetModuleFileName (hInjectorDLL, wszSKFileName, MAX_PATH - 1);
+
+  injector_dll = wszSKFileName;
+
   std::wstring plugin_name = L"Tales of Berseria \"Fix\" v " + TBF_VER_STR;
 
   dll_log = TBF_CreateLog (L"logs/tbfix.log");
@@ -68,39 +74,38 @@ DllThread (LPVOID user)
                             TBF_VER_STR.c_str () );
 
   if (! TBF_LoadConfig ()) {
-    config.audio.channels                 = 6;
-    config.audio.sample_hz                = 48000;
-    config.audio.compatibility            = false;
-    config.audio.enable_fix               = true;
+    config.audio.channels            = 6;
+    config.audio.sample_hz           = 48000;
+    config.audio.compatibility       = false;
+    config.audio.enable_fix          = true;
 
-    config.file_io.capture                = false;
+    config.file_io.capture           = false;
 
-    config.steam.allow_broadcasts         = false;
+    config.steam.allow_broadcasts    = false;
+    config.lua.fix_priest            = true;
 
-    config.lua.fix_priest                 = true;
+    config.render.aspect_ratio       = 1.777778f;
+    config.render.fovy               = 0.785398f;
 
-    config.render.aspect_ratio            = 1.777778f;
-    config.render.fovy                    = 0.785398f;
+    config.render.postproc_ratio     =  0.0f;
+    config.render.shadow_rescale     = -2;
+    config.render.env_shadow_rescale =  1;
 
-    config.render.postproc_ratio          =  1.0f;
-    config.render.shadow_rescale          = -2;
-    config.render.env_shadow_rescale      =  0;
+    config.textures.remaster         = true;
+    config.textures.cache            = true;
+    config.textures.dump             = false;
 
-    config.textures.remaster              = true;
-    config.textures.dump                  = false;
-    config.textures.cache                 = true;
-
-    config.system.injector = injector_dll;
+    config.system.injector           = injector_dll;
 
     // Save a new config if none exists
     TBF_SaveConfig ();
   }
 
-  config.system.injector = injector_dll;
+  config.system.injector             = injector_dll;
 
-  SK_SetPluginName = 
-    (SK_SetPluginName_pfn)
-      GetProcAddress (hInjectorDLL, "SK_SetPluginName");
+  SKX_SetPluginName = 
+    (SKX_SetPluginName_pfn)
+      GetProcAddress (hInjectorDLL, "SKX_SetPluginName");
   SK_GetCommandProcessor =
     (SK_GetCommandProcessor_pfn)
       GetProcAddress (hInjectorDLL, "SK_GetCommandProcessor");
@@ -108,8 +113,8 @@ DllThread (LPVOID user)
   //
   // If this is NULL, the injector system isn't working right!!!
   //
-  if (SK_SetPluginName != nullptr)
-    SK_SetPluginName (plugin_name);
+  if (SKX_SetPluginName != nullptr)
+    SKX_SetPluginName (plugin_name.c_str ());
 
   if (TBF_Init_MinHook () == MH_OK) {
     CoInitializeEx (nullptr, COINIT_MULTITHREADED);
@@ -144,36 +149,13 @@ DllThread (LPVOID user)
     }
   }
 
-  return 0;
-}
-
-__declspec (dllexport)
-BOOL
-WINAPI
-SKPlugIn_Init (HMODULE hModSpecialK)
-{
-  wchar_t wszSKFileName [ MAX_PATH + 2] = { L'\0' };
-          wszSKFileName [   MAX_PATH  ] =   L'\0';
-
-  GetModuleFileName (hModSpecialK, wszSKFileName, MAX_PATH - 1);
-
-  injector_dll = wszSKFileName;
-
-  hInjectorDLL = hModSpecialK;
-
-#if 1
-  DllThread (nullptr);
-#else
-  _beginthreadex ( nullptr, 0, DllThread, nullptr, 0x00, nullptr );
-#endif
-
   return TRUE;
 }
 
 BOOL
 APIENTRY
 DllMain (HMODULE hModule,
-         DWORD    ul_reason_for_call,
+         DWORD   ul_reason_for_call,
          LPVOID  /* lpReserved */)
 {
   switch (ul_reason_for_call)

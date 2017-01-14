@@ -73,10 +73,13 @@ struct {
   tbf::ParameterFloat*   aspect_ratio;
   tbf::ParameterBool*    aspect_correct_vids;
   tbf::ParameterBool*    aspect_correction;
-  tbf::ParameterInt*     rescale_shadows;
-  tbf::ParameterInt*     rescale_env_shadows;
   tbf::ParameterFloat*   postproc_ratio;
   tbf::ParameterBool*    clear_blackbars;
+
+  tbf::ParameterInt*     rescale_shadows;
+  tbf::ParameterInt*     rescale_env_shadows;
+
+  tbf::ParameterBool*    dump_shaders;
 } render;
 
 struct {
@@ -198,8 +201,8 @@ TBF_LoadConfig (std::wstring name)
         L"Cache Textures to Speed Up Menus (and Remaster)")
       );
   textures.cache->register_to_ini (
-    dll_ini,
-      L"TBFIX.Textures",
+    render_ini,
+      L"Texture.System",
         L"Cache" );
 
   textures.dump =
@@ -208,8 +211,8 @@ TBF_LoadConfig (std::wstring name)
         L"Dump Textures as they are loaded")
       );
   textures.dump->register_to_ini (
-    dll_ini,
-      L"TBFIX.Textures",
+    render_ini,
+      L"Texture.System",
         L"Dump" );
 
   textures.remaster =
@@ -218,8 +221,8 @@ TBF_LoadConfig (std::wstring name)
         L"Various Fixes to Eliminate Texture Aliasing")
       );
   textures.remaster->register_to_ini (
-    dll_ini,
-      L"TBFIX.Textures",
+    render_ini,
+      L"Texture.System",
         L"Remaster" );
 
   textures.cache_size = 
@@ -228,8 +231,8 @@ TBF_LoadConfig (std::wstring name)
         L"Size of Texture Cache")
       );
   textures.cache_size->register_to_ini (
-    dll_ini,
-      L"TBFIX.Textures",
+    render_ini,
+      L"Texture.System",
         L"MaxCacheInMiB" );
 
   textures.worker_threads = 
@@ -238,9 +241,20 @@ TBF_LoadConfig (std::wstring name)
         L"Number of Worker Threads")
       );
   textures.worker_threads->register_to_ini (
-    dll_ini,
-      L"TBFIX.Textures",
+    render_ini,
+      L"Texture.System",
         L"WorkerThreads" );
+
+
+  render.dump_shaders = 
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Dump D3D9 Shaders")
+      );
+  render.dump_shaders->register_to_ini (
+    render_ini,
+      L"Shader.System",
+        L"Dump" );
 
 
   render.rescale_shadows =
@@ -313,12 +327,6 @@ TBF_LoadConfig (std::wstring name)
   audio.compatibility->load (        config.audio.compatibility );
   audio.enable_fix->load    (        config.audio.enable_fix    );
 
-  textures.remaster->load       (config.textures.remaster);
-  textures.cache->load          (config.textures.cache);
-  textures.dump->load           (config.textures.dump);
-  textures.cache_size->load     (config.textures.max_cache_in_mib);
-  textures.worker_threads->load (config.textures.worker_threads);
-
   sys.version->load     (config.system.version);
   //sys.intro_video->load (config.system.intro_video);
   sys.injector->load    (config.system.injector);
@@ -335,6 +343,14 @@ TBF_LoadConfig (std::wstring name)
   render.rescale_shadows->load     (config.render.shadow_rescale);
   render.rescale_env_shadows->load (config.render.env_shadow_rescale);
 
+  render.dump_shaders->load        (config.render.dump_shaders);
+
+  textures.remaster->load       (config.textures.remaster);
+  textures.cache->load          (config.textures.cache);
+  textures.dump->load           (config.textures.dump);
+  textures.cache_size->load     (config.textures.max_cache_in_mib);
+  textures.worker_threads->load (config.textures.worker_threads);
+
   if (empty)
     return false;
 
@@ -348,6 +364,8 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   audio.sample_rate->store   (config.audio.sample_hz);
   audio.compatibility->store (config.audio.compatibility);
   audio.enable_fix->store    (config.audio.enable_fix);
+
+  render.dump_shaders->store        (config.render.dump_shaders);
 
   render.rescale_shadows->store     (config.render.shadow_rescale);
   render.rescale_env_shadows->store (config.render.env_shadow_rescale);

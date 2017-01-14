@@ -73,10 +73,11 @@ struct tbf_config_t
     uintptr_t fovy_addr          = 0x00D56498ULL;//0x00D5239C;
     bool      blackbar_videos    = false;  // OBSOLETE
     bool      aspect_correction  = false;
-    int32_t   shadow_rescale     = -2;
     float     postproc_ratio     =  0.0f;
     bool      clear_blackbars    = false;
+    int32_t   shadow_rescale     = -2;
     int32_t   env_shadow_rescale =  1;
+    bool      dump_shaders       = false;
   } render;
 
   struct {

@@ -1618,23 +1618,25 @@ TBFix_LoadQueuedTextures (void)
     ISKTextureD3D9* pSKTex =
       (ISKTextureD3D9 *)load->pDest;
 
-    if (pSKTex->refs == 0 && load->pSrc != nullptr) {
-      tex_log->Log (L"[ Tex. Mgr ] >> Original texture no longer referenced, discarding new one!");
-      load->pSrc->Release ();
-    } else {
-      QueryPerformanceCounter/*_Original*/ (&pSKTex->last_used);
+    if (pSKTex != nullptr) {
+      if (pSKTex->refs == 0 && load->pSrc != nullptr) {
+        tex_log->Log (L"[ Tex. Mgr ] >> Original texture no longer referenced, discarding new one!");
+        load->pSrc->Release ();
+      } else {
+        QueryPerformanceCounter/*_Original*/ (&pSKTex->last_used);
 
-      pSKTex->pTexOverride  = load->pSrc;
-      pSKTex->override_size = load->SrcDataSize;
+        pSKTex->pTexOverride  = load->pSrc;
+        pSKTex->override_size = load->SrcDataSize;
 
-      tbf::RenderFix::tex_mgr.addInjected (load->SrcDataSize);
+        tbf::RenderFix::tex_mgr.addInjected (load->SrcDataSize);
+      }
+
+      finished_streaming (load->checksum);
+
+      tbf::RenderFix::tex_mgr.updateOSD ();
+
+      ++loads;
     }
-
-    finished_streaming (load->checksum);
-
-    tbf::RenderFix::tex_mgr.updateOSD ();
-
-    ++loads;
 
     delete load;
   }
@@ -1850,6 +1852,35 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   if (SUCCEEDED (hr)) {
     new ISKTextureD3D9 (ppTexture, SrcDataSize, checksum);
 
+    const uint32_t license_crc32 = 0x86c4b6d0UL;
+
+    if (checksum == license_crc32) {
+      wchar_t wszFile [MAX_PATH + 2] = { L'\0' };
+
+      lstrcatW ( wszFile, L"TBFix_Res\\license.dds" );
+
+      if (GetFileAttributesW (wszFile) != INVALID_FILE_ATTRIBUTES) {
+        tex_log->LogEx (true, L"[Inject Tex] Injecting custom license disclaimer... ");
+
+        load_op           = new tbf_tex_load_s;
+        load_op->pDevice  = pDevice;
+        load_op->checksum = checksum;
+        load_op->type     = tbf_tex_load_s::Immediate;
+        wcsncpy (load_op->wszFilename, wszFile, MAX_PATH);
+
+        if (load_op->type == tbf_tex_load_s::Stream) {
+          if ((! remap_stream))
+            tex_log->LogEx ( false, L"streaming\n" );
+          else
+            tex_log->LogEx ( false, L"in-flight already\n" );
+        } else {
+          tex_log->LogEx ( false, L"blocking (deferred)\n" );
+        }
+
+        resample = false;
+      }
+    }
+
     if (checksum == tbf::RenderFix::pad_buttons.crc32_ps4) {
       tbf::RenderFix::pad_buttons.tex_ps4 = *ppTexture;
     }
@@ -2042,8 +2073,15 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     bool compressed = (fmt_real >= D3DFMT_DXT1 && fmt_real <= D3DFMT_DXT5);
 
     wchar_t wszPath [MAX_PATH];
-    _swprintf ( wszPath, L"%s\\dump\\textures\\%s",
-                  TBFIX_TEXTURE_DIR, SK_D3D9_FormatToStr (fmt_real, false).c_str () );
+    _swprintf ( wszPath, L"%s\\dump\\textures",
+                  TBFIX_TEXTURE_DIR );
+
+    if (GetFileAttributesW (wszPath) != FILE_ATTRIBUTE_DIRECTORY)
+      CreateDirectoryW (wszPath, nullptr);
+
+    _swprintf ( wszPath, L"%s\\%s",
+                  wszPath,
+                   SK_D3D9_FormatToStr (fmt_real, false).c_str () );
 
     if (GetFileAttributesW (wszPath) != FILE_ATTRIBUTE_DIRECTORY)
       CreateDirectoryW (wszPath, nullptr);

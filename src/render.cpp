@@ -273,11 +273,16 @@ SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
                            uint32_t crc32,
                            LPVOID   pbFunc )
 {
-  static bool dump =
-    GetFileAttributes (L"TBFix_Res\\dump\\shaders") ==
-         FILE_ATTRIBUTE_DIRECTORY;
+  static bool dump = config.render.dump_shaders;
 
   if (dump) {
+    if (GetFileAttributes (L"TBFix_Res\\dump\\shaders") !=
+         FILE_ATTRIBUTE_DIRECTORY) {
+      CreateDirectoryW (L"TBFix_Res",                nullptr);
+      CreateDirectoryW (L"TBFix_Res\\dump",          nullptr);
+      CreateDirectoryW (L"TBFix_Res\\dump\\shaders", nullptr);
+    }
+
     wchar_t wszDumpName [MAX_PATH];
     _swprintf ( wszDumpName,
                   L"TBFix_Res\\dump\\shaders\\%s_%08x.html",
