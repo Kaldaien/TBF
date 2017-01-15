@@ -124,8 +124,6 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
   if (This != tbf::RenderFix::pDevice)
     return D3D9SetSamplerState_Original (This, Sampler, Type, Value);
 
-  static int aniso = 1;
-
   //dll_log->Log ( L" [!] IDirect3DDevice9::SetSamplerState (%lu, %lu, %lu)",
                    //Sampler, Type, Value );
 
@@ -137,9 +135,6 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
     //dll_log->Log (L" [!] IDirect3DDevice9::SetSamplerState (...)");
 
     if (Type < 8) {
-      //if (Value != D3DTEXF_ANISOTROPIC)
-        //D3D9SetSamplerState_Original (This, Sampler, D3DSAMP_MAXANISOTROPY, aniso);
-
       //dll_log->Log (L" %s Filter: %x", Type == D3DSAMP_MIPFILTER ? L"Mip" : Type == D3DSAMP_MINFILTER ? L"Min" : L"Mag", Value);
       if (Type == D3DSAMP_MIPFILTER && Value != D3DTEXF_NONE) {
         Value = D3DTEXF_LINEAR;
@@ -151,13 +146,15 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
           Value = D3DTEXF_ANISOTROPIC;
 
       // Clamp [0, oo)
-      //if (Type == D3DSAMP_MIPMAPLODBIAS)
-        //*(float *)&Value = max (0.0f, *(float *)&Value);
+      if (Type == D3DSAMP_MIPMAPLODBIAS) {
+        float fMax =
+          max (0.0f, *(float *)&Value);
+
+        *(DWORD *)&Value =
+          *(DWORD *)&fMax;
+      }
     }
   }
-
-  if (Type == D3DSAMP_MAXANISOTROPY) 
-    aniso = Value;
 
   if (Type == D3DSAMP_MAXMIPLEVEL)
     Value = 0;
@@ -336,6 +333,22 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
   if (This != tbf::RenderFix::pDevice)
     return D3D9SetVertexShader_Original (This, pShader);
 
+#if 0
+  static DWORD dwLastTid = GetCurrentThreadId ();
+
+  if (dwLastTid != GetCurrentThreadId ()) {
+    dll_log->Log ( L"[   D3D9   ]  >> WARNING:  Multi-threaded Rendering "
+                                     L" {SetVertexShader}  "
+                                     L"(last_tid=%x, new_tid=%x, r_tid=%x)",
+                 dwLastTid, GetCurrentThreadId (), tbf::RenderFix::dwRenderThreadID );
+    dwLastTid = GetCurrentThreadId ();
+  }
+#endif
+
+  if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
+    return D3D9SetVertexShader_Original (This, pShader);
+
+
   if (g_pVS != pShader) {
     if (pShader != nullptr) {
       if (vs_checksums.find (pShader) == vs_checksums.end ()) {
@@ -361,8 +374,8 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
   }
 
   vs_checksum = vs_checksums [pShader];
+  g_pVS       = pShader;
 
-  g_pVS = pShader;
   return D3D9SetVertexShader_Original (This, pShader);
 }
 
@@ -382,6 +395,22 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice)
     return D3D9SetPixelShader_Original (This, pShader);
+
+#if 0
+  static DWORD dwLastTid = GetCurrentThreadId ();
+
+  if (dwLastTid != GetCurrentThreadId ()) {
+    dll_log->Log ( L"[   D3D9   ]  >> WARNING:  Multi-threaded Rendering "
+                                     L" {SetPixelShader }  "
+                                     L"(last_tid=%x, new_tid=%x, r_tid=%x)",
+                 dwLastTid, GetCurrentThreadId (), tbf::RenderFix::dwRenderThreadID );
+    dwLastTid = GetCurrentThreadId ();
+  }
+#endif
+
+  if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
+    return D3D9SetPixelShader_Original (This, pShader);
+
 
   if (g_pPS != pShader) {
     if (pShader != nullptr) {
@@ -407,8 +436,8 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
   }
 
   ps_checksum = ps_checksums [pShader];
+  g_pPS       = pShader;
 
-  g_pPS = pShader;
   return D3D9SetPixelShader_Original (This, pShader);
 }
 
@@ -463,8 +492,17 @@ HRESULT
 STDMETHODCALLTYPE
 D3D9EndScene_Detour (IDirect3DDevice9* This)
 {
+  extern bool pending_loads (void);
+  if (pending_loads ()) {
+    extern void TBFix_LoadQueuedTextures (void);
+    TBFix_LoadQueuedTextures ();
+  }
+
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice)
+    return D3D9EndScene_Original (This);
+
+  if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
     return D3D9EndScene_Original (This);
 
   // EndScene is invoked multiple times per-frame, but we
@@ -538,11 +576,7 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
   }
 #endif
 
-  extern bool pending_loads (void);
-  if (pending_loads ()) {
-    extern void TBFix_LoadQueuedTextures (void);
-    TBFix_LoadQueuedTextures ();
-  }
+  tbf::RenderFix::draw_state.cegui_active = true;
 
   typedef BOOL (__stdcall *SKX_DrawExternalOSD_pfn)(const char* szAppName, const char* szText);
 
@@ -580,10 +614,10 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
   draw_count         = 0;
   next_draw          = 0;
 
-  g_pPS           = nullptr;
-  g_pVS           = nullptr;
-  vs_checksum     = 0;
-  ps_checksum     = 0;
+  g_pPS              = nullptr;
+  g_pVS              = nullptr;
+  vs_checksum        = 0;
+  ps_checksum        = 0;
 
   return hr;
 }
@@ -593,7 +627,9 @@ void
 STDMETHODCALLTYPE
 D3D9EndFrame_Pre (void)
 {
-  tbf::RenderFix::draw_state.cegui_active = true;
+  if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
+    return SK_BeginBufferSwap ();
+
 
   void TBFix_LogUsedTextures (void);
   TBFix_LogUsedTextures ();
@@ -601,7 +637,9 @@ D3D9EndFrame_Pre (void)
   //if (! config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
 
-  return SK_BeginBufferSwap ();
+  SK_BeginBufferSwap ();
+
+  tbf::RenderFix::draw_state.cegui_active = false;
 }
 
 COM_DECLSPEC_NOTHROW
@@ -615,9 +653,7 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
 
   scene_count = 0;
 
-  tbf::RenderFix::dwRenderThreadID = GetCurrentThreadId ();
-
-  tbf::RenderFix::draw_state.cegui_active = false;
+  InterlockedExchange (&tbf::RenderFix::dwRenderThreadID, GetCurrentThreadId ());
 
   hr = SK_EndBufferSwap (hr, device);
 
@@ -733,6 +769,10 @@ STDMETHODCALLTYPE
 D3D9SetScissorRect_Detour (IDirect3DDevice9* This,
                      const RECT*             pRect)
 {
+  return D3D9SetScissorRect_Original (This, pRect);
+
+
+
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice)
     return D3D9SetScissorRect_Original (This, pRect);
@@ -904,7 +944,7 @@ TBF_AdjustViewport (IDirect3DDevice9* This, bool UI)
   vp9_orig.Width  = tbf::RenderFix::width;
   vp9_orig.Height = tbf::RenderFix::height;
 
-  DWORD width = vp9_orig.Width;
+  DWORD width  = vp9_orig.Width;
   DWORD height = (9.0f / 16.0f) * vp9_orig.Width;
 
   // We can't do this, so instead we need to sidebar the stuff
@@ -1089,13 +1129,14 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
     }
   }
 
+#if 0
   //
   // Post-Processing
   //
   else if (StartRegister     == 240 &&
-      Vector4fCount     == 1   &&
-      pConstantData [0] == -1.0f / 512.0f &&
-      pConstantData [1] ==  1.0f / 256.0f &&
+           Vector4fCount     == 1   &&
+           pConstantData [0] == -1.0f / 512.0f &&
+           pConstantData [1] ==  1.0f / 256.0f &&
       config.render.postproc_ratio > 0.0f) {
     if (SUCCEEDED (This->GetRenderTarget (0, &tbf::RenderFix::pPostProcessSurface)))
       tbf::RenderFix::pPostProcessSurface->Release ();
@@ -1118,6 +1159,7 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
 
     return D3D9SetVertexShaderConstantF_Original (This, 240, newData, 1);
   }
+#endif
 
   //
   // Env Shadow
@@ -1131,29 +1173,29 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
       //dll_log->Log (L" 512x512 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
     }
 
-    if (pConstantData [0] == -1.0f / 1024.0f) {
+    else if (pConstantData [0] == -1.0f / 1024.0f) {
       dim = 1024UL;
       //dll_log->Log (L" 1024x1024 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
     }
 
-    if (pConstantData [0] == -1.0f / 2048.0f) {
+    else if (pConstantData [0] == -1.0f / 2048.0f) {
       dim = 2048UL;
       //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
     }
 
-    if (pConstantData [0] == -1.0f / 4096.0f) {
+    else if (pConstantData [0] == -1.0f / 4096.0f) {
       dim = 4096UL;
       //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
     }
 
-    if (pConstantData [0] == -1.0f / 8192.0f) {
+    else if (pConstantData [0] == -1.0f / 8192.0f) {
       dim = 8192UL;
       //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
     }
 
     shift = config.render.env_shadow_rescale;
 
-    float newData [4] = { 0.0f, 0.0f, pConstantData [2], pConstantData [3] };
+    float newData [4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
     newData [0] = -1.0f / (dim << shift);
     newData [1] =  1.0f / (dim << shift);
@@ -1180,6 +1222,7 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
       pSurf->GetDesc (&desc);
       pSurf->Release ();
 
+#if 0
       //
       // Post-Processing
       //
@@ -1214,11 +1257,12 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
           }
         }
       }
+#endif
 
       //
       // Model Shadows
       //
-      if (desc.Width == desc.Height && desc.Width > 64 && desc.Height < 2048) {
+      if (desc.Width == desc.Height && desc.Width > 64 && desc.Height < 4096) {
         float newData [12];
 
         uint32_t shift = TBF_MakeShadowBitShift (desc.Width);
@@ -1385,6 +1429,23 @@ D3D9DrawIndexedPrimitiveUP_Detour ( IDirect3DDevice9* This,
 
 
 
+void
+tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
+                        D3DPRESENT_PARAMETERS *pPresentationParameters )
+{
+  tex_mgr.reset      ();
+
+  vs_checksums.clear ();
+  ps_checksums.clear ();
+
+  g_pPS   = nullptr;
+  g_pVS   = nullptr;
+
+  pDevice = This;
+
+  width   = pPresentationParameters->BackBufferWidth;
+  height  = pPresentationParameters->BackBufferHeight;
+}
 
 typedef HRESULT (__stdcall *Reset_pfn)(
   IDirect3DDevice9     *This,
@@ -1399,15 +1460,10 @@ __stdcall
 D3D9Reset_Detour ( IDirect3DDevice9      *This,
                    D3DPRESENT_PARAMETERS *pPresentationParameters )
 {
-  if (This != tbf::RenderFix::pDevice)
+  if (tbf::RenderFix::pDevice != nullptr && This != tbf::RenderFix::pDevice)
     return D3D9Reset_Original (This, pPresentationParameters);
 
-  tbf::RenderFix::tex_mgr.reset         ();
-
-  tbf::RenderFix::pDevice = This;
-
-  tbf::RenderFix::width  = pPresentationParameters->BackBufferWidth;
-  tbf::RenderFix::height = pPresentationParameters->BackBufferHeight;
+  tbf::RenderFix::Reset (This, pPresentationParameters);
 
   HRESULT hr =
     D3D9Reset_Original (This, pPresentationParameters);
@@ -1421,7 +1477,7 @@ __stdcall
 SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
                                  D3DPRESENT_PARAMETERS* pparams)
 {
-  static D3DPRESENT_PARAMETERS present_params;
+  ////static D3DPRESENT_PARAMETERS present_params;
 
   //
   // TODO: Figure out what the hell is doing this when RTSS is allowed to use
@@ -1434,9 +1490,9 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
     return SK_SetPresentParamsD3D9_Original (device, pparams);
   }
 
-  memcpy (&present_params, pparams, sizeof D3DPRESENT_PARAMETERS);
+  ////memcpy (&present_params, pparams, sizeof D3DPRESENT_PARAMETERS);
 
-  tbf::RenderFix::tex_mgr.reset ();
+  ////tbf::RenderFix::tex_mgr.reset ();
 
   if (pparams != nullptr) {
     tbf::RenderFix::fullscreen = (! pparams->Windowed);
@@ -1497,10 +1553,10 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
     tbf::RenderFix::width  = pparams->BackBufferWidth;
     tbf::RenderFix::height = pparams->BackBufferHeight;
 
+#if 0
     DEVMODE devmode = { 0 };
     devmode.dmSize  = sizeof DEVMODE;
 
-#if 0
     // We have to call this once with a value of 0, or Windows is not going to be happy...
     EnumDisplaySettings (nullptr, 0,                     &devmode);
     EnumDisplaySettings (nullptr, ENUM_CURRENT_SETTINGS, &devmode);
@@ -1544,14 +1600,14 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
       EnumDisplaySettings (nullptr, ENUM_CURRENT_SETTINGS, &devmode);
     }
 
-    //if (config.window.borderless || (! tsf::RenderFix::fullscreen)) {
-      //DwmEnableMMCSS (TRUE);
+    if (config.window.borderless || (! tsf::RenderFix::fullscreen)) {
+      DwmEnableMMCSS (TRUE);
 
       // The game will draw in windowed mode, but it will think it's fullscreen
-      //pparams->Windowed  = true;
-    //} else {
-      //DwmEnableMMCSS (FALSE);
-    //}
+      pparams->Windowed  = true;
+    } else {
+      DwmEnableMMCSS (FALSE);
+    }
 
     if (! tbf::RenderFix::fullscreen) {
       bool shrunk = false;
@@ -1581,8 +1637,8 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
 
   // Reset will fail without this
   if (pparams->Windowed) {
-    BringWindowToTop (tbf::RenderFix::hWndDevice);
-    SetActiveWindow  (tbf::RenderFix::hWndDevice);
+    //BringWindowToTop (tbf::RenderFix::hWndDevice);
+    //SetActiveWindow  (tbf::RenderFix::hWndDevice);
     pparams->FullScreen_RefreshRateInHz = 0;
   }
 
@@ -1708,8 +1764,8 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
   SK_ICommandProcessor& command =
     *SK_GetCommandProcessor ();
 
-  fovy_         = TBF_CreateVar (SK_IVariable::Float, &config.render.fovy,         this);
-  aspect_ratio_ = TBF_CreateVar (SK_IVariable::Float, &config.render.aspect_ratio, this);
+  //fovy_         = TBF_CreateVar (SK_IVariable::Float, &config.render.fovy,         this);
+  //aspect_ratio_ = TBF_CreateVar (SK_IVariable::Float, &config.render.aspect_ratio, this);
 
   SK_IVariable* aspect_correct_vids = TBF_CreateVar (SK_IVariable::Boolean, &config.render.blackbar_videos);
   SK_IVariable* aspect_correction   = TBF_CreateVar (SK_IVariable::Boolean, &config.render.aspect_correction);
@@ -1720,8 +1776,8 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
   SK_IVariable* postproc_ratio      = TBF_CreateVar (SK_IVariable::Float,   &config.render.postproc_ratio);
   SK_IVariable* clear_blackbars     = TBF_CreateVar (SK_IVariable::Boolean, &config.render.clear_blackbars);
 
-  command.AddVariable ("AspectRatio",         aspect_ratio_);
-  command.AddVariable ("FOVY",                fovy_);
+  //command.AddVariable ("AspectRatio",         aspect_ratio_);
+  //command.AddVariable ("FOVY",                fovy_);
 
   command.AddVariable ("AspectCorrectVideos", aspect_correct_vids);
   command.AddVariable ("AspectCorrection",    aspect_correction);
@@ -1733,10 +1789,10 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
 
   command.AddVariable ("TestVS", TBF_CreateVar (SK_IVariable::Int, &TEST_VS));
 
+#if 0
    uint8_t signature [] = { 0x39, 0x8E, 0xE3, 0x3F,
                             0xDB, 0x0F, 0x49, 0x3F };
 
-#if 0
   if (*(float *)(uintptr_t)config.render.aspect_addr != 16.0f / 9.0f) {
     void* addr = TBF_Scan (signature, sizeof (float) * 2, nullptr);
     if (addr != nullptr) {
@@ -1755,6 +1811,7 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
 bool
 tbf::RenderFix::CommandProcessor::OnVarChange (SK_IVariable* var, void* val)
 {
+#if 0
   DWORD dwOld;
 
   if (var == aspect_ratio_) {
@@ -1799,21 +1856,24 @@ tbf::RenderFix::CommandProcessor::OnVarChange (SK_IVariable* var, void* val)
                          *((float *)config.render.fovy_addr) );
     }
   }
+#endif
 
   return true;
 }
 
 
-tbf::RenderFix::CommandProcessor* tbf::RenderFix::CommandProcessor::pCommProc;
+tbf::RenderFix::CommandProcessor*
+                   tbf::RenderFix::CommandProcessor::pCommProc
+                                                       = nullptr;
 
-HWND              tbf::RenderFix::hWndDevice = NULL;
-IDirect3DDevice9* tbf::RenderFix::pDevice    = nullptr;
+HWND               tbf::RenderFix::hWndDevice          = NULL;
+IDirect3DDevice9*  tbf::RenderFix::pDevice             = nullptr;
 
-bool     tbf::RenderFix::fullscreen       = false;
+bool               tbf::RenderFix::fullscreen          = false;
 
-uint32_t tbf::RenderFix::width            = 0UL;
-uint32_t tbf::RenderFix::height           = 0UL;
-uint32_t tbf::RenderFix::dwRenderThreadID = 0UL;
+         uint32_t  tbf::RenderFix::width               = 0UL;
+         uint32_t  tbf::RenderFix::height              = 0UL;
+volatile ULONG     tbf::RenderFix::dwRenderThreadID    = 0UL;
 
 IDirect3DSurface9* tbf::RenderFix::pPostProcessSurface = nullptr;
 bool               tbf::RenderFix::bink                = false;

@@ -25,8 +25,8 @@
 
 #include "command.h"
 
-struct IDirect3DDevice9;
-struct IDirect3DSurface9;
+#include <d3d9.h>
+#include <d3d9types.h>
 
 #include <Windows.h>
 
@@ -34,8 +34,11 @@ namespace tbf
 {
   namespace RenderFix
   {
-    void Init     ();
-    void Shutdown ();
+    void Init     (void);
+    void Shutdown (void);
+
+    void Reset    ( IDirect3DDevice9      *This,
+                    D3DPRESENT_PARAMETERS *pPresentationParameters );
 
     class CommandProcessor : public SK_IVariableListener {
     public:
@@ -68,7 +71,7 @@ namespace tbf
     extern IDirect3DDevice9*  pDevice;
     extern HWND               hWndDevice;
 
-    extern uint32_t           dwRenderThreadID;
+    extern volatile ULONG     dwRenderThreadID;
     extern bool               bink; // True if a bink video is playing
 
     extern HMODULE            d3dx9_43_dll;
