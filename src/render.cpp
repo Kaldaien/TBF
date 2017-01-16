@@ -52,6 +52,10 @@ DrawIndexedPrimitiveUP_pfn              D3D9DrawIndexedPrimitiveUP_Original     
 SK_SetPresentParamsD3D9_pfn             SK_SetPresentParamsD3D9_Original             = nullptr;
 
 
+extern bool pending_loads            (void);
+extern void TBFix_LoadQueuedTextures (void);
+
+
 bool fullscreen_blit  = false;
 bool needs_aspect     = false;
 bool world_radial     = false;
@@ -492,18 +496,16 @@ HRESULT
 STDMETHODCALLTYPE
 D3D9EndScene_Detour (IDirect3DDevice9* This)
 {
-  extern bool pending_loads (void);
-  if (pending_loads ()) {
-    extern void TBFix_LoadQueuedTextures (void);
-    TBFix_LoadQueuedTextures ();
-  }
-
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice)
     return D3D9EndScene_Original (This);
 
   if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
     return D3D9EndScene_Original (This);
+
+  if (pending_loads ()) {
+    TBFix_LoadQueuedTextures ();
+  }
 
   // EndScene is invoked multiple times per-frame, but we
   //   are only interested in the first.
@@ -1428,12 +1430,22 @@ D3D9DrawIndexedPrimitiveUP_Detour ( IDirect3DDevice9* This,
 }
 
 
-
 void
 tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
                         D3DPRESENT_PARAMETERS *pPresentationParameters )
 {
-  tex_mgr.reset      ();
+  static volatile
+    ULONG reset_count = 0UL;
+
+  if (InterlockedIncrement (&reset_count) == 1UL)
+    tex_mgr.Init ();
+
+  else {
+    if (pending_loads ())
+      TBFix_LoadQueuedTextures ();
+
+    tex_mgr.reset    ();
+  }
 
   vs_checksums.clear ();
   ps_checksums.clear ();
@@ -1460,10 +1472,10 @@ __stdcall
 D3D9Reset_Detour ( IDirect3DDevice9      *This,
                    D3DPRESENT_PARAMETERS *pPresentationParameters )
 {
+  tbf::RenderFix::Reset (This, pPresentationParameters);
+
   if (tbf::RenderFix::pDevice != nullptr && This != tbf::RenderFix::pDevice)
     return D3D9Reset_Original (This, pPresentationParameters);
-
-  tbf::RenderFix::Reset (This, pPresentationParameters);
 
   HRESULT hr =
     D3D9Reset_Original (This, pPresentationParameters);
@@ -1650,8 +1662,6 @@ void
 tbf::RenderFix::Init (void)
 {
   d3dx9_43_dll = LoadLibrary (L"D3DX9_43.DLL");
-
-  tex_mgr.Init ();
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetSamplerState_Override",
                       D3D9SetSamplerState_Detour,

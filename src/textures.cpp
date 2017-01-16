@@ -1636,6 +1636,9 @@ TBFix_LoadQueuedTextures (void)
       tbf::RenderFix::tex_mgr.updateOSD ();
 
       ++loads;
+
+      // Remove the temporary reference
+      load->pDest->Release ();
     }
 
     delete load;
@@ -2017,9 +2020,12 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
       load_op->pSrcData    = new uint8_t [SrcDataSize];
       load_op->SrcDataSize = SrcDataSize;
 
+      swprintf (load_op->wszFilename, L"Resample_%x.dds", checksum);
+
       memcpy (load_op->pSrcData, pSrcData, SrcDataSize);
 
-      load_op->pDest = *ppTexture;
+      (*ppTexture)->AddRef ();
+      load_op->pDest       = *ppTexture;
 
       resample_pool->postJob (load_op);
     }
