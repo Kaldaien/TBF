@@ -20,11 +20,12 @@
  *
 **/
 
-#ifndef __TZF__SCANNER_H__
-#define __TZF__SCANNER_H__
+#ifndef __TBF__SCANNER_H__
+#define __TBF__SCANNER_H__
 
 #include <stdint.h>
 
-void* TBF_Scan (uint8_t* pattern, size_t len, uint8_t* mask = nullptr);
+void*     TBF_Scan        (uint8_t* pattern, size_t len, uint8_t* mask = nullptr);
+uintptr_t TBF_GetBaseAddr (void);
 
-#endif /* __TZF__SCANNER_H__ */
+#endif /* __TBF__SCANNER_H__ */

@@ -59,31 +59,28 @@ typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
 
 
 static D3DXSaveTextureToFile_pfn               D3DXSaveTextureToFile                        = nullptr;
-static D3DXCreateTextureFromFileInMemoryEx_pfn D3DXCreateTextureFromFileInMemoryEx_Original = nullptr;
+static D3DXCreateTextureFromFileInMemoryEx_pfn D3DXCreateTextureFromFileInMemoryEx = nullptr;
 
-static BeginScene_pfn                          D3D9BeginScene_Original                      = nullptr;
-static EndScene_pfn                            D3D9EndScene_Original                        = nullptr;
-       SetRenderState_pfn                      D3D9SetRenderState_Original                  = nullptr;
+static BeginScene_pfn                          D3D9BeginScene                      = nullptr;
+static EndScene_pfn                            D3D9EndScene                        = nullptr;
+       SetRenderState_pfn                      D3D9SetRenderState                  = nullptr;
 
-static StretchRect_pfn                         D3D9StretchRect_Original                     = nullptr;
-static CreateTexture_pfn                       D3D9CreateTexture_Original                   = nullptr;
-static CreateRenderTarget_pfn                  D3D9CreateRenderTarget_Original              = nullptr;
-static CreateDepthStencilSurface_pfn           D3D9CreateDepthStencilSurface_Original       = nullptr;
+static StretchRect_pfn                         D3D9StretchRect                     = nullptr;
+static CreateTexture_pfn                       D3D9CreateTexture                   = nullptr;
+static CreateRenderTarget_pfn                  D3D9CreateRenderTarget              = nullptr;
+static CreateDepthStencilSurface_pfn           D3D9CreateDepthStencilSurface       = nullptr;
 
-static SetTexture_pfn                          D3D9SetTexture_Original                      = nullptr;
-static SetRenderTarget_pfn                     D3D9SetRenderTarget_Original                 = nullptr;
-static SetDepthStencilSurface_pfn              D3D9SetDepthStencilSurface_Original          = nullptr;
+static SetTexture_pfn                          D3D9SetTexture                      = nullptr;
+static SetRenderTarget_pfn                     D3D9SetRenderTarget                 = nullptr;
+static SetDepthStencilSurface_pfn              D3D9SetDepthStencilSurface          = nullptr;
 
 extern uint32_t
 TBF_MakeShadowBitShift (uint32_t dim);
 
-typedef BOOL(WINAPI *QueryPerformanceCounter_t)(_Out_ LARGE_INTEGER *lpPerformanceCount);
-extern QueryPerformanceCounter_t QueryPerformanceCounter_Original;
-
 tbf::RenderFix::TextureManager
   tbf::RenderFix::tex_mgr;
 
-iSK_Logger* tex_log;
+iSK_Logger* tex_log = nullptr;
 
 #include <set>
 
@@ -453,7 +450,7 @@ D3D9StretchRect_Detour (      IDirect3DDevice9    *This,
 
   dumping = false;
 
-  return D3D9StretchRect_Original (This, pSourceSurface, pSourceRect,
+  return D3D9StretchRect (This, pSourceSurface, pSourceRect,
                                          pDestSurface,   pDestRect,
                                          Filter);
 }
@@ -470,7 +467,7 @@ D3D9SetRenderState_Detour (IDirect3DDevice9*  This,
   if (This != tbf::RenderFix::pDevice) {
     dll_log->Log (L"[Render Fix] >> WARNING: SetRenderState came from unknown IDirect3DDevice9! << ");
 
-    return D3D9SetRenderState_Original (This, State, Value);
+    return D3D9SetRenderState (This, State, Value);
   }
 
 #if 0
@@ -481,7 +478,7 @@ D3D9SetRenderState_Detour (IDirect3DDevice9*  This,
   }
 #endif
 
-  return D3D9SetRenderState_Original (This, State, Value);
+  return D3D9SetRenderState (This, State, Value);
 }
 
 COM_DECLSPEC_NOTHROW
@@ -502,7 +499,7 @@ D3D9CreateRenderTarget_Detour (IDirect3DDevice9     *This,
                   Width, Height, Format, MultiSample, MultisampleQuality,
                   Lockable, ppSurface, pSharedHandle);
 
-  return D3D9CreateRenderTarget_Original (This, Width, Height, Format,
+  return D3D9CreateRenderTarget (This, Width, Height, Format,
                                           MultiSample, MultisampleQuality,
                                           Lockable, ppSurface, pSharedHandle);
 }
@@ -525,7 +522,7 @@ D3D9CreateDepthStencilSurface_Detour (IDirect3DDevice9     *This,
                   Width, Height, Format, MultiSample, MultisampleQuality,
                   Discard, ppSurface, pSharedHandle);
 
-  return D3D9CreateDepthStencilSurface_Original (This, Width, Height, Format,
+  return D3D9CreateDepthStencilSurface (This, Width, Height, Format,
                                                  MultiSample, MultisampleQuality,
                                                  Discard, ppSurface, pSharedHandle);
 }
@@ -569,7 +566,7 @@ D3D9StretchRect_Detour (      IDirect3DDevice9    *This,
 {
   dumping = false;
 
-  return D3D9StretchRect_Original (This, pSourceSurface, pSourceRect,
+  return D3D9StretchRect (This, pSourceSurface, pSourceRect,
                                          pDestSurface,   pDestRect,
                                          Filter);
 }
@@ -588,10 +585,10 @@ D3D9SetDepthStencilSurface_Detour (
 {
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice) {
-    return D3D9SetDepthStencilSurface_Original (This, pNewZStencil);
+    return D3D9SetDepthStencilSurface (This, pNewZStencil);
   }
 
-  return D3D9SetDepthStencilSurface_Original (This, pNewZStencil);
+  return D3D9SetDepthStencilSurface (This, pNewZStencil);
 }
 
 
@@ -609,7 +606,7 @@ D3D9SetTexture_Detour (
 {
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice) {
-    return D3D9SetTexture_Original (This, Sampler, pTexture);
+    return D3D9SetTexture (This, Sampler, pTexture);
   }
 
   //if (tbf::RenderFix::tracer.log) {
@@ -627,7 +624,7 @@ D3D9SetTexture_Detour (
 
     textures_used.insert (pSKTex->tex_crc32);
 
-    QueryPerformanceCounter/*_Original*/ (&pSKTex->last_used);
+    QueryPerformanceCounter (&pSKTex->last_used);
 
     //
     // This is how blocking is implemented -- only do it when a texture that needs
@@ -656,7 +653,7 @@ D3D9SetTexture_Detour (
   else                     tsf::RenderFix::active_samplers.erase  (Sampler);
 #endif
 
-  return D3D9SetTexture_Original (This, Sampler, pTexture);
+  return D3D9SetTexture (This, Sampler, pTexture);
 }
 
 D3DXSaveSurfaceToFile_pfn D3DXSaveSurfaceToFileW = nullptr;
@@ -678,7 +675,7 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
 {
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice) {
-    return D3D9CreateTexture_Original ( This, Width, Height,
+    return D3D9CreateTexture ( This, Width, Height,
                                           Levels, Usage, Format,
                                             Pool, ppTexture, pSharedHandle );
   }
@@ -755,7 +752,7 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
   int levels = Levels;
 
   HRESULT result = 
-    D3D9CreateTexture_Original (This, Width, Height, levels, Usage,
+    D3D9CreateTexture (This, Width, Height, levels, Usage,
                                 Format, Pool, ppTexture, pSharedHandle);
 
   return result;
@@ -770,7 +767,7 @@ D3D9BeginScene_Detour (IDirect3DDevice9* This)
   if (This != tbf::RenderFix::pDevice) {
     dll_log->Log (L"[Render Fix] >> WARNING: D3D9 BeginScene came from unknown IDirect3DDevice9! << ");
 
-    return D3D9BeginScene_Original (This);
+    return D3D9BeginScene (This);
   }
 
   tbf::RenderFix::draw_state.draws = 0;
@@ -781,7 +778,7 @@ D3D9BeginScene_Detour (IDirect3DDevice9* This)
     D3D9_VIRTUAL_OVERRIDE ( &This, 16,
                             L"IDirect3DDevice9::Reset",
                             D3D9Reset_Detour,
-                            D3D9Reset_Original,
+                            D3D9Reset,
                             Reset_pfn );
 
     D3DXCreateFontW ( This,
@@ -795,7 +792,7 @@ sss                                  L"Arial",
   }
 #endif
 
-  HRESULT result = D3D9BeginScene_Original (This);
+  HRESULT result = D3D9BeginScene (This);
 
   return result;
 }
@@ -808,9 +805,9 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 {
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice) {
-    return D3D9EndScene_Original (This);
+    return D3D9EndScene (This);
   }
-  return D3D9EndScene_Original (This);
+  return D3D9EndScene (This);
 }
 #endif
 
@@ -938,14 +935,11 @@ static D3DXCreateTextureFromFile_pfn
 #define D3DX_SKIP_DDS_MIP_LEVELS(l, f) ((((l) & D3DX_SKIP_DDS_MIP_LEVELS_MASK) \
 << D3DX_SKIP_DDS_MIP_LEVELS_SHIFT) | ((f) == D3DX_DEFAULT ? D3DX_FILTER_BOX : (f)))
 
-typedef BOOL(WINAPI *QueryPerformanceCounter_t)(_Out_ LARGE_INTEGER *lpPerformanceCount);
-extern QueryPerformanceCounter_t QueryPerformanceCounter_Original;
-
 
 #define __PTR_SIZE   sizeof LPCVOID
 #define __PAGE_PRIVS PAGE_EXECUTE_READWRITE
 
-#define D3D9_VIRTUAL_OVERRIDE(_Base,_Index,_Name,_Override,_Original,_Type) { \
+#define D3D9_VIRTUAL_OVERRIDE(_Base,_Index,_Name,_Override,_Type) {           \
   void** vftable = *(void***)*_Base;                                          \
                                                                               \
   if (vftable [_Index] != _Override) {                                        \
@@ -957,10 +951,10 @@ extern QueryPerformanceCounter_t QueryPerformanceCounter_Original;
                  /*L##_Name, vftable [_Index],                              */\
                  /*SK_DescribeVirtualProtectFlags (dwProtect));             */\
                                                                               \
-    if (_Original == NULL)                                                    \
-      _Original = (##_Type)vftable [_Index];                                  \
+    if ( == NULL)                                                             \
+       = (##_Type)vftable [_Index];                                           \
                                                                               \
-    /*dll_log->Log (L"  + %s: %08Xh", L#_Original, _Original);*/               \
+    /*dll_log->Log (L"  + %s: %08Xh", L#, );*/               \
                                                                               \
     vftable [_Index] = _Override;                                             \
                                                                               \
@@ -1489,7 +1483,7 @@ InjectTexture (tbf_tex_load_s* load)
             load->SrcDataSize,
               &img_info );
 
-        hr = D3DXCreateTextureFromFileInMemoryEx_Original (
+        hr = D3DXCreateTextureFromFileInMemoryEx (
           load->pDevice,
             load->pSrcData, load->SrcDataSize,
               D3DX_DEFAULT, D3DX_DEFAULT, img_info.MipLevels,
@@ -1591,7 +1585,7 @@ TBFix_LoadQueuedTextures (void)
     tbf_tex_load_s* load =
       *it;
 
-    QueryPerformanceCounter/*_Original*/ (&load->end);
+    QueryPerformanceCounter (&load->end);
 
     if (true) {
       tex_log->Log ( L"[%s] Finished %s texture %08x (%5.2f MiB in %9.4f ms)",
@@ -1623,7 +1617,7 @@ TBFix_LoadQueuedTextures (void)
         tex_log->Log (L"[ Tex. Mgr ] >> Original texture no longer referenced, discarding new one!");
         load->pSrc->Release ();
       } else {
-        QueryPerformanceCounter/*_Original*/ (&pSKTex->last_used);
+        QueryPerformanceCounter (&pSKTex->last_used);
 
         pSKTex->pTexOverride  = load->pSrc;
         pSKTex->override_size = load->SrcDataSize;
@@ -1706,7 +1700,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   // Injection would recurse slightly and cause impossible to diagnose reference counting problems
   //   with texture caching if we did not check for this!
   if (inject_thread) {
-    return D3DXCreateTextureFromFileInMemoryEx_Original (
+    return D3DXCreateTextureFromFileInMemoryEx (
       pDevice,
         pSrcData, SrcDataSize,
           Width, Height, MipLevels,
@@ -1734,7 +1728,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   if (freq.QuadPart == 0LL)
     QueryPerformanceFrequency (&freq);
 
-  QueryPerformanceCounter/*_Original*/ (&start);
+  QueryPerformanceCounter     (&start);
 
   uint32_t checksum =
     crc32 (0, pSrcData, SrcDataSize);
@@ -1760,7 +1754,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
   // Necessary to make D3DX texture write functions work
   if ( Pool == D3DPOOL_DEFAULT && config.textures.dump &&
-        (! dumped_textures.count     (checksum))           &&
+        (! dumped_textures.count     (checksum))       &&
         (! injectable_textures.count (checksum)) )
     Usage = D3DUSAGE_DYNAMIC;
 
@@ -1775,7 +1769,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     if (true) {//fmt_real == D3DFMT_DXT1 ||
         //fmt_real == D3DFMT_DXT3 ||
         //fmt_real == D3DFMT_DXT5) {
-      if (/*info.Width >= 128 && info.Height >= 128 && */info.MipLevels == 3) {
+      if (/*info.Width >= 128 && info.Height >= 128 && */ info.MipLevels > 1 || config.textures.uncompressed) {
         // Don't resample faces
         if ( resample_blacklist.count (checksum) == 0 )
           resample = true;
@@ -1844,9 +1838,9 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
   //tex_log->Log (L"D3DXCreateTextureFromFileInMemoryEx (... MipLevels=%lu ...)", MipLevels);
   hr =
-    D3DXCreateTextureFromFileInMemoryEx_Original ( pDevice,
+    D3DXCreateTextureFromFileInMemoryEx ( pDevice,
                                                      pSrcData,         SrcDataSize,
-                                                       Width,          Height,    will_replace ? 1 : MipLevels,
+                                                       Width,          Height,    MipLevels,
                                                          Usage,        Format,    Pool,
                                                            Filter,     MipFilter, ColorKey,
                                                              pSrcInfo, pPalette,
@@ -1968,7 +1962,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     //
     else if (load_op != nullptr && load_op->type == tsf_tex_load_s::Immediate) {
       QueryPerformanceFrequency        (&load_op->freq);
-      QueryPerformanceCounter/*_Original*/ (&load_op->start);
+      QueryPerformanceCounter (&load_op->start);
 
       EnterCriticalSection (&cs_tex_inject);
       inject_tids.insert   (GetCurrentThreadId ());
@@ -1982,7 +1976,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
       inject_tids.erase    (GetCurrentThreadId ());
       LeaveCriticalSection (&cs_tex_inject);
 
-      QueryPerformanceCounter/*_Original*/ (&load_op->end);
+      QueryPerformanceCounter (&load_op->end);
 
       if (SUCCEEDED (hr)) {
         tex_log->Log ( L"[Inject Tex] Finished synchronous texture %08x (%5.2f MiB in %9.4f ms)",
@@ -2036,7 +2030,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     load_op = nullptr;
   }
 
-  QueryPerformanceCounter/*_Original*/ (&end);
+  QueryPerformanceCounter (&end);
 
   if (SUCCEEDED (hr)) {
     if (config.textures.cache && checksum != 0x00) {
@@ -2206,7 +2200,7 @@ D3D9SetRenderTarget_Detour (
 
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice) {
-    return D3D9SetRenderTarget_Original (This, RenderTargetIndex, pRenderTarget);
+    return D3D9SetRenderTarget (This, RenderTargetIndex, pRenderTarget);
   }
 
   //if (tsf::RenderFix::tracer.log) {
@@ -2249,7 +2243,7 @@ D3D9SetRenderTarget_Detour (
 #endif
   //}
 
-  return D3D9SetRenderTarget_Original (This, RenderTargetIndex, pRenderTarget);
+  return D3D9SetRenderTarget (This, RenderTargetIndex, pRenderTarget);
 }
 
 void
@@ -2548,47 +2542,47 @@ tbf::RenderFix::TextureManager::Init (void)
   TBF_CreateDLLHook ( config.system.injector.c_str (),
                        "D3D9SetRenderState_Override",
                         D3D9SetRenderState_Detour,
-              (LPVOID*)&D3D9SetRenderState_Original );
+              (LPVOID*)&D3D9SetRenderState );
 
   TBF_CreateDLLHook ( config.system.injector.c_str (),
                        "D3D9BeginScene_Override",
                         D3D9BeginScene_Detour,
-              (LPVOID*)&D3D9BeginScene_Original );
+              (LPVOID*)&D3D9BeginScene );
 
   TBF_CreateDLLHook ( config.system.injector.c_str (),
                        "D3D9StretchRect_Override",
                         D3D9StretchRect_Detour,
-              (LPVOID*)&D3D9StretchRect_Original );
+              (LPVOID*)&D3D9StretchRect );
 
   TBF_CreateDLLHook ( config.system.injector.c_str (),
                        "D3D9CreateDepthStencilSurface_Override",
                         D3D9CreateDepthStencilSurface_Detour,
-              (LPVOID*)&D3D9CreateDepthStencilSurface_Original );
+              (LPVOID*)&D3D9CreateDepthStencilSurface );
 
   TBF_CreateDLLHook ( config.system.injector.c_str (),
                        "D3D9CreateTexture_Override",
                         D3D9CreateTexture_Detour,
-              (LPVOID*)&D3D9CreateTexture_Original );
+              (LPVOID*)&D3D9CreateTexture );
 
   TBF_CreateDLLHook ( config.system.injector.c_str (),
                        "D3D9SetTexture_Override",
                         D3D9SetTexture_Detour,
-              (LPVOID*)&D3D9SetTexture_Original );
+              (LPVOID*)&D3D9SetTexture );
 
   TBF_CreateDLLHook ( config.system.injector.c_str (),
                        "D3D9SetRenderTarget_Override",
                         D3D9SetRenderTarget_Detour,
-              (LPVOID*)&D3D9SetRenderTarget_Original );
+              (LPVOID*)&D3D9SetRenderTarget );
 
   TBF_CreateDLLHook ( config.system.injector.c_str (),
                        "D3D9SetDepthStencilSurface_Override",
                         D3D9SetDepthStencilSurface_Detour,
-              (LPVOID*)&D3D9SetDepthStencilSurface_Original );
+              (LPVOID*)&D3D9SetDepthStencilSurface );
 
   TBF_CreateDLLHook ( L"D3DX9_43.DLL",
                         "D3DXCreateTextureFromFileInMemoryEx",
                          D3DXCreateTextureFromFileInMemoryEx_Detour,
-              (LPVOID *)&D3DXCreateTextureFromFileInMemoryEx_Original );
+              (LPVOID *)&D3DXCreateTextureFromFileInMemoryEx );
 
   D3DXSaveTextureToFile =
     (D3DXSaveTextureToFile_pfn)
@@ -2616,19 +2610,19 @@ tbf::RenderFix::TextureManager::Init (void)
                          "D3DXGetImageInfoFromFileW" );
 
   // We don't hook this, but we still use it...
-  if (D3D9CreateRenderTarget_Original == nullptr) {
+  if (D3D9CreateRenderTarget == nullptr) {
     static HMODULE hModD3D9 =
       GetModuleHandle (config.system.injector.c_str ());
-    D3D9CreateRenderTarget_Original =
+    D3D9CreateRenderTarget =
       (CreateRenderTarget_pfn)
         GetProcAddress (hModD3D9, "D3D9CreateRenderTarget_Override");
   }
 
   // We don't hook this, but we still use it...
-  if (D3D9CreateDepthStencilSurface_Original == nullptr) {
+  if (D3D9CreateDepthStencilSurface == nullptr) {
     static HMODULE hModD3D9 =
       GetModuleHandle (config.system.injector.c_str ());
-    D3D9CreateDepthStencilSurface_Original =
+    D3D9CreateDepthStencilSurface =
       (CreateDepthStencilSurface_pfn)
         GetProcAddress (hModD3D9, "D3D9CreateDepthStencilSurface_Override");
   }
@@ -2677,6 +2671,12 @@ bool shutting_down = false;
 void
 tbf::RenderFix::TextureManager::Shutdown (void)
 {
+  // It is possible for the DLL to be unloaded before the texture manager is
+  //   initialized, in which case a nullptr value for tex_log is the easiest
+  //     way to detect this.
+  if (tex_log == nullptr)
+    return;
+
   // 16.6 ms per-frame (60 FPS)
   const float frame_time = 16.6f;
 
@@ -3033,8 +3033,8 @@ HRESULT
 WINAPI
 ResampleTexture (tbf_tex_load_s* load)
 {
-  QueryPerformanceFrequency        (&load->freq);
-  QueryPerformanceCounter/*_Original*/ (&load->start);
+  QueryPerformanceFrequency (&load->freq);
+  QueryPerformanceCounter   (&load->start);
 
   D3DXIMAGE_INFO img_info;
 
@@ -3047,13 +3047,14 @@ ResampleTexture (tbf_tex_load_s* load)
 
   if (img_info.Depth == 1) {
     hr =
-    D3DXCreateTextureFromFileInMemoryEx_Original (
+    D3DXCreateTextureFromFileInMemoryEx (
       load->pDevice,
           load->pSrcData, load->SrcDataSize,
-            img_info.Width, img_info.Height, 0,//D3DX_DEFAULT,
-              0, img_info.Format,
+            img_info.Width, img_info.Height, 0,
+              0, config.textures.uncompressed ? D3DFMT_A8R8G8B8 : img_info.Format,
                 D3DPOOL_DEFAULT,
-                  D3DX_FILTER_POINT, D3DX_FILTER_TRIANGLE | D3DX_FILTER_DITHER,
+                  D3DX_FILTER_TRIANGLE | D3DX_FILTER_DITHER,
+                  D3DX_FILTER_BOX      | D3DX_FILTER_DITHER,
                     0,
                       nullptr, nullptr,
                         &load->pSrc );
@@ -3135,13 +3136,13 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
         if (pStream->type == tbf_tex_load_s::Resample) {
           InterlockedIncrement   (&resampling);
 
-          QueryPerformanceFrequency        (&pStream->freq);
-          QueryPerformanceCounter/*_Original*/ (&pStream->start);
+          QueryPerformanceFrequency (&pStream->freq);
+          QueryPerformanceCounter   (&pStream->start);
 
           HRESULT hr =
             ResampleTexture (pStream);//InjectTexture (pStream);
 
-          QueryPerformanceCounter/*_Original*/ (&pStream->end);
+          QueryPerformanceCounter (&pStream->end);
 
           InterlockedDecrement   (&resampling);
 
@@ -3153,13 +3154,13 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
           InterlockedIncrement   (&streaming);
           InterlockedExchangeAdd (&streaming_bytes, pStream->SrcDataSize);
 
-          QueryPerformanceFrequency        (&pStream->freq);
-          QueryPerformanceCounter/*_Original*/ (&pStream->start);
+          QueryPerformanceFrequency (&pStream->freq);
+          QueryPerformanceCounter   (&pStream->start);
 
           HRESULT hr =
             InjectTexture (pStream);
 
-          QueryPerformanceCounter/*_Original*/ (&pStream->end);
+          QueryPerformanceCounter (&pStream->end);
 
           InterlockedExchangeSubtract (&streaming_bytes, pStream->SrcDataSize);
           InterlockedDecrement        (&streaming);

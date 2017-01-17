@@ -35,6 +35,8 @@
 #include "command.h"
 #include "hook.h"
 
+#include "scanner.h"
+
 #pragma comment (lib, "kernel32.lib")
 
 typedef HRESULT (__stdcall *SK_UpdateSoftware_pfn)   (const wchar_t* wszProduct);
@@ -74,15 +76,17 @@ SKPlugIn_Init (HMODULE hModSpecialK)
                             TBF_VER_STR.c_str () );
 
   if (! TBF_LoadConfig ()) {
-    config.audio.channels            = 6;
-    config.audio.sample_hz           = 48000;
+    config.audio.channels            =  6;
+    config.audio.sample_hz           = -1;
     config.audio.compatibility       = false;
     config.audio.enable_fix          = true;
 
     config.file_io.capture           = false;
 
     config.steam.allow_broadcasts    = false;
-    config.lua.fix_priest            = true;
+
+    config.framerate.replace_limiter = true;
+    config.framerate.target          = 20;
 
     config.render.aspect_ratio       = 1.777778f;
     config.render.fovy               = 0.785398f;
@@ -123,7 +127,7 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     //tbf::FileIO::Init       ();
     //tbf::SteamFix::Init     ();
     tbf::RenderFix::Init    ();
-    //tbf::FrameRateFix::Init ();
+    tbf::FrameRateFix::Init ();
     //tbf::KeyboardFix::Init  ();
 
     // Uncomment this when spawning a thread
@@ -176,7 +180,7 @@ DllMain (HMODULE hModule,
         //tbf::FileIO::Shutdown       ();
         //tbf::SteamFix::Shutdown     ();
         tbf::RenderFix::Shutdown    ();
-        //tbf::FrameRateFix::Shutdown ();
+        tbf::FrameRateFix::Shutdown ();
         //tbf::KeyboardFix::Shutdown  ();
 
         TBF_UnInit_MinHook ();

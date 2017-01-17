@@ -24,7 +24,7 @@
 #include <Windows.h>
 #include "log.h"
 
-iSK_Logger* dll_log;
+iSK_Logger* dll_log = nullptr;
 
 iSK_Logger*
 TBF_CreateLog (const wchar_t* const wszName)

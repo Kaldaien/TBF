@@ -138,7 +138,7 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
       Type == D3DSAMP_MIPMAPLODBIAS) {
     //dll_log->Log (L" [!] IDirect3DDevice9::SetSamplerState (...)");
 
-    if (Type < 8) {
+    if (Type <= 8) {
       //dll_log->Log (L" %s Filter: %x", Type == D3DSAMP_MIPFILTER ? L"Mip" : Type == D3DSAMP_MINFILTER ? L"Min" : L"Mag", Value);
       if (Type == D3DSAMP_MIPFILTER && Value != D3DTEXF_NONE) {
         Value = D3DTEXF_LINEAR;
@@ -151,11 +151,11 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
 
       // Clamp [0, oo)
       if (Type == D3DSAMP_MIPMAPLODBIAS) {
-        float fMax =
-          max (0.0f, *(float *)&Value);
+        float fMax = config.textures.lod_bias;
+        //float fMax =
+          //max (0.0f, *reinterpret_cast <float *> (&Value));
 
-        *(DWORD *)&Value =
-          *(DWORD *)&fMax;
+        Value = *reinterpret_cast <DWORD *> (&fMax);
       }
     }
   }
@@ -658,6 +658,11 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
   InterlockedExchange (&tbf::RenderFix::dwRenderThreadID, GetCurrentThreadId ());
 
   hr = SK_EndBufferSwap (hr, device);
+
+  if ( config.framerate.replace_limiter &&
+       tbf::FrameRateFix::variable_speed_installed ) {
+    tbf::FrameRateFix::RenderTick ();
+  }
 
   //if (config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
@@ -1780,22 +1785,30 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
   SK_IVariable* aspect_correct_vids = TBF_CreateVar (SK_IVariable::Boolean, &config.render.blackbar_videos);
   SK_IVariable* aspect_correction   = TBF_CreateVar (SK_IVariable::Boolean, &config.render.aspect_correction);
 
-  SK_IVariable* remaster_textures   = TBF_CreateVar (SK_IVariable::Boolean, &config.textures.remaster);
-  SK_IVariable* rescale_shadows     = TBF_CreateVar (SK_IVariable::Int,     &config.render.shadow_rescale);
-  SK_IVariable* rescale_env_shadows = TBF_CreateVar (SK_IVariable::Int,     &config.render.env_shadow_rescale);
   SK_IVariable* postproc_ratio      = TBF_CreateVar (SK_IVariable::Float,   &config.render.postproc_ratio);
   SK_IVariable* clear_blackbars     = TBF_CreateVar (SK_IVariable::Boolean, &config.render.clear_blackbars);
+
+  SK_IVariable* remaster_textures   = TBF_CreateVar (SK_IVariable::Boolean, &config.textures.remaster);
+  SK_IVariable* lod_bias            = TBF_CreateVar (SK_IVariable::Float,   &config.textures.lod_bias);
+  SK_IVariable* uncompressed        = TBF_CreateVar (SK_IVariable::Boolean, &config.textures.uncompressed);
+
+  SK_IVariable* rescale_shadows     = TBF_CreateVar (SK_IVariable::Int,     &config.render.shadow_rescale);
+  SK_IVariable* rescale_env_shadows = TBF_CreateVar (SK_IVariable::Int,     &config.render.env_shadow_rescale);
 
   //command.AddVariable ("AspectRatio",         aspect_ratio_);
   //command.AddVariable ("FOVY",                fovy_);
 
-  command.AddVariable ("AspectCorrectVideos", aspect_correct_vids);
-  command.AddVariable ("AspectCorrection",    aspect_correction);
-  command.AddVariable ("RemasterTextures",    remaster_textures);
-  command.AddVariable ("RescaleShadows",      rescale_shadows);
-  command.AddVariable ("RescaleEnvShadows",   rescale_env_shadows);
-  command.AddVariable ("PostProcessRatio",    postproc_ratio);
-  command.AddVariable ("ClearBlackbars",      clear_blackbars);
+  command.AddVariable ("Textures.Remaster",     remaster_textures);
+  command.AddVariable ("Textures.LODBias",      lod_bias);
+  command.AddVariable ("Textures.Uncompressed", uncompressed);
+
+  command.AddVariable ("Shadows.Rescale",       rescale_shadows);
+  command.AddVariable ("Shadows.RescaleEnv",    rescale_env_shadows);
+
+  command.AddVariable ("AspectCorrectVideos",   aspect_correct_vids);
+  command.AddVariable ("AspectCorrection",      aspect_correction);
+  command.AddVariable ("PostProcessRatio",      postproc_ratio);
+  command.AddVariable ("ClearBlackbars",        clear_blackbars);
 
   command.AddVariable ("TestVS", TBF_CreateVar (SK_IVariable::Int, &TEST_VS));
 

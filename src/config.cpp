@@ -51,19 +51,7 @@ struct {
 } audio;
 
 struct {
-  tbf::ParameterBool*    allow_fake_sleep;
-  tbf::ParameterBool*    yield_processor;
-  tbf::ParameterBool*    minimize_latency;
-  tbf::ParameterInt*     speedresetcode_addr;
-  tbf::ParameterInt*     speedresetcode2_addr;
-  tbf::ParameterInt*     speedresetcode3_addr;
-  tbf::ParameterInt*     limiter_branch_addr;
-  tbf::ParameterBool*    disable_limiter;
-  tbf::ParameterBool*    auto_adjust;
-  tbf::ParameterInt*     target;
-  tbf::ParameterInt*     battle_target;
-  tbf::ParameterBool*    battle_adaptive;
-  tbf::ParameterInt*     cutscene_target;
+  tbf::ParameterBool*    replace_limiter;
 } framerate;
 
 struct {
@@ -84,6 +72,8 @@ struct {
 
 struct {
   tbf::ParameterBool*    remaster;
+  tbf::ParameterBool*    uncompressed;
+  tbf::ParameterFloat*   lod_bias;
   tbf::ParameterBool*    cache;
   tbf::ParameterBool*    dump;
   tbf::ParameterInt*     cache_size;
@@ -100,10 +90,6 @@ struct {
   tbf::ParameterStringW* swap_keys;
 } keyboard;
 
-
-struct {
-  tbf::ParameterBool*    fix_priest;
-} lua;
 
 struct {
   struct {
@@ -225,6 +211,26 @@ TBF_LoadConfig (std::wstring name)
       L"Texture.System",
         L"Remaster" );
 
+  textures.uncompressed =
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Do Not Re-Compress Remastered Textures")
+      );
+  textures.uncompressed->register_to_ini (
+    render_ini,
+      L"Texture.System",
+        L"UncompressedRemasters" );
+
+  textures.lod_bias =
+    static_cast <tbf::ParameterFloat *>
+      (g_ParameterFactory.create_parameter <float> (
+        L"Texture LOD Bias")
+      );
+  textures.lod_bias->register_to_ini (
+    render_ini,
+      L"Texture.System",
+        L"LODBias" );
+
   textures.cache_size = 
     static_cast <tbf::ParameterInt *>
       (g_ParameterFactory.create_parameter <int> (
@@ -276,6 +282,16 @@ TBF_LoadConfig (std::wstring name)
     render_ini,
       L"Shadow.Quality",
         L"RescaleEnvShadows" );
+
+  framerate.replace_limiter =
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Replace Namco's Framerate Limiter")
+      );
+  framerate.replace_limiter->register_to_ini (
+    render_ini,
+      L"Framerate.Fix",
+        L"ReplaceLimiter" );
 
 
   input.gamepad.texture_set =
@@ -345,7 +361,11 @@ TBF_LoadConfig (std::wstring name)
 
   render.dump_shaders->load        (config.render.dump_shaders);
 
+  framerate.replace_limiter->load  (config.framerate.replace_limiter);
+
   textures.remaster->load       (config.textures.remaster);
+  textures.uncompressed->load   (config.textures.uncompressed);
+  textures.lod_bias->load       (config.textures.lod_bias);
   textures.cache->load          (config.textures.cache);
   textures.dump->load           (config.textures.dump);
   textures.cache_size->load     (config.textures.max_cache_in_mib);
@@ -365,12 +385,16 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   audio.compatibility->store (config.audio.compatibility);
   audio.enable_fix->store    (config.audio.enable_fix);
 
+  framerate.replace_limiter->store  (config.framerate.replace_limiter);
+
   render.dump_shaders->store        (config.render.dump_shaders);
 
   render.rescale_shadows->store     (config.render.shadow_rescale);
   render.rescale_env_shadows->store (config.render.env_shadow_rescale);
 
   textures.remaster->store       (config.textures.remaster);
+  textures.uncompressed->store   (config.textures.uncompressed);
+  textures.lod_bias->store       (config.textures.lod_bias);
   textures.cache->store          (config.textures.cache);
   textures.dump->store           (config.textures.dump);
   textures.cache_size->store     (config.textures.max_cache_in_mib);

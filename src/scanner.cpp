@@ -24,6 +24,12 @@
 
 #include <Windows.h>
 
+uintptr_t
+TBF_GetBaseAddr (void)
+{
+  return (uintptr_t)GetModuleHandle (nullptr);
+}
+
 void*
 TBF_Scan (uint8_t* pattern, size_t len, uint8_t* mask)
 {

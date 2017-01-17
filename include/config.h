@@ -31,40 +31,25 @@ extern std::wstring DEFAULT_BK2;
 struct tbf_config_t
 {
   struct {
-    uint32_t sample_hz        = 48000;
-    uint32_t channels         = 6; // OBSOLETE
-    bool     compatibility    = false;
-    bool     enable_fix       = true;
+    uint32_t sample_hz       = -1;
+    uint32_t channels        =  6;
+    bool     compatibility   = false;
+    bool     enable_fix      = true;
   } audio;
 
   struct {
-    bool  yield_processor      = true;
-    bool  allow_fake_sleep     = false;
-    bool  minimize_latency     = false;
-    DWORD speedresetcode_addr  = 0x0046C0F9; //0x0046C529;
-    DWORD speedresetcode2_addr = 0x0056EB41; //0x0056E441;  0x217B464
-    DWORD speedresetcode3_addr = 0x0056E03F; //0x0056D93F;
-    DWORD limiter_branch_addr  = 0x00990F53; //0x00990873;
-    bool  disable_limiter      = true;
-    bool  auto_adjust          = false;
-    int   target               = 60;
-    int   battle_target        = 60;
-    bool  battle_adaptive      = false;
-    int   cutscene_target      = 30;
-    bool  reshade_fix          = false;
+    bool     replace_limiter = true;
+    int      target          = 60;
+    bool     reshade_fix     = false;
   } framerate;
 
   struct {
-    bool capture            = false;
+    bool capture             = false;
   } file_io;
 
   struct {
-    bool allow_broadcasts   = false;
+    bool allow_broadcasts    = false;
   } steam;
-
-  struct {
-    bool fix_priest         = true;
-  } lua;
 
   struct {
     float     fovy               = 0.785398f;
@@ -81,11 +66,13 @@ struct tbf_config_t
   } render;
 
   struct {
-    bool     dump                = false;
-    bool     remaster            = true;
-    bool     cache               = true;
-    int32_t  max_cache_in_mib    = 2048L;
-    int32_t  worker_threads      = 6;
+    bool     dump                =  false;
+    bool     remaster            =  true;
+    bool     cache               =  true;
+    bool     uncompressed        =  false;
+    float    lod_bias            = -0.2666f;
+    int32_t  max_cache_in_mib    =  2048L;
+    int32_t  worker_threads      =  6;
   } textures;
 
   struct {

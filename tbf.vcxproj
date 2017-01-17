@@ -229,6 +229,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\framerate.cpp" />
     <ClCompile Include="src\hook.cpp" />
     <ClCompile Include="src\input.cpp" />
     <ClCompile Include="src\ini.cpp" />
