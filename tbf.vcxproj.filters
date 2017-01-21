@@ -55,7 +55,7 @@
     <ClCompile Include="src\tbt\imgui_impl_dx9.cpp">
       <Filter>Source Files\Tales of Berseria Tweak</Filter>
     </ClCompile>
-    <ClCompile Include="src\tbt\main.cpp">
+    <ClCompile Include="src\tbt\control_panel.cpp">
       <Filter>Source Files\Tales of Berseria Tweak</Filter>
     </ClCompile>
   </ItemGroup>

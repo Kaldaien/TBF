@@ -39,6 +39,17 @@ namespace tbf
     void RenderTick (void);
 
 
+    // Call when re-engaging the framerate limiter to make it match
+    //   user prefrences.
+    void BlipFramerate    (void);
+
+    // Disable Special K's framerate limit, generally only useful
+    //   when demonstrating what is wrong with Namco's.
+    void DisengageLimiter (void);
+
+    float GetTargetFrametime (void);
+
+
 #if 0
     //
     // At key points during the game, we need to disable the code that

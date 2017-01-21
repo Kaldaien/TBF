@@ -817,7 +817,7 @@ ImGuiIO::ImGuiIO()
     DisplaySize   = ImVec2(-1.0f, -1.0f);
     DeltaTime     = 1.0f/60.0f;
     IniSavingRate = 5.0f;
-    IniFilename   = "TBFix_UI.ini";
+    //IniFilename   = "TBFix_UI.ini";
     LogFilename   = "logs/ui.log";
 
     Fonts = &GImDefaultFontAtlas;
@@ -2143,7 +2143,7 @@ void ImGui::NewFrame()
         IM_PLACEMENT_NEW(g.LogClipboard) ImGuiTextBuffer();
 
         IM_ASSERT(g.Settings.empty());
-        LoadIniSettingsFromDisk(g.IO.IniFilename);
+        //LoadIniSettingsFromDisk(g.IO.IniFilename);
         g.Initialized = true;
     }
 
@@ -2250,8 +2250,8 @@ void ImGui::NewFrame()
     if (g.SettingsDirtyTimer > 0.0f)
     {
         g.SettingsDirtyTimer -= g.IO.DeltaTime;
-        if (g.SettingsDirtyTimer <= 0.0f)
-            SaveIniSettingsToDisk(g.IO.IniFilename);
+        //if (g.SettingsDirtyTimer <= 0.0f)
+            //SaveIniSettingsToDisk(g.IO.IniFilename);
     }
 
     // Find the window we are hovering. Child windows can extend beyond the limit of their parent so we need to derive HoveredRootWindow from HoveredWindow
@@ -2378,7 +2378,7 @@ void ImGui::Shutdown()
     if (!g.Initialized)
         return;
 
-    SaveIniSettingsToDisk(g.IO.IniFilename);
+    //SaveIniSettingsToDisk(g.IO.IniFilename);
 
     for (int i = 0; i < g.Windows.Size; i++)
     {

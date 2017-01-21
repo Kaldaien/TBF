@@ -48,6 +48,9 @@ uint32_t         tbf::FrameRateFix::target_fps               = 0;
 HMODULE          tbf::FrameRateFix::bink_dll                 = 0;
 HMODULE          tbf::FrameRateFix::kernel32_dll             = 0;
 
+typedef void (*NamcoLimiter_pfn)(void);
+NamcoLimiter_pfn NamcoLimiter_Original = nullptr;
+
 typedef void* (__stdcall *BinkOpen_pfn)(const char* filename, DWORD unknown0);
 BinkOpen_pfn BinkOpen_Original = nullptr;
 
@@ -173,6 +176,13 @@ CreateTimerQueueTimer_Override (
 }
 
 void
+NamcoLimiter_Detour(void)
+{
+  if (! config.framerate.replace_limiter)
+    NamcoLimiter_Original ();
+}
+
+void
 tbf::FrameRateFix::Init (void)
 {
   //CommandProcessor* comm_proc = CommandProcessor::getInstance ();
@@ -200,7 +210,7 @@ tbf::FrameRateFix::Init (void)
 
   TBF_ApplyQueuedHooks ();
 
-  if (config.framerate.replace_limiter) {
+  //if (config.framerate.replace_limiter) {
     /*
       6D3610 0x48 0x83 0xec 0x38	; Namco Limiter
       6D3610 0xc3 0x90 0x90 0x90	; No Limiter
@@ -230,6 +240,7 @@ tbf::FrameRateFix::Init (void)
     if (limiter_addr != nullptr) {
       //dll_log->LogEx (true, L"[FrameLimit]  * Installing variable rate simulation... ");
 
+#if 0
       uint8_t disable_inst [] = { 0xc3, 0x90, 0x90, 0x90 };
 
       TBF_InjectMachineCode ( limiter_addr,
@@ -237,9 +248,18 @@ tbf::FrameRateFix::Init (void)
                                   sizeof (disable_inst),
                                     PAGE_EXECUTE_READWRITE );
 
+#endif
+
+      TBF_CreateFuncHook ( L"NamcoLimiter",
+                             limiter_addr,
+                               NamcoLimiter_Detour,
+                    (LPVOID *)&NamcoLimiter_Original );
+      TBF_EnableHook    (limiter_addr);
+
+
       variable_speed_installed = true;
     }
-  }
+  //}
 }
 
 void
@@ -249,13 +269,31 @@ tbf::FrameRateFix::Shutdown (void)
 
   FreeLibrary (kernel32_dll);
   FreeLibrary (bink_dll);
+}
 
-  ////TBF_DisableHook (pfnSK_SetPresentParamsD3D9);
+// Force RevMatching when re-engaging the limiter
+void
+tbf::FrameRateFix::BlipFramerate (void)
+{
+  tick_scale = 0;
 
-  if (variable_speed_installed) {
-  }
+  // A value of 0 will cause the game's preference be re-engaged.
+}
 
-  ////TBF_DisableHook (pfnSleep);
+void
+tbf::FrameRateFix::DisengageLimiter (void)
+{
+  SK_GetCommandProcessor ()->ProcessCommandLine ("TargetFPS 0.0");
+}
+
+
+float
+tbf::FrameRateFix::GetTargetFrametime (void)
+{
+  uint32_t* pTickScale =
+    (uint32_t *)(TBF_GetBaseAddr () + TICK_ADDR_BASE);
+
+  return ( (float)(*pTickScale) * 16.6666666f );
 }
 
 //

@@ -247,7 +247,7 @@
     <ClCompile Include="src\input.cpp" />
     <ClCompile Include="src\ini.cpp" />
     <ClCompile Include="src\tbt\imgui_impl_dx9.cpp" />
-    <ClCompile Include="src\tbt\main.cpp" />
+    <ClCompile Include="src\tbt\control_panel.cpp" />
     <ClCompile Include="src\textures.cpp" />
     <Text Include="include\keyboard.h" />
     <ClCompile Include="src\log.cpp" />

@@ -9,6 +9,8 @@
 #include <tchar.h>
 
 #include "config.h"
+#include "render.h"
+#include "framerate.h"
 
 // Data
 static LPDIRECT3DDEVICE9        g_pd3dDevice = NULL;
@@ -62,9 +64,8 @@ WndProc ( HWND   hWnd,
 #include <vector>
 
 
-bool show_config         = true;
-bool show_test_window    = true;
-bool show_gamepad_config = false;
+bool show_config      = true;
+bool show_test_window = false;
 
 ImVec4 clear_col = ImColor(114, 144, 154);
 
@@ -163,26 +164,27 @@ TBFix_GamepadConfigDlg (void)
     }
   }
 
-  int orig_sel = gamepads.sel;
-
-  ImGui::SetNextWindowSize (ImVec2 (225, 90), ImGuiSetCond_Appearing);
-
-  ImGui::Begin             ("Gamepad Config");
-  ImGui::ListBox           ("Gamepad\nIcons", &gamepads.sel, gamepads.array.data (), gamepads.array.size (), 3);
-  ImGui::End               ();
-
-  if (orig_sel != gamepads.sel)
+  if (ImGui::BeginPopupModal ("Gamepad Config", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders))
   {
-    wchar_t pad [128] = { L'\0' };
+    int orig_sel = gamepads.sel;
 
-    swprintf (pad, L"%hs", gamepads.array [gamepads.sel]);
+    if (ImGui::ListBox ("Gamepad\nIcons", &gamepads.sel, gamepads.array.data (), gamepads.array.size (), 3))
+    {
+      if (orig_sel != gamepads.sel)
+      {
+        wchar_t pad[128] = { L'\0' };
 
-    config.input.gamepad.texture_set = pad;
+        swprintf(pad, L"%hs", gamepads.array[gamepads.sel]);
 
-    //extern void
-    //TBFix_ReloadPadButtons (void);
+        config.input.gamepad.texture_set = pad;
 
-    //TBFix_ReloadPadButtons ();
+        tbf::RenderFix::need_reset.textures = true;
+      }
+
+      ImGui::CloseCurrentPopup ();
+    }
+
+    ImGui::EndPopup();
   }
 }
 
@@ -196,50 +198,117 @@ TBFix_DrawConfigUI (LPDIRECT3DDEVICE9 pDev = nullptr)
 
   ImGui_ImplDX9_NewFrame ();
 
-  ImGui::SetNextWindowPos (ImVec2 (640, 360), ImGuiSetCond_FirstUseEver);
+  //ImGui::SetNextWindowPos             (ImVec2 ( 640, 360), ImGuiSetCond_FirstUseEver);
+  ImGui::SetNextWindowPosCenter       (ImGuiSetCond_Always);
+  ImGui::SetNextWindowSizeConstraints (ImVec2 (50, 50), ImGui::GetIO ().DisplaySize);
 
   // 1. Show a simple window
   // Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
-    ImGui::Begin ("Tales of Berseria \"Fix\" Control Panel", &show_config);
+    ImGui::Begin ("Tales of Berseria \"Fix\" Control Panel", &show_config, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders);
 
     ImGui::PushItemWidth (ImGui::GetWindowWidth () * 0.65f);
 
-    if (ImGui::CollapsingHeader ("Framerate Control"))
+    if (tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures) {
+      ImGui::TextColored ( ImVec4 (0.8f, 0.8f, 0.1f, 1.0f),
+                             "    You have made changes that will not apply until you change Screen Modes in Graphics Settings,\n"
+                             "      or by performing Alt + Tab with the game set to Fullscreen mode." );
+    }
+
+    if (ImGui::CollapsingHeader ("Framerate Control", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
     {
-      ImGui::Checkbox ("Disable Namco's Limiter (requires restart)", &config.framerate.replace_limiter);
+      int limiter =
+        config.framerate.replace_limiter ? 1 : 0;
+
+      const char* szLabel = (limiter == 0 ? "Framerate Limiter  (choose something else!)" : "Framerate Limiter");
+
+      ImGui::Combo (szLabel, &limiter, "Namco          (A.K.A. Stutterfest 2017)\0"
+                                       "Special K      (Precision Timing For The Win!)\0\0" );
 
       static float values [120]  = { 0 };
-      static int   values_offset = 0;
-      static float refresh_time  = ImGui::GetTime ();
+      static int   values_offset =   0;
 
       values [values_offset] = 1000.0f * ImGui::GetIO ().DeltaTime;
       values_offset = (values_offset + 1) % IM_ARRAYSIZE (values);
 
-      ImGui::PlotLines ( "Frametimes",
+      if (limiter != config.framerate.replace_limiter)
+      {
+        config.framerate.replace_limiter = limiter;
+
+        if (config.framerate.replace_limiter)
+          tbf::FrameRateFix::BlipFramerate    ();
+        else
+          tbf::FrameRateFix::DisengageLimiter ();
+
+        float fZero = 0.0f;
+        memset (values, *(reinterpret_cast <DWORD *> (&fZero)), sizeof (float) * 120);
+        values_offset = 0;
+      }
+
+      float sum = 0.0f;
+
+      float min = FLT_MAX;
+      float max = 0.0f;
+
+      for (float val : values) {
+        sum += val;
+
+        if (val > max)
+          max = val;
+
+        if (val < min)
+          min = val;
+      }
+
+      static char szAvg [512];
+
+      sprintf ( szAvg,
+                  "Avg milliseconds per-frame: %6.3f  (Target: %6.3f)\n"
+                  "    Extreme frametimes:      %6.3f min, %6.3f max\n\n\n\n"
+                  "Variation:  %8.5f ms  ==>  %.1f FPS  +/-  %3.1f frames",
+                    sum / 120.0f, tbf::FrameRateFix::GetTargetFrametime (),
+                      min, max, max - min,
+                        1000.0f / (sum / 120.0f), (max - min) / (1000.0f / (sum / 120.0f)) );
+
+      ImGui::PlotLines ( "",
                            values,
                              IM_ARRAYSIZE (values),
                                values_offset,
-                                 "Milliseconds per-frame",
+                                 szAvg,
                                    0.0f,
-                                     33.0f,
+                                     2.0f * tbf::FrameRateFix::GetTargetFrametime (),
                                        ImVec2 (0, 80) );
 
-      ImGui::Text ( "Application average %.3f ms/frame (%.1f FPS)",
-                      1000.0f / ImGui::GetIO ().Framerate,
-                                ImGui::GetIO ().Framerate );
+      ImGui::SameLine ();
+
+      if (! config.framerate.replace_limiter) {
+        ImGui::TextColored ( ImVec4 (1.0f, 1.0f, 0.0f, 1.0f),
+                               "\n"
+                               "\n"
+                               " ... working limiters do not resemble EKGs!" );
+      } else {
+        ImGui::TextColored ( ImVec4 ( 0.2f, 1.0f, 0.2f, 1.0f),
+                               "\n"
+                               "\n"
+                               "This is how a framerate limiter should work." );
+      }
+
+      //ImGui::Text ( "Application average %.3f ms/frame (%.1f FPS)",
+                      //1000.0f / ImGui::GetIO ().Framerate,
+                                //ImGui::GetIO ().Framerate );
     }
 
     if (ImGui::CollapsingHeader ("Texture Options"))
     {
-      ImGui::Checkbox ("Dump Textures",    &config.textures.dump);
-      ImGui::Checkbox ("Generate Mipmaps", &config.textures.remaster);
+      if (ImGui::Checkbox ("Dump Textures",    &config.textures.dump))     tbf::RenderFix::need_reset.graphics = true;
+      if (ImGui::Checkbox ("Generate Mipmaps", &config.textures.remaster)) tbf::RenderFix::need_reset.graphics = true;
 
       if (ImGui::IsItemHovered ())
         ImGui::SetTooltip ("Eliminates distant texture aliasing");
 
       if (config.textures.remaster) {
         ImGui::SameLine (150); 
-        ImGui::Checkbox ("(Uncompressed)", &config.textures.uncompressed);
+
+        if (ImGui::Checkbox ("(Uncompressed)", &config.textures.uncompressed)) tbf::RenderFix::need_reset.graphics = true;
 
         if (ImGui::IsItemHovered ())
           ImGui::SetTooltip ("Uses more VRAM, but avoids texture compression artifacts on generated mipmaps.");
@@ -273,7 +342,8 @@ TBFix_DrawConfigUI (LPDIRECT3DDEVICE9 pDev = nullptr)
           if (scale > 3)
             scale = 3;
 
-          radio = scale;
+          radio    = scale;
+          last_sel = radio;
         }
 
         int radio    = 0;
@@ -286,19 +356,37 @@ TBFix_DrawConfigUI (LPDIRECT3DDEVICE9 pDev = nullptr)
       ImGui::Combo ("Character Shadow Resolution",     &shadows.radio,     "Normal\0Enhanced\0High\0Ultra\0\0");
       ImGui::Combo ("Environmental Shadow Resolution", &env_shadows.radio, "Normal\0High\0Ultra\0\0");
 
+      ImGui::TextColored ( ImVec4 ( 0.999f, 0.01f, 0.999f, 1.0f),
+                             " * Changes to these settings will produce weird results until you change Screen Mode in-game...\n" );
+
       if (env_shadows.radio != env_shadows.last_sel) {
-        config.render.env_shadow_rescale = env_shadows.radio;
-        env_shadows.last_sel             = env_shadows.radio;
+        config.render.env_shadow_rescale    = env_shadows.radio;
+        env_shadows.last_sel                = env_shadows.radio;
+        tbf::RenderFix::need_reset.graphics = true;
       }
 
       if (shadows.radio != shadows.last_sel) {
-        config.render.shadow_rescale = -shadows.radio;
-        shadows.last_sel             =  shadows.radio;
+        config.render.shadow_rescale        = -shadows.radio;
+        shadows.last_sel                    =  shadows.radio;
+        tbf::RenderFix::need_reset.graphics = true;
+      }
+    }
+
+    if (ImGui::CollapsingHeader ("Audio Configuration"))
+    {
+      ImGui::Checkbox ("Enable 7.1 Channel Audio Fix", &config.audio.enable_fix);
+
+      if (config.audio.enable_fix) {
+        ImGui::RadioButton ("Stereo",       (int *)&config.audio.channels, 2);
+        ImGui::RadioButton ("Quadraphonic", (int *)&config.audio.channels, 4);
+        ImGui::RadioButton ("5.1 Surround", (int *)&config.audio.channels, 6);
       }
     }
 
     if (ImGui::Button ("Gamepad Config"))
-      show_gamepad_config ^= 1;
+      ImGui::OpenPopup ("Gamepad Config");
+
+    TBFix_GamepadConfigDlg ();
 
     ImGui::SameLine ();
 
@@ -308,18 +396,18 @@ TBFix_DrawConfigUI (LPDIRECT3DDEVICE9 pDev = nullptr)
     if ( ImGui::Checkbox ("Pause Game While This Menu Is Open", &config.input.ui.pause) )
       TBFix_PauseGame (config.input.ui.pause);
 
+    ImGui::SameLine (500);
+
+    if (ImGui::Selectable ("...", show_test_window))
+      show_test_window ^= show_test_window;
+
     ImGui::End ();
 
-  if (show_gamepad_config)
+  if (show_test_window)
   {
-    TBFix_GamepadConfigDlg ();
-  }
-
-  //if (show_test_window)
-  //{
     //ImGui::SetNextWindowPos (ImVec2 (650, 20), ImGuiSetCond_FirstUseEver);
     //ImGui::ShowTestWindow   (&show_test_window);
-  //}
+  }
 
   // Rendering
   g_pd3dDevice->SetRenderState (D3DRS_ZENABLE,           false);

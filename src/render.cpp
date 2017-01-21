@@ -1464,8 +1464,12 @@ tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
     if (pending_loads ())
       TBFix_LoadQueuedTextures ();
 
-    tex_mgr.reset                       ();
+    tex_mgr.reset              ();
+
+    need_reset.textures = false;
   }
+
+  need_reset.graphics = false;
 
   vs_checksums.clear ();
   ps_checksums.clear ();
@@ -1935,3 +1939,6 @@ IDirect3DSurface9* tbf::RenderFix::pPostProcessSurface = nullptr;
 bool               tbf::RenderFix::bink                = false;
 
 HMODULE            tbf::RenderFix::user32_dll          = 0;
+
+tbf::RenderFix::reset_state_s
+                   tbf::RenderFix::need_reset;

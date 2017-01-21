@@ -5,7 +5,6 @@
 // You can call ImGui::ShowTestWindow() in your code to learn about various features of ImGui.
 // Everything in this file will be stripped out by the linker if you don't call ImGui::ShowTestWindow().
 
-#if 0
 #if defined(_MSC_VER) && !defined(_CRT_SECURE_NO_WARNINGS)
 #define _CRT_SECURE_NO_WARNINGS
 #endif
@@ -2635,7 +2634,5 @@ static void ShowExampleAppLongText(bool* p_open)
 void ImGui::ShowTestWindow(bool*) {}
 void ImGui::ShowUserGuide() {}
 void ImGui::ShowStyleEditor(ImGuiStyle*) {}
-
-#endif
 
 #endif

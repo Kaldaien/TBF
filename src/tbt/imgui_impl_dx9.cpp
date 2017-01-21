@@ -15,6 +15,8 @@
 #include <dinput.h>
 
 #include "config.h"
+#include "render.h"
+
 
 // Data
 static HWND                     g_hWnd             = 0;

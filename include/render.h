@@ -40,6 +40,12 @@ namespace tbf
     void Reset    ( IDirect3DDevice9      *This,
                     D3DPRESENT_PARAMETERS *pPresentationParameters );
 
+    // Indicates whether setting changes need a device reset
+    struct reset_state_s {
+      bool textures = false;
+      bool graphics = false;
+    } extern need_reset;
+
     class CommandProcessor : public SK_IVariableListener {
     public:
       CommandProcessor (void);
