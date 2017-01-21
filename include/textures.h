@@ -33,6 +33,30 @@ extern iSK_Logger* tex_log;
 
 interface ISKTextureD3D9;
 
+typedef enum D3DXIMAGE_FILEFORMAT {
+  D3DXIFF_BMP = 0,
+  D3DXIFF_JPG = 1,
+  D3DXIFF_TGA = 2,
+  D3DXIFF_PNG = 3,
+  D3DXIFF_DDS = 4,
+  D3DXIFF_PPM = 5,
+  D3DXIFF_DIB = 6,
+  D3DXIFF_HDR = 7,
+  D3DXIFF_PFM = 8,
+  D3DXIFF_FORCE_DWORD = 0x7fffffff
+} D3DXIMAGE_FILEFORMAT, *LPD3DXIMAGE_FILEFORMAT;
+
+#define D3DX_DEFAULT ((UINT) -1)
+typedef struct D3DXIMAGE_INFO {
+  UINT                 Width;
+  UINT                 Height;
+  UINT                 Depth;
+  UINT                 MipLevels;
+  D3DFORMAT            Format;
+  D3DRESOURCETYPE      ResourceType;
+  D3DXIMAGE_FILEFORMAT ImageFileFormat;
+} D3DXIMAGE_INFO, *LPD3DXIMAGE_INFO;
+
 namespace tbf {
 namespace RenderFix {
 #if 0
@@ -94,6 +118,21 @@ namespace RenderFix {
 
     IDirect3DTexture9* tex_ps4       = nullptr;
     IDirect3DTexture9* tex_xboxone   = nullptr;
+
+    struct {
+      LPVOID         pSrcData       = nullptr;
+      UINT           SrcDataSize    = 0;
+      UINT           Width          = 0;
+      UINT           Height         = 0;
+      UINT           MipLevels      = 0;
+      DWORD          Usage          = 0;
+      D3DFORMAT      Format;
+      D3DPOOL        Pool;
+      DWORD          Filter;
+      DWORD          MipFilter;
+      D3DCOLOR       ColorKey;
+      D3DXIMAGE_INFO SrcInfo;
+    } base_img;
   } extern pad_buttons;
 
   class TextureManager {
@@ -214,7 +253,7 @@ public:
 
     /*** IDirect3DBaseTexture9 methods ***/
     STDMETHOD(GetDevice)(THIS_ IDirect3DDevice9** ppDevice) {
-      tex_log->Log (L"[ Tex. Mgr ] ISKTextureD3D9::GetDevice (%ph)", ppDevice);
+      //tex_log->Log (L"[ Tex. Mgr ] ISKTextureD3D9::GetDevice (%ph)", ppDevice);
       return pTex->GetDevice (ppDevice);
     }
     STDMETHOD(SetPrivateData)(THIS_ REFGUID refguid,CONST void* pData,DWORD SizeOfData,DWORD Flags) {
@@ -342,29 +381,6 @@ public:
                                       //     set when SetTexture (...) is called.
 };
 
-typedef enum D3DXIMAGE_FILEFORMAT { 
-  D3DXIFF_BMP          = 0,
-  D3DXIFF_JPG          = 1,
-  D3DXIFF_TGA          = 2,
-  D3DXIFF_PNG          = 3,
-  D3DXIFF_DDS          = 4,
-  D3DXIFF_PPM          = 5,
-  D3DXIFF_DIB          = 6,
-  D3DXIFF_HDR          = 7,
-  D3DXIFF_PFM          = 8,
-  D3DXIFF_FORCE_DWORD  = 0x7fffffff
-} D3DXIMAGE_FILEFORMAT, *LPD3DXIMAGE_FILEFORMAT;
-
-#define D3DX_DEFAULT ((UINT) -1)
-typedef struct D3DXIMAGE_INFO {
-  UINT                 Width;
-  UINT                 Height;
-  UINT                 Depth;
-  UINT                 MipLevels;
-  D3DFORMAT            Format;
-  D3DRESOURCETYPE      ResourceType;
-  D3DXIMAGE_FILEFORMAT ImageFileFormat;
-} D3DXIMAGE_INFO, *LPD3DXIMAGE_INFO;
 typedef HRESULT (STDMETHODCALLTYPE *D3DXCreateTextureFromFileInMemoryEx_pfn)
 (
   _In_        LPDIRECT3DDEVICE9  pDevice,

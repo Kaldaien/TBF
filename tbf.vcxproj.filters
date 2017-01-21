@@ -43,6 +43,21 @@
     <ClCompile Include="src\framerate.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\imgui\imgui.cpp">
+      <Filter>Source Files\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\imgui\imgui_demo.cpp">
+      <Filter>Source Files\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\imgui\imgui_draw.cpp">
+      <Filter>Source Files\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tbt\imgui_impl_dx9.cpp">
+      <Filter>Source Files\Tales of Berseria Tweak</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tbt\main.cpp">
+      <Filter>Source Files\Tales of Berseria Tweak</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\command.h">
@@ -93,6 +108,27 @@
     <ClInclude Include="include\input.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\tbt\imgui_impl_dx9.h">
+      <Filter>Header Files\Tales of Berseria Tweak</Filter>
+    </ClInclude>
+    <ClInclude Include="include\imgui\imconfig.h">
+      <Filter>Header Files\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\imgui\imgui.h">
+      <Filter>Header Files\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\imgui\imgui_internal.h">
+      <Filter>Header Files\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="include\stb\rect_pack.h">
+      <Filter>Header Files\stb</Filter>
+    </ClInclude>
+    <ClInclude Include="include\stb\textedit.h">
+      <Filter>Header Files\stb</Filter>
+    </ClInclude>
+    <ClInclude Include="include\stb\truetype.h">
+      <Filter>Header Files\stb</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="version.ini" />
@@ -116,6 +152,21 @@
     </Filter>
     <Filter Include="Resource Files">
       <UniqueIdentifier>{75d25c58-9b48-45cc-948e-40de7eb119d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\imgui">
+      <UniqueIdentifier>{9210efff-0c00-41e1-b760-d0a76b632352}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Tales of Berseria Tweak">
+      <UniqueIdentifier>{7614fb09-0ecb-419e-9843-a7a83f8f3521}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\imgui">
+      <UniqueIdentifier>{9a0b79ba-cdc0-45eb-8818-c78ab4eab12c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\stb">
+      <UniqueIdentifier>{a385dfec-22b1-46dc-b1ea-a8ffa2f7c2ba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Tales of Berseria Tweak">
+      <UniqueIdentifier>{5c26b66a-640f-414a-a4b6-23e2e2fa03d2}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

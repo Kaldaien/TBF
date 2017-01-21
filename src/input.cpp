@@ -51,11 +51,19 @@ typedef BOOL (WINAPI *GetCursorInfo_pfn)
 typedef BOOL (WINAPI *GetCursorPos_pfn)
   (_Out_ LPPOINT lpPoint);
 
-GetCursorInfo_pfn GetCursorInfo_Original    = nullptr;
-GetCursorPos_pfn  GetCursorPos_Original     = nullptr;
+typedef BOOL (WINAPI *SetCursorPos_pfn)
+(
+  _In_ int X,
+  _In_ int Y
+);
+
+GetCursorInfo_pfn GetCursorInfo_Original = nullptr;
+GetCursorPos_pfn  GetCursorPos_Original  = nullptr;
+SetCursorPos_pfn  SetCursorPos_Original  = nullptr;
 
 BOOL WINAPI GetCursorInfo_Detour (_Inout_ PCURSORINFO pci);
 BOOL WINAPI GetCursorPos_Detour  (_Out_   LPPOINT     lpPoint);
+BOOL WINAPI SetCursorPos_Detour  (_In_ int X, _In_ int Y);
 
 
 // Returns the original cursor position and stores the new one in pPoint
@@ -101,6 +109,12 @@ SK_TBF_PluginKeyPress ( BOOL Control,
 {
   SK_ICommandProcessor& command =
     *SK_GetCommandProcessor ();
+
+  if (Control && Shift && vkCode == VK_BACK)  {
+    extern void TBFix_ToggleConfigUI (void);
+    TBFix_ToggleConfigUI ();
+  }
+
 
   if (Control && Shift) {
     if (vkCode == 'U') {
@@ -192,12 +206,32 @@ typedef LRESULT (CALLBACK *DetourWindowProc_pfn)(
 DetourWindowProc_pfn DetourWindowProc_Original = nullptr;
 
 LRESULT
+ImGui_ImplDX9_WndProcHandler ( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam );
+
+LRESULT
 CALLBACK
 DetourWindowProc ( _In_  HWND   hWnd,
                    _In_  UINT   uMsg,
                    _In_  WPARAM wParam,
                    _In_  LPARAM lParam )
 {
+  if (ImGui_ImplDX9_WndProcHandler (hWnd, uMsg, wParam, lParam)) {
+    if (config.input.ui.visible) {
+      return DefWindowProc (hWnd, uMsg, wParam, lParam);//DetourWindowProc_Original (hWnd, uMsg, wParam, lParam);
+    }
+  }
+
+  if (config.input.ui.visible) {
+    if (uMsg == WM_MOUSEMOVE)// && uMsg <= WM_MOUSELAST)
+      return DefWindowProc (hWnd, uMsg, wParam, lParam);
+
+    //if (uMsg == WM_INPUT)
+      //return DefWindowProc (hWnd, uMsg, wParam, lParam);
+
+    //if (uMsg >= WM_KEYFIRST && uMsg <= WM_KEYLAST)
+      //return DefWindowProc (hWnd, uMsg, wParam, lParam);
+  }
+
   if (uMsg >= WM_MOUSEFIRST && uMsg <= WM_MOUSELAST) {
     static POINT last_p = { LONG_MIN, LONG_MIN };
 
@@ -229,7 +263,6 @@ DetourWindowProc ( _In_  HWND   hWnd,
 void
 tbf::InputFix::Init (void)
 {
-#if 0
   TBF_CreateDLLHook2 ( L"user32.dll", "GetCursorInfo",
                       GetCursorInfo_Detour,
             (LPVOID*)&GetCursorInfo_Original );
@@ -237,7 +270,10 @@ tbf::InputFix::Init (void)
   TBF_CreateDLLHook2 ( L"user32.dll", "GetCursorPos",
                       GetCursorPos_Detour,
             (LPVOID*)&GetCursorPos_Original );
-#endif
+
+  TBF_CreateDLLHook2 ( L"user32.dll", "SetCursorPos",
+                      SetCursorPos_Detour,
+            (LPVOID*)&SetCursorPos_Original );
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                       "SK_PluginKeyPress",
@@ -257,12 +293,24 @@ tbf::InputFix::Shutdown (void)
 {
 }
 
+int game_x, game_y;
 
 BOOL
 WINAPI
 GetCursorInfo_Detour (PCURSORINFO pci)
 {
   BOOL ret = GetCursorInfo_Original (pci);
+
+  static CURSORINFO last_ci;
+
+  if (! config.input.ui.visible) {
+    last_ci = *pci;
+  } else {
+    *pci = last_ci;
+    pci->ptScreenPos.x = game_x;
+    pci->ptScreenPos.x = game_y;
+    return TRUE;
+  }
 
   // Correct the cursor position for Aspect Ratio
   if (game_state.needsFixedMouseCoords () && config.render.aspect_correction) {
@@ -286,9 +334,35 @@ GetCursorPos_Detour (LPPOINT lpPoint)
 {
   BOOL ret = GetCursorPos_Original (lpPoint);
 
+  static POINT last_pt;
+
+  if (! config.input.ui.visible) {
+    last_pt = *lpPoint;
+  }
+  else {
+    lpPoint->x = game_x;
+    lpPoint->y = game_y;
+    //*lpPoint = last_pt;
+
+    return true;
+  }
+
   // Correct the cursor position for Aspect Ratio
   if (game_state.needsFixedMouseCoords () && config.render.aspect_correction)
     CalcCursorPos (lpPoint);
 
   return ret;
+}
+
+BOOL
+WINAPI
+SetCursorPos_Detour(_In_ int x, _In_ int y)
+{
+  game_x = x; game_y = y;
+
+  if (! config.input.ui.visible) {
+    return SetCursorPos_Original (x, y);
+  }
+
+  return TRUE;
 }

@@ -6,8 +6,10 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommand>C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria Demo\Tales of Berseria.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommand>C:\Windows\System32\rundll32.exe</LocalDebuggerCommand>
     <LocalDebuggerWorkingDirectory>C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria Demo\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments>"C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria Demo\tbfix.dll", TBT_Main</LocalDebuggerCommandArguments>
+    <LocalDebuggerAttach>false</LocalDebuggerAttach>
   </PropertyGroup>
 </Project>

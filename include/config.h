@@ -79,6 +79,11 @@ struct tbf_config_t
     struct {
       std::wstring texture_set   = L"XboxOne";
     } gamepad;
+
+    struct {
+      bool         visible       = false;
+      bool         pause         = true;
+    } ui;
   } input;
 
   struct {

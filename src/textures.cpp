@@ -58,7 +58,7 @@ typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
 );
 
 
-static D3DXSaveTextureToFile_pfn               D3DXSaveTextureToFile                        = nullptr;
+static D3DXSaveTextureToFile_pfn               D3DXSaveTextureToFile               = nullptr;
 static D3DXCreateTextureFromFileInMemoryEx_pfn D3DXCreateTextureFromFileInMemoryEx = nullptr;
 
 static BeginScene_pfn                          D3D9BeginScene                      = nullptr;
@@ -1665,6 +1665,95 @@ TBFix_LoadQueuedTextures (void)
 std::set <uint32_t> resample_blacklist;
 bool resample_blacklist_init = false;
 
+void
+TBFix_ReloadPadButtons (void)
+{
+  if (tbf::RenderFix::pad_buttons.tex_xboxone != nullptr)
+  {
+    uint32_t checksum = tbf::RenderFix::pad_buttons.crc32_xboxone;
+
+    tbf::RenderFix::Texture* pTex = 
+      tbf::RenderFix::tex_mgr.getTexture (tbf::RenderFix::pad_buttons.crc32_xboxone);
+
+    IDirect3DTexture9* pD3DTex =
+      pTex->d3d9_tex;
+
+    void* dontcare;
+    if ( pD3DTex != nullptr &&
+         pD3DTex->QueryInterface (IID_SKTextureD3D9, &dontcare) == S_OK )
+    {
+      ISKTextureD3D9* pSKTex =
+        (ISKTextureD3D9 *)pD3DTex;
+
+      IDirect3DDevice9* pDevice = nullptr;
+
+      wchar_t wszFile [MAX_PATH + 2] = { L'\0' };
+
+      _swprintf ( wszFile,
+                    L"TBFix_Res\\Gamepads\\%s\\Buttons.dds",
+                      config.input.gamepad.texture_set.c_str () );
+
+      if (GetFileAttributesW (wszFile) != INVALID_FILE_ATTRIBUTES) {
+        tex_log->LogEx (true, L"[Inject Tex] Injecting custom gamepad buttons... ");
+
+        pD3DTex->GetDevice (&pDevice);
+
+        tbf_tex_load_s* load_op = new tbf_tex_load_s;
+
+        load_op->SrcDataSize =
+          injectable_textures.count (checksum) == 0 ?
+            0 : (UINT)injectable_textures [checksum].size;
+
+        load_op->pDevice  = pDevice;
+        load_op->checksum = checksum;
+        load_op->type     = tbf_tex_load_s::Immediate;
+        wcsncpy (load_op->wszFilename, wszFile, MAX_PATH);
+
+        tex_log->LogEx ( false, L"blocking (deferred)\n" );
+
+        wcsncpy ( load_op->wszFilename,
+                    wszFile,
+                      MAX_PATH );
+
+        load_op->pDest     = pD3DTex;
+
+        EnterCriticalSection        (&cs_tex_stream);
+
+        ((ISKTextureD3D9 *)pD3DTex)->must_block = true;
+
+        if (is_streaming (load_op->checksum))
+        {
+          ISKTextureD3D9* pTexOrig =
+            (ISKTextureD3D9 *)textures_in_flight [load_op->checksum]->pDest;
+
+          // Remap the output of the in-flight texture
+          textures_in_flight [load_op->checksum]->pDest =
+            pD3DTex;
+
+          if (tbf::RenderFix::tex_mgr.getTexture (load_op->checksum)  != nullptr) {
+            for ( int i = 0;
+                      i < tbf::RenderFix::tex_mgr.getTexture (load_op->checksum)->refs;
+                    ++i ) {
+              pD3DTex->AddRef ();
+            }
+          }
+
+          ////tsf::RenderFix::tex_mgr.removeTexture (pTexOrig);
+        }
+
+        else {
+          textures_in_flight.insert ( std::make_pair ( load_op->checksum,
+                                       load_op ) );
+
+          resample_pool->postJob (load_op);
+        }
+        current_tex = pSKTex->tex_crc32;
+        LeaveCriticalSection (&cs_tex_stream);
+      }
+    }
+  }
+}
+
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -1884,6 +1973,27 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
     if (checksum == tbf::RenderFix::pad_buttons.crc32_xboxone) {
       tbf::RenderFix::pad_buttons.tex_xboxone = *ppTexture;
+
+#if 0
+      if (tbf::RenderFix::pad_buttons.base_img.pSrcData == nullptr && pSrcData != nullptr) {
+        tbf::RenderFix::pad_buttons.base_img.pSrcData    =  new uint8_t [SrcDataSize];
+        tbf::RenderFix::pad_buttons.base_img.SrcDataSize =  SrcDataSize;
+        tbf::RenderFix::pad_buttons.base_img.Width       =  Width;
+        tbf::RenderFix::pad_buttons.base_img.Height      =  Height;
+        tbf::RenderFix::pad_buttons.base_img.MipLevels   =  MipLevels;
+        tbf::RenderFix::pad_buttons.base_img.Usage       =  Usage;
+        tbf::RenderFix::pad_buttons.base_img.Format      =  Format;
+        tbf::RenderFix::pad_buttons.base_img.Pool        =  Pool;
+        tbf::RenderFix::pad_buttons.base_img.Filter      =  Filter;
+        tbf::RenderFix::pad_buttons.base_img.MipFilter   =  MipFilter;
+        tbf::RenderFix::pad_buttons.base_img.ColorKey    =  ColorKey;
+        tbf::RenderFix::pad_buttons.base_img.SrcInfo     = *pSrcInfo;
+
+        memcpy ( tbf::RenderFix::pad_buttons.base_img.pSrcData,
+                   pSrcData,
+                     SrcDataSize );
+      }
+#endif
 
       wchar_t wszFile [MAX_PATH + 2] = { L'\0' };
 

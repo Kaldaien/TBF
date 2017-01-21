@@ -2,7 +2,7 @@
 
 
 #define TBF_MAJOR 0
-#define TBF_MINOR 2
+#define TBF_MINOR 3
 #define TBF_BUILD 0
 #define TBF_REV   0
 

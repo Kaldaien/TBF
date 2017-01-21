@@ -33,6 +33,9 @@
 #include <d3d9.h>
 #include <d3d9types.h>
 
+#include <imgui/imgui.h>
+#include "tbt/imgui_impl_dx9.h"
+
 tbf::RenderFix::tbf_draw_states_s
   tbf::RenderFix::draw_state;
 
@@ -601,13 +604,22 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
     SKX_DrawExternalOSD ("ToBFix", output.c_str ());
 
-    output   = "";
+    output = "";
   } else
     SKX_DrawExternalOSD ("ToBFix", mod_text.c_str ());
 
   mod_text = "";
 
   HRESULT hr = D3D9EndScene_Original (This);
+
+  if (SUCCEEDED (hr)) {
+    extern void
+      TBFix_DrawConfigUI(LPDIRECT3DDEVICE9 pDev = nullptr);
+
+    if (config.input.ui.visible) {
+      TBFix_DrawConfigUI (This);
+    }
+  }
 
   game_state.in_skit = false;
 
@@ -1442,14 +1454,17 @@ tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
   static volatile
     ULONG reset_count = 0UL;
 
-  if (InterlockedIncrement (&reset_count) == 1UL)
-    tex_mgr.Init ();
+  ULONG count = InterlockedIncrement (&reset_count);
+
+  if (count == 1UL) {
+    tex_mgr.Init      ();
+  }
 
   else {
     if (pending_loads ())
       TBFix_LoadQueuedTextures ();
 
-    tex_mgr.reset    ();
+    tex_mgr.reset                       ();
   }
 
   vs_checksums.clear ();
@@ -1477,13 +1492,31 @@ __stdcall
 D3D9Reset_Detour ( IDirect3DDevice9      *This,
                    D3DPRESENT_PARAMETERS *pPresentationParameters )
 {
-  tbf::RenderFix::Reset (This, pPresentationParameters);
+  static bool ImGui_Init = false;
 
-  if (tbf::RenderFix::pDevice != nullptr && This != tbf::RenderFix::pDevice)
-    return D3D9Reset_Original (This, pPresentationParameters);
+  if (ImGui_Init) {
+    ImGui_ImplDX9_InvalidateDeviceObjects ();
+  }
+
+  tbf::RenderFix::Reset (This, pPresentationParameters);
 
   HRESULT hr =
     D3D9Reset_Original (This, pPresentationParameters);
+
+  if ( SUCCEEDED         (hr) &&
+      ImGui_ImplDX9_Init (pPresentationParameters->hDeviceWindow, This) )
+  {
+    HWND hWnd = pPresentationParameters->hDeviceWindow;
+
+    DWORD dwStyle =
+      GetClassLong ( hWnd, GCL_STYLE );
+
+    dwStyle &= ~(CS_DBLCLKS);
+
+    SetClassLong ( hWnd, GCL_STYLE, dwStyle );
+
+    ImGui_Init = true;
+  }
 
   return hr;
 }
