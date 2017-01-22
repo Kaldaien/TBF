@@ -1,4 +1,4 @@
-/**
+fr/**
  * This file is part of Tales of Berseria "Fix".
  *
  * Tales of Berseria "Fix" is free software : you can redistribute it

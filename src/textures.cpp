@@ -1533,44 +1533,48 @@ TBFix_LoadQueuedTextures (void)
   if (spin > 199)
     spin = 193;
 
-  if (InterlockedExchangeAdd (&resampling, 0)) {
-    mod_text += spin;
+  if (config.textures.show_loading_text) {
+    if (InterlockedExchangeAdd (&resampling, 0)) {
+      mod_text += spin;
 
-    char szFormatted [64];
-    sprintf (szFormatted, "  Resampling: %li texture", InterlockedExchangeAdd (&resampling, 0));
+      char szFormatted [64];
+      sprintf (szFormatted, "  Resampling: %li texture", InterlockedExchangeAdd (&resampling, 0));
 
-    mod_text += szFormatted;
-
-    if (InterlockedExchangeAdd (&resampling, 0) > 1)
-      mod_text += 's';
-
-    size_t queue_len = resample_pool->queueLength ();
-
-    if (queue_len) {
-      sprintf (szFormatted, " (%lu queued)", queue_len);
       mod_text += szFormatted;
+
+      if (InterlockedExchangeAdd (&resampling, 0) > 1)
+        mod_text += 's';
+
+      size_t queue_len = resample_pool->queueLength ();
+
+      if (queue_len) {
+        sprintf (szFormatted, " (%lu queued)", queue_len);
+        mod_text += szFormatted;
+      }
+
+      mod_text += "\n\n";
     }
+  
+    if (InterlockedExchangeAdd (&streaming, 0)) {
+      mod_text += spin;
 
-    mod_text += "\n\n";
-  }
+      char szFormatted [64];
+      sprintf (szFormatted, "  Streaming: %li texture", InterlockedExchangeAdd (&streaming, 0));
 
-  if (InterlockedExchangeAdd (&streaming, 0)) {
-    mod_text += spin;
-
-    char szFormatted [64];
-    sprintf (szFormatted, "  Streaming: %li texture", InterlockedExchangeAdd (&streaming, 0));
-
-    mod_text += szFormatted;
-
-    if (InterlockedExchangeAdd (&streaming, 0) > 1)
-      mod_text += 's';
-
-    sprintf (szFormatted, " [%7.2f MiB]", (double)InterlockedExchangeAdd (&streaming_bytes, 0) / (1024.0f * 1024.0f));
-    mod_text += szFormatted;
-
-    if (textures_to_stream.size ()) {
-      sprintf (szFormatted, " (%lu outstanding)", textures_to_stream.size ());
       mod_text += szFormatted;
+
+      if (InterlockedExchangeAdd (&streaming, 0) > 1)
+        mod_text += 's';
+
+      sprintf (szFormatted, " [%7.2f MiB]", (double)InterlockedExchangeAdd (&streaming_bytes, 0) / (1024.0f * 1024.0f));
+      mod_text += szFormatted;
+
+      if (config.textures.show_loading_text) {
+        if (textures_to_stream.size ()) {
+          sprintf (szFormatted, " (%lu outstanding)", textures_to_stream.size ());
+          mod_text += szFormatted;
+        }
+      }
     }
   }
 

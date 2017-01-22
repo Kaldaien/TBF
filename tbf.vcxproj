@@ -209,21 +209,16 @@
     <ClInclude Include="include\hook.h" />
     <ClInclude Include="include\imgui\imconfig.h" />
     <ClInclude Include="include\imgui\imgui.h" />
-    <ClInclude Include="include\imgui\imgui_internal.h" />
     <ClInclude Include="include\ini.h" />
     <ClInclude Include="include\input.h" />
     <ClInclude Include="include\log.h" />
     <ClInclude Include="include\parameter.h" />
     <ClInclude Include="include\render.h" />
-    <ClInclude Include="include\stb\rect_pack.h" />
-    <ClInclude Include="include\stb\textedit.h" />
-    <ClInclude Include="include\stb\truetype.h" />
     <ClInclude Include="resource\resource.h" />
     <ClInclude Include="include\scanner.h" />
     <ClInclude Include="include\sound.h" />
     <ClInclude Include="include\steam.h" />
     <ClInclude Include="include\textures.h" />
-    <ClInclude Include="src\tbt\imgui_impl_dx9.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\command.cpp" />
@@ -246,7 +241,6 @@
     <ClCompile Include="src\hook.cpp" />
     <ClCompile Include="src\input.cpp" />
     <ClCompile Include="src\ini.cpp" />
-    <ClCompile Include="src\tbt\imgui_impl_dx9.cpp" />
     <ClCompile Include="src\tbt\control_panel.cpp" />
     <ClCompile Include="src\textures.cpp" />
     <Text Include="include\keyboard.h" />

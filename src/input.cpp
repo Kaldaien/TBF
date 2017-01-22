@@ -206,9 +206,6 @@ typedef LRESULT (CALLBACK *DetourWindowProc_pfn)(
 DetourWindowProc_pfn DetourWindowProc_Original = nullptr;
 
 LRESULT
-ImGui_ImplDX9_WndProcHandler ( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam );
-
-LRESULT
 CALLBACK
 DetourWindowProc ( _In_  HWND   hWnd,
                    _In_  UINT   uMsg,

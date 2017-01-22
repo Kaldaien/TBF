@@ -78,6 +78,7 @@ struct {
   tbf::ParameterBool*    dump;
   tbf::ParameterInt*     cache_size;
   tbf::ParameterInt*     worker_threads;
+  tbf::ParameterBool*    show_loading_text;
 } textures;
 
 
@@ -251,6 +252,16 @@ TBF_LoadConfig (std::wstring name)
       L"Texture.System",
         L"WorkerThreads" );
 
+  textures.show_loading_text =
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Show a loading indicator in OSD")
+      );
+  textures.show_loading_text->register_to_ini (
+    render_ini,
+      L"Texture.System",
+        L"ShowLoadingIndicator" );
+
 
   render.dump_shaders = 
     static_cast <tbf::ParameterBool *>
@@ -354,7 +365,7 @@ TBF_LoadConfig (std::wstring name)
     render_ini->parse  ();
   }
 
-  input.gamepad.texture_set->load (config.input.gamepad.texture_set);
+  input.gamepad.texture_set->load  (config.input.gamepad.texture_set);
 
   render.rescale_shadows->load     (config.render.shadow_rescale);
   render.rescale_env_shadows->load (config.render.env_shadow_rescale);
@@ -363,13 +374,14 @@ TBF_LoadConfig (std::wstring name)
 
   framerate.replace_limiter->load  (config.framerate.replace_limiter);
 
-  textures.remaster->load       (config.textures.remaster);
-  textures.uncompressed->load   (config.textures.uncompressed);
-  textures.lod_bias->load       (config.textures.lod_bias);
-  textures.cache->load          (config.textures.cache);
-  textures.dump->load           (config.textures.dump);
-  textures.cache_size->load     (config.textures.max_cache_in_mib);
-  textures.worker_threads->load (config.textures.worker_threads);
+  textures.remaster->load          (config.textures.remaster);
+  textures.uncompressed->load      (config.textures.uncompressed);
+  textures.lod_bias->load          (config.textures.lod_bias);
+  textures.cache->load             (config.textures.cache);
+  textures.dump->load              (config.textures.dump);
+  textures.cache_size->load        (config.textures.max_cache_in_mib);
+  textures.worker_threads->load    (config.textures.worker_threads);
+  textures.show_loading_text->load (config.textures.show_loading_text);
 
   if (empty)
     return false;
@@ -392,13 +404,14 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.rescale_shadows->store     (config.render.shadow_rescale);
   render.rescale_env_shadows->store (config.render.env_shadow_rescale);
 
-  textures.remaster->store       (config.textures.remaster);
-  textures.uncompressed->store   (config.textures.uncompressed);
-  textures.lod_bias->store       (config.textures.lod_bias);
-  textures.cache->store          (config.textures.cache);
-  textures.dump->store           (config.textures.dump);
-  textures.cache_size->store     (config.textures.max_cache_in_mib);
-  textures.worker_threads->store (config.textures.worker_threads);
+  textures.remaster->store          (config.textures.remaster);
+  textures.uncompressed->store      (config.textures.uncompressed);
+  textures.lod_bias->store          (config.textures.lod_bias);
+  textures.cache->store             (config.textures.cache);
+  textures.dump->store              (config.textures.dump);
+  textures.cache_size->store        (config.textures.max_cache_in_mib);
+  textures.worker_threads->store    (config.textures.worker_threads);
+  textures.show_loading_text->store (config.textures.show_loading_text);
 
   input.gamepad.texture_set->store (config.input.gamepad.texture_set);
 

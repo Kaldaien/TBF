@@ -33,9 +33,6 @@
 #include <d3d9.h>
 #include <d3d9types.h>
 
-#include <imgui/imgui.h>
-#include "tbt/imgui_impl_dx9.h"
-
 tbf::RenderFix::tbf_draw_states_s
   tbf::RenderFix::draw_state;
 
@@ -152,11 +149,8 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
         if (Value != D3DTEXF_POINT)
           Value = D3DTEXF_ANISOTROPIC;
 
-      // Clamp [0, oo)
       if (Type == D3DSAMP_MIPMAPLODBIAS) {
         float fMax = config.textures.lod_bias;
-        //float fMax =
-          //max (0.0f, *reinterpret_cast <float *> (&Value));
 
         Value = *reinterpret_cast <DWORD *> (&fMax);
       }
@@ -614,10 +608,10 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
   if (SUCCEEDED (hr)) {
     extern void
-      TBFix_DrawConfigUI(LPDIRECT3DDEVICE9 pDev = nullptr);
+      TBFix_DrawConfigUI (void);
 
     if (config.input.ui.visible) {
-      TBFix_DrawConfigUI (This);
+      TBFix_DrawConfigUI ();
     }
   }
 

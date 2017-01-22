@@ -73,6 +73,7 @@ struct tbf_config_t
     float    lod_bias            = -0.2666f;
     int32_t  max_cache_in_mib    =  2048L;
     int32_t  worker_threads      =  6;
+    bool     show_loading_text   =  false;
   } textures;
 
   struct {
