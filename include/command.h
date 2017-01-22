@@ -139,8 +139,9 @@ interface SK_ICommandProcessor
   virtual SK_ICommandResult ProcessCommandFormatted (const char* szCommandFormat, ...) = 0;
 };
 
-typedef SK_ICommandProcessor* (__stdcall *SK_GetCommandProcessor_pfn)(void);
-extern SK_GetCommandProcessor_pfn SK_GetCommandProcessor;
+SK_ICommandProcessor*
+__stdcall
+SK_GetCommandProcessor (void);
 
 SK_IVariable*
 TBF_CreateVar ( SK_IVariable::VariableType  type,

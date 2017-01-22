@@ -1,3 +1,4 @@
+#if 0
 // ImGui Win32 + DirectX9 binding
 // In this binding, ImTextureID is used to store a 'LPDIRECT3DTEXTURE9' texture identifier. Read the FAQ about ImTextureID in imgui.cpp.
 
@@ -258,17 +259,64 @@ ImGui_ImplDX9_RenderDrawLists (ImDrawData* draw_data)
   d3d9_state_block->Release ();
 }
 
-IMGUI_API
 LRESULT
-ImGui_ImplDX9_WndProcHandler ( HWND, UINT   msg,
-                                     WPARAM wParam,
-                                     LPARAM lParam )
+ImGui_ImplDX9_WndProcHandler ( HWND hWnd,  UINT   msg,
+                                           WPARAM wParam,
+                                           LPARAM lParam )
 {
+  static bool window_active = true;
+
   ImGuiIO& io =
     ImGui::GetIO ();
 
+  auto ActivateWindow = [&](bool active = false)->
+  void
+    {
+      window_active = active;
+
+      for (int i = 0; i < 5;   i++)  io.MouseDown [i] = false;
+      for (int i = 0; i < 512; i++)  io.KeysDown  [i] = false;
+    };
+
+  //if (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) {
+    //io.MousePos.x = (signed short)(lParam);
+    //io.MousePos.y = (signed short)(lParam >> 16);
+  //}
+
   switch (msg)
   {
+    case WM_MOUSEACTIVATE:
+      ActivateWindow (((HWND)wParam == hWnd));
+      break;
+
+  case WM_ACTIVATEAPP:
+  case WM_ACTIVATE:
+  case WM_NCACTIVATE:
+  {
+    if (msg == WM_NCACTIVATE)
+    {
+      ActivateWindow ((bool)wParam);
+    }
+
+    else if (msg == WM_ACTIVATEAPP || msg == WM_ACTIVATE)
+    {
+      switch (wParam)
+      {
+        case 1:  // WA_ACTIVE / TRUE
+        case 2:  // WA_CLICKACTIVE
+        default: // Unknown
+        {
+          ActivateWindow (TRUE);
+        } break;
+
+        case 0: // WA_INACTIVE / FALSE
+        {
+          ActivateWindow (FALSE);
+        } break;
+      }
+    }
+  } break;
+
   case WM_LBUTTONDOWN:
   //case WM_LBUTTONDBLCLK: // Sent on receipt of the second click
     io.MouseDown [0] = true;
@@ -308,12 +356,12 @@ ImGui_ImplDX9_WndProcHandler ( HWND, UINT   msg,
   case WM_KEYDOWN:
     if (wParam < 256) {
       io.KeysDown [wParam] = 1;
-
-      extern void TBFix_ToggleConfigUI (void);
-
-      if (wParam == VK_BACK && io.KeyCtrl && io.KeyShift && config.input.ui.visible)
-        TBFix_ToggleConfigUI ();
     }
+
+    extern void TBFix_ToggleConfigUI (void);
+    if (io.KeyCtrl && io.KeyShift && io.KeysDown [VK_BACK] && config.input.ui.visible)
+      TBFix_ToggleConfigUI ();
+
     return true;
 
   case WM_KEYUP:
@@ -457,6 +505,7 @@ ImGui_ImplDX9_InvalidateDeviceObjects (void)
     g_pVB = NULL;
   }
 
+
   if (g_pIB)
   {
     g_pIB->Release ();
@@ -515,3 +564,4 @@ ImGui_ImplDX9_NewFrame (void)
   // Start the frame
   ImGui::NewFrame ();
 }
+#endif

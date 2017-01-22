@@ -11,12 +11,18 @@
 #include "config.h"
 #include "render.h"
 #include "framerate.h"
+#include "hook.h"
 
 // Data
 static LPDIRECT3DDEVICE9        g_pd3dDevice = NULL;
 static D3DPRESENT_PARAMETERS    g_d3dpp;
 
-extern LRESULT ImGui_ImplDX9_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+IMGUI_API
+LRESULT
+WINAPI
+ImGui_WndProcHandler ( HWND, UINT   msg,
+                             WPARAM wParam,
+                             LPARAM lParam );
 
 LRESULT
 WINAPI
@@ -25,7 +31,7 @@ WndProc ( HWND   hWnd,
           WPARAM wParam,
           LPARAM lParam )
 {
-  if (ImGui_ImplDX9_WndProcHandler (hWnd, msg, wParam, lParam))
+  if (ImGui_WndProcHandler (hWnd, msg, wParam, lParam))
     return TRUE;
 
   switch (msg)
@@ -75,16 +81,23 @@ struct {
 } gamepads;
 
 void
+__TBF_DefaultSetOverlayState (bool)
+{
+}
+
+void
 TBFix_PauseGame (bool pause)
 {
-  extern HMODULE hInjectorDLL;
-
   typedef void (__stdcall *SK_SteamAPI_SetOverlayState_pfn)(bool active);
 
-  static SK_SteamAPI_SetOverlayState_pfn SK_SteamAPI_SetOverlayState =
-    (SK_SteamAPI_SetOverlayState_pfn)
-      GetProcAddress ( hInjectorDLL,
-                         "SK_SteamAPI_SetOverlayState" );
+  static SK_SteamAPI_SetOverlayState_pfn
+    SK_SteamAPI_SetOverlayState =
+      (SK_SteamAPI_SetOverlayState_pfn)
+
+    TBF_ImportFunctionFromSpecialK (
+      "SK_SteamAPI_SetOverlayState",
+        &__TBF_DefaultSetOverlayState
+    );
 
   SK_SteamAPI_SetOverlayState (pause);
 }
@@ -112,6 +125,11 @@ TBFix_ToggleConfigUI (void)
   }
 
   config.input.ui.visible = (! config.input.ui.visible);
+
+  if (config.input.ui.visible)
+    SK_GetCommandProcessor ()->ProcessCommandLine ("ImGui.Visible 1");
+  else
+    SK_GetCommandProcessor ()->ProcessCommandLine ("ImGui.Visible 0");
 
   if (config.input.ui.pause)
     TBFix_PauseGame (config.input.ui.visible);
@@ -197,6 +215,8 @@ TBFix_DrawConfigUI (LPDIRECT3DDEVICE9 pDev = nullptr)
     g_pd3dDevice = pDev;
 
   ImGui_ImplDX9_NewFrame ();
+
+  ImGuiIO& io = ImGui::GetIO ();
 
   //ImGui::SetNextWindowPos             (ImVec2 ( 640, 360), ImGuiSetCond_FirstUseEver);
   ImGui::SetNextWindowPosCenter       (ImGuiSetCond_Always);
@@ -399,15 +419,14 @@ TBFix_DrawConfigUI (LPDIRECT3DDEVICE9 pDev = nullptr)
     ImGui::SameLine (500);
 
     if (ImGui::Selectable ("...", show_test_window))
-      show_test_window ^= show_test_window;
+      show_test_window = (! show_test_window);
 
     ImGui::End ();
 
-  if (show_test_window)
-  {
-    //ImGui::SetNextWindowPos (ImVec2 (650, 20), ImGuiSetCond_FirstUseEver);
-    //ImGui::ShowTestWindow   (&show_test_window);
-  }
+    if (show_test_window) {
+      ImGui::SetNextWindowPos (ImVec2 (650, 20), ImGuiSetCond_FirstUseEver);
+      ImGui::ShowTestWindow   (&show_test_window);
+    }
 
   // Rendering
   g_pd3dDevice->SetRenderState (D3DRS_ZENABLE,           false);
@@ -438,6 +457,7 @@ TBFix_DrawConfigUI (LPDIRECT3DDEVICE9 pDev = nullptr)
   }
 }
 
+#if 0
 __declspec (dllexport)
 void
 CALLBACK
@@ -550,3 +570,4 @@ tbt_main (HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow)
 
   UnregisterClass (L"Tales of Berseria Tweak", wc.hInstance);
 }
+#endif

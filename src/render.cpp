@@ -1496,19 +1496,12 @@ __stdcall
 D3D9Reset_Detour ( IDirect3DDevice9      *This,
                    D3DPRESENT_PARAMETERS *pPresentationParameters )
 {
-  static bool ImGui_Init = false;
-
-  if (ImGui_Init) {
-    ImGui_ImplDX9_InvalidateDeviceObjects ();
-  }
-
   tbf::RenderFix::Reset (This, pPresentationParameters);
 
   HRESULT hr =
     D3D9Reset_Original (This, pPresentationParameters);
 
-  if ( SUCCEEDED         (hr) &&
-      ImGui_ImplDX9_Init (pPresentationParameters->hDeviceWindow, This) )
+  if (SUCCEEDED (hr))
   {
     HWND hWnd = pPresentationParameters->hDeviceWindow;
 
@@ -1518,8 +1511,6 @@ D3D9Reset_Detour ( IDirect3DDevice9      *This,
     dwStyle &= ~(CS_DBLCLKS);
 
     SetClassLong ( hWnd, GCL_STYLE, dwStyle );
-
-    ImGui_Init = true;
   }
 
   return hr;

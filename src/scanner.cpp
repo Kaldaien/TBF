@@ -27,7 +27,9 @@
 uintptr_t
 TBF_GetBaseAddr (void)
 {
-  return (uintptr_t)GetModuleHandle (nullptr);
+  static uintptr_t base = (uintptr_t)GetModuleHandle (nullptr);
+
+  return base;
 }
 
 void*

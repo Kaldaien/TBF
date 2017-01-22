@@ -108,11 +108,10 @@ SKPlugIn_Init (HMODULE hModSpecialK)
   config.system.injector             = injector_dll;
 
   SKX_SetPluginName = 
-    (SKX_SetPluginName_pfn)
-      GetProcAddress (hInjectorDLL, "SKX_SetPluginName");
-  SK_GetCommandProcessor =
-    (SK_GetCommandProcessor_pfn)
-      GetProcAddress (hInjectorDLL, "SK_GetCommandProcessor");
+    TBF_ImportFunctionFromSpecialK (
+      "SKX_SetPluginName",
+        SKX_SetPluginName
+    );
 
   //
   // If this is NULL, the injector system isn't working right!!!
@@ -134,17 +133,16 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     //CoUninitialize ();
   }
 
-  SK_UpdateSoftware_pfn SK_UpdateSoftware =
-    (SK_UpdateSoftware_pfn)
-      GetProcAddress ( hInjectorDLL,
-                         "SK_UpdateSoftware" );
+  static SK_UpdateSoftware_pfn SK_UpdateSoftware =
+    TBF_ImportFunctionFromSpecialK ( "SK_UpdateSoftware",
+                                       SK_UpdateSoftware );
 
-  SK_FetchVersionInfo_pfn SK_FetchVersionInfo =
-    (SK_FetchVersionInfo_pfn)
-      GetProcAddress ( hInjectorDLL,
-                         "SK_FetchVersionInfo" );
+  static SK_FetchVersionInfo_pfn SK_FetchVersionInfo =
+    TBF_ImportFunctionFromSpecialK ( "SK_FetcHVersionInfo",
+                                       SK_FetchVersionInfo );
 
-  if (! wcsstr (injector_dll.c_str (), L"SpecialK")) {
+  if (! wcsstr (injector_dll.c_str (), L"SpecialK"))
+  {
     if ( SK_FetchVersionInfo != nullptr &&
          SK_UpdateSoftware   != nullptr ) {
       if (SK_FetchVersionInfo (L"TBF")) {

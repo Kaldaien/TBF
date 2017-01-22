@@ -5,4 +5,4 @@ LIBRARY "tbfix"
 EXPORTS
 
 SKPlugIn_Init = SKPlugIn_Init @1
-TBT_Main      = tbt_main      @2
+;TBT_Main      = tbt_main      @2

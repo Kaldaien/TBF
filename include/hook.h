@@ -22,6 +22,23 @@
 #ifndef __TBF__HOOK_H__
 #define __TBF__HOOK_H__
 
+template <typename _T>
+_T
+TBF_ImportFunctionFromSpecialK ( const char* szName,
+                                          _T fallback_fn )
+{
+  extern HMODULE hInjectorDLL;
+
+  _T ret =
+    reinterpret_cast <_T> (
+      GetProcAddress ( hInjectorDLL,
+                         szName )
+    );
+
+  return (ret == nullptr)  ?  fallback_fn  :
+                              ret;
+}
+
 // MinHook Error Codes.
 typedef enum MH_STATUS
 {

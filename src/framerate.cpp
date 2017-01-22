@@ -257,7 +257,24 @@ tbf::FrameRateFix::Init (void)
       TBF_EnableHook    (limiter_addr);
 
 
-      variable_speed_installed = true;
+      MEMORY_BASIC_INFORMATION minfo;
+      DWORD*                   pTickAddr = 
+        (DWORD *)(TBF_GetBaseAddr () + TICK_ADDR_BASE);
+
+      VirtualQuery (pTickAddr, &minfo, sizeof (minfo));
+
+      if ( (minfo.Protect & PAGE_READWRITE) &&
+           *pTickAddr <= 2 )
+      {
+        variable_speed_installed = true;
+      }
+
+      else if (config.framerate.replace_limiter)
+      {
+        SK_GetCommandProcessor ()->ProcessCommandFormatted (
+                                     "TargetFPS %f",
+                                       60.0f );
+      }
     }
   //}
 }
@@ -290,8 +307,11 @@ tbf::FrameRateFix::DisengageLimiter (void)
 float
 tbf::FrameRateFix::GetTargetFrametime (void)
 {
-  uint32_t* pTickScale =
-    (uint32_t *)(TBF_GetBaseAddr () + TICK_ADDR_BASE);
+  if (! variable_speed_installed)
+    return 16.666666f;
+
+  int32_t* pTickScale =
+    (int32_t *)(TBF_GetBaseAddr () + TICK_ADDR_BASE);
 
   return ( (float)(*pTickScale) * 16.6666666f );
 }
@@ -303,8 +323,13 @@ tbf::FrameRateFix::GetTargetFrametime (void)
 void
 tbf::FrameRateFix::RenderTick (void)
 {
-  uint32_t* pTickScale =
-    (uint32_t *)(TBF_GetBaseAddr () + TICK_ADDR_BASE);
+  int32_t* pTickScale =
+    (int32_t *)(TBF_GetBaseAddr () + TICK_ADDR_BASE);
+
+  // In case we fail to locate the actual variable in memory,
+  //   allback to this...
+  if (! variable_speed_installed)
+    pTickScale = &tick_scale;
 
   if (*pTickScale != tick_scale) {
     dll_log->Log ( L"[FrameLimit] [@] Framerate limit changed from "

@@ -35,13 +35,15 @@ TBF_CreateFuncHook ( LPCWSTR pwszFuncName,
                      LPVOID  pDetour,
                      LPVOID *ppOriginal )
 {
-  static HMODULE hParent = GetModuleHandle (config.system.injector.c_str ());
-
   typedef MH_STATUS (WINAPI *SK_CreateFuncHook_pfn)
       ( LPCWSTR pwszFuncName, LPVOID  pTarget,
         LPVOID  pDetour,      LPVOID *ppOriginal );
+
   static SK_CreateFuncHook_pfn SK_CreateFuncHook =
-    (SK_CreateFuncHook_pfn)GetProcAddress (hParent, "SK_CreateFuncHook");
+    TBF_ImportFunctionFromSpecialK (
+      "SK_CreateFuncHook",
+        SK_CreateFuncHook
+    );
 
   return
     SK_CreateFuncHook (pwszFuncName, pTarget, pDetour, ppOriginal);
@@ -53,14 +55,16 @@ TBF_CreateDLLHook ( LPCWSTR pwszModule, LPCSTR  pszProcName,
                     LPVOID  pDetour,    LPVOID *ppOriginal,
                     LPVOID *ppFuncAddr )
 {
-  static HMODULE hParent = GetModuleHandle (config.system.injector.c_str ());
-
   typedef MH_STATUS (WINAPI *SK_CreateDLLHook_pfn)(
         LPCWSTR pwszModule, LPCSTR  pszProcName,
         LPVOID  pDetour,    LPVOID *ppOriginal, 
         LPVOID *ppFuncAddr );
+
   static SK_CreateDLLHook_pfn SK_CreateDLLHook =
-    (SK_CreateDLLHook_pfn)GetProcAddress (hParent, "SK_CreateDLLHook");
+    TBF_ImportFunctionFromSpecialK (
+      "SK_CreateDLLHook",
+        SK_CreateDLLHook
+    );
 
   return
     SK_CreateDLLHook (pwszModule,pszProcName,pDetour,ppOriginal,ppFuncAddr);
@@ -72,14 +76,16 @@ TBF_CreateDLLHook2 ( LPCWSTR pwszModule, LPCSTR  pszProcName,
                      LPVOID  pDetour,    LPVOID *ppOriginal,
                      LPVOID *ppFuncAddr )
 {
-  static HMODULE hParent = GetModuleHandle (config.system.injector.c_str ());
-
   typedef MH_STATUS (WINAPI *SK_CreateDLLHook2_pfn)(
         LPCWSTR pwszModule, LPCSTR  pszProcName,
         LPVOID  pDetour,    LPVOID *ppOriginal, 
         LPVOID *ppFuncAddr );
+
   static SK_CreateDLLHook2_pfn SK_CreateDLLHook2 =
-    (SK_CreateDLLHook2_pfn)GetProcAddress (hParent, "SK_CreateDLLHook2");
+    TBF_ImportFunctionFromSpecialK (
+      "SK_CreateDLLHook2",
+        SK_CreateDLLHook2
+    );
 
   return
     SK_CreateDLLHook2 (pwszModule,pszProcName,pDetour,ppOriginal,ppFuncAddr);
@@ -89,11 +95,13 @@ MH_STATUS
 WINAPI
 TBF_ApplyQueuedHooks (void)
 {
-  static HMODULE hParent = GetModuleHandle (config.system.injector.c_str ());
-
   typedef MH_STATUS (WINAPI *SK_ApplyQueuedHooks_pfn)(void);
+
   static SK_ApplyQueuedHooks_pfn SK_ApplyQueuedHooks =
-    (SK_ApplyQueuedHooks_pfn)GetProcAddress (hParent, "SK_ApplyQueuedHooks");
+    TBF_ImportFunctionFromSpecialK (
+      "SK_ApplyQueuedHooks",
+        SK_ApplyQueuedHooks
+    );
 
   return SK_ApplyQueuedHooks ();
 }
@@ -102,11 +110,13 @@ MH_STATUS
 WINAPI
 TBF_EnableHook (LPVOID pTarget)
 {
-  static HMODULE hParent = GetModuleHandle (config.system.injector.c_str ());
-
   typedef MH_STATUS (WINAPI *SK_EnableHook_pfn)(LPVOID pTarget);
+
   static SK_EnableHook_pfn SK_EnableHook =
-    (SK_EnableHook_pfn)GetProcAddress (hParent, "SK_EnableHook");
+    TBF_ImportFunctionFromSpecialK (
+      "SK_EnableHook",
+        SK_EnableHook
+    );
 
   return SK_EnableHook (pTarget);
 }
@@ -115,11 +125,13 @@ MH_STATUS
 WINAPI
 TBF_DisableHook (LPVOID pTarget)
 {
-  static HMODULE hParent = GetModuleHandle (config.system.injector.c_str ());
-
   typedef MH_STATUS (WINAPI *SK_DisableHook_pfn)(LPVOID pTarget);
+
   static SK_DisableHook_pfn SK_DisableHook =
-    (SK_DisableHook_pfn)GetProcAddress (hParent, "SK_DisableHook");
+    TBF_ImportFunctionFromSpecialK (
+      "SK_DisableHook",
+        SK_DisableHook
+    );
 
   return SK_DisableHook (pTarget);
 }
@@ -128,11 +140,13 @@ MH_STATUS
 WINAPI
 TBF_RemoveHook (LPVOID pTarget)
 {
-  static HMODULE hParent = GetModuleHandle (config.system.injector.c_str ());
-
   typedef MH_STATUS (WINAPI *SK_RemoveHook_pfn)(LPVOID pTarget);
+
   static SK_RemoveHook_pfn SK_RemoveHook =
-    (SK_RemoveHook_pfn)GetProcAddress (hParent, "SK_RemoveHook");
+    TBF_ImportFunctionFromSpecialK (
+      "SK_RemoveHook",
+        SK_RemoveHook
+    );
 
   return SK_RemoveHook (pTarget);
 }

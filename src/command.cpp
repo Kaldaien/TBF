@@ -21,24 +21,40 @@
 **/
 #include "command.h"
 
-SK_GetCommandProcessor_pfn SK_GetCommandProcessor = nullptr;
+extern HMODULE hInjectorDLL;
 
-typedef SK_IVariable* (__stdcall *SK_CreateVar_pfn)( SK_IVariable::VariableType  type,
-                                                     void*                       var,
-                                                     SK_IVariableListener       *pListener );
-SK_CreateVar_pfn SK_CreateVar = nullptr;
+typedef SK_ICommandProcessor* (__stdcall *SK_GetCommandProcessor_pfn)
+  ( void );
+
+typedef SK_IVariable*         (__stdcall *SK_CreateVar_pfn)
+  ( SK_IVariable::VariableType  type,
+    void*                       var,
+    SK_IVariableListener       *pListener );
+
+SK_ICommandProcessor*
+__stdcall
+SK_GetCommandProcessor (void)
+{
+
+  static SK_GetCommandProcessor_pfn
+    SK_GetCommandProcessor_imp =
+      (SK_GetCommandProcessor_pfn)
+        GetProcAddress ( hInjectorDLL,
+                           "SK_GetCommandProcessor" );
+
+  return SK_GetCommandProcessor_imp ();
+}
 
 SK_IVariable*
 TBF_CreateVar ( SK_IVariable::VariableType  type,
                 void*                       var,
                 SK_IVariableListener       *pListener )
 {
-  extern HMODULE hInjectorDLL;
-
-  if (SK_CreateVar == nullptr) {
+  static SK_CreateVar_pfn
     SK_CreateVar =
-      (SK_CreateVar_pfn)GetProcAddress (hInjectorDLL, "SK_CreateVar");
-  }
+      (SK_CreateVar_pfn)
+        GetProcAddress ( hInjectorDLL,
+                           "SK_CreateVar" );
 
   return SK_CreateVar (type, var, pListener);
 }
