@@ -40,6 +40,7 @@ struct tbf_config_t
   struct {
     bool     replace_limiter = true;
     int      target          = 60;
+    float    tolerance       = 0.05f;
     bool     reshade_fix     = false;
   } framerate;
 

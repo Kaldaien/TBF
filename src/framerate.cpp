@@ -344,5 +344,10 @@ tbf::FrameRateFix::RenderTick (void)
       "TargetFPS %f",
         60.0f / (float)tick_scale
     );
+
+    SK_GetCommandProcessor()->ProcessCommandFormatted(
+      "LimiterTolerance %f",
+        config.framerate.tolerance
+    );
   }
 }

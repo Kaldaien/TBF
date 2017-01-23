@@ -500,14 +500,14 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
   if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
     return D3D9EndScene_Original (This);
 
-  if (pending_loads ()) {
-    TBFix_LoadQueuedTextures ();
-  }
-
   // EndScene is invoked multiple times per-frame, but we
   //   are only interested in the first.
   if (scene_count++ > 0)
     return D3D9EndScene_Original (This);
+
+  if (pending_loads ()) {
+    TBFix_LoadQueuedTextures ();
+  }
 
 #if 0
   if ( ((game_state.hasFixedAspect ()     &&
@@ -606,15 +606,6 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
   HRESULT hr = D3D9EndScene_Original (This);
 
-  if (SUCCEEDED (hr)) {
-    extern void
-      TBFix_DrawConfigUI (void);
-
-    if (config.input.ui.visible) {
-      TBFix_DrawConfigUI ();
-    }
-  }
-
   game_state.in_skit = false;
 
   needs_aspect       = false;
@@ -638,12 +629,16 @@ D3D9EndFrame_Pre (void)
   if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
     return SK_BeginBufferSwap ();
 
-
   void TBFix_LogUsedTextures (void);
   TBFix_LogUsedTextures ();
 
   //if (! config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
+
+  if ( config.framerate.replace_limiter &&
+       tbf::FrameRateFix::variable_speed_installed ) {
+    tbf::FrameRateFix::RenderTick ();
+  }
 
   SK_BeginBufferSwap ();
 
@@ -664,11 +659,6 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
   InterlockedExchange (&tbf::RenderFix::dwRenderThreadID, GetCurrentThreadId ());
 
   hr = SK_EndBufferSwap (hr, device);
-
-  if ( config.framerate.replace_limiter &&
-       tbf::FrameRateFix::variable_speed_installed ) {
-    tbf::FrameRateFix::RenderTick ();
-  }
 
   //if (config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();

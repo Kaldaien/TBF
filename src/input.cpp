@@ -45,27 +45,6 @@
 #include <comdef.h>
 #include "textures.h"
 
-typedef BOOL (WINAPI *GetCursorInfo_pfn)
-  (_Inout_ PCURSORINFO pci);
-
-typedef BOOL (WINAPI *GetCursorPos_pfn)
-  (_Out_ LPPOINT lpPoint);
-
-typedef BOOL (WINAPI *SetCursorPos_pfn)
-(
-  _In_ int X,
-  _In_ int Y
-);
-
-GetCursorInfo_pfn GetCursorInfo_Original = nullptr;
-GetCursorPos_pfn  GetCursorPos_Original  = nullptr;
-SetCursorPos_pfn  SetCursorPos_Original  = nullptr;
-
-BOOL WINAPI GetCursorInfo_Detour (_Inout_ PCURSORINFO pci);
-BOOL WINAPI GetCursorPos_Detour  (_Out_   LPPOINT     lpPoint);
-BOOL WINAPI SetCursorPos_Detour  (_In_ int X, _In_ int Y);
-
-
 // Returns the original cursor position and stores the new one in pPoint
 POINT
 CalcCursorPos (LPPOINT pPoint)
@@ -109,12 +88,6 @@ SK_TBF_PluginKeyPress ( BOOL Control,
 {
   SK_ICommandProcessor& command =
     *SK_GetCommandProcessor ();
-
-  if (Control && Shift && vkCode == VK_BACK)  {
-    extern void TBFix_ToggleConfigUI (void);
-    TBFix_ToggleConfigUI             ();
-  }
-
 
   if (Control && Shift) {
     if (vkCode == 'U') {
@@ -197,55 +170,6 @@ SK_TBF_PluginKeyPress ( BOOL Control,
   SK_PluginKeyPress_Original (Control, Shift, Alt, vkCode);
 }
 
-typedef LRESULT (CALLBACK *DetourWindowProc_pfn)(
-                   _In_  HWND   hWnd,
-                   _In_  UINT   uMsg,
-                   _In_  WPARAM wParam,
-                   _In_  LPARAM lParam );
-
-DetourWindowProc_pfn DetourWindowProc_Original = nullptr;
-
-LRESULT
-CALLBACK
-DetourWindowProc ( _In_  HWND   hWnd,
-                   _In_  UINT   uMsg,
-                   _In_  WPARAM wParam,
-                   _In_  LPARAM lParam )
-{
-  if (uMsg == WM_SYSCOMMAND)
-  {
-    //if ( (wParam & 0xfff0) == SC_KEYMENU ) // Disable ALT application menu
-      //return 0;
-  }
-
-  if (uMsg >= WM_MOUSEFIRST && uMsg <= WM_MOUSELAST) {
-    static POINT last_p = { LONG_MIN, LONG_MIN };
-
-    POINT p;
-
-    p.x = MAKEPOINTS (lParam).x;
-    p.y = MAKEPOINTS (lParam).y;
-
-    if (game_state.needsFixedMouseCoords () && config.render.aspect_correction) {
-      // Only do this if cursor actually moved!
-      //
-      //   Otherwise, it tricks the game into thinking the input device changed
-      //     from gamepad to mouse (and changes button icons).
-      if (last_p.x != p.x || last_p.y != p.y) {
-        CalcCursorPos (&p);
-
-        last_p = p;
-      }
-
-      return DetourWindowProc_Original (hWnd, uMsg, wParam, MAKELPARAM (p.x, p.y));
-    }
-
-    last_p = p;
-  }
-
-  return DetourWindowProc_Original (hWnd, uMsg, wParam, lParam);
-}
-
 void
 tbf::InputFix::Init (void)
 {
@@ -254,10 +178,6 @@ tbf::InputFix::Init (void)
                       SK_TBF_PluginKeyPress,
            (LPVOID *)&SK_PluginKeyPress_Original );
 
-  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
-                      "SK_DetourWindowProc",
-                      DetourWindowProc,
-           (LPVOID *)&DetourWindowProc_Original );
 
   TBF_ApplyQueuedHooks ();
 }

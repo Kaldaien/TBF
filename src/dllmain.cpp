@@ -120,6 +120,9 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     SKX_SetPluginName (plugin_name.c_str ());
 
   if (TBF_Init_MinHook () == MH_OK) {
+    extern void TBFix_ImGui_Init (void);
+                TBFix_ImGui_Init ();
+
     CoInitializeEx (nullptr, COINIT_MULTITHREADED);
 
     tbf::SoundFix::Init     ();
@@ -138,7 +141,7 @@ SKPlugIn_Init (HMODULE hModSpecialK)
                                        SK_UpdateSoftware );
 
   static SK_FetchVersionInfo_pfn SK_FetchVersionInfo =
-    TBF_ImportFunctionFromSpecialK ( "SK_FetcHVersionInfo",
+    TBF_ImportFunctionFromSpecialK ( "SK_FetchVersionInfo",
                                        SK_FetchVersionInfo );
 
   if (! wcsstr (injector_dll.c_str (), L"SpecialK"))

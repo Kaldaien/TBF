@@ -52,6 +52,7 @@ struct {
 
 struct {
   tbf::ParameterBool*    replace_limiter;
+  tbf::ParameterFloat*   tolerance;
 } framerate;
 
 struct {
@@ -304,6 +305,16 @@ TBF_LoadConfig (std::wstring name)
       L"Framerate.Fix",
         L"ReplaceLimiter" );
 
+  framerate.tolerance =
+    static_cast <tbf::ParameterFloat *>
+      (g_ParameterFactory.create_parameter <float> (
+        L"Replace Namco's Framerate Limiter")
+      );
+  framerate.tolerance->register_to_ini (
+    render_ini,
+      L"Framerate.Fix",
+        L"LimiterTolerance" );
+
 
   input.gamepad.texture_set =
     static_cast <tbf::ParameterStringW *>
@@ -373,6 +384,7 @@ TBF_LoadConfig (std::wstring name)
   render.dump_shaders->load        (config.render.dump_shaders);
 
   framerate.replace_limiter->load  (config.framerate.replace_limiter);
+  framerate.tolerance->load        (config.framerate.tolerance);
 
   textures.remaster->load          (config.textures.remaster);
   textures.uncompressed->load      (config.textures.uncompressed);
@@ -398,6 +410,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   audio.enable_fix->store    (config.audio.enable_fix);
 
   framerate.replace_limiter->store  (config.framerate.replace_limiter);
+  framerate.tolerance->store        (config.framerate.tolerance);
 
   render.dump_shaders->store        (config.render.dump_shaders);
 
