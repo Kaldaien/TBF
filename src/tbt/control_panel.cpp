@@ -430,10 +430,6 @@ TBFix_DrawConfigUI (void)
        )
      )
   {
-    tbf::RenderFix::pDevice->SetRenderState (D3DRS_ZENABLE,           false);
-    tbf::RenderFix::pDevice->SetRenderState (D3DRS_ALPHABLENDENABLE,  false);
-    tbf::RenderFix::pDevice->SetRenderState (D3DRS_SCISSORTESTENABLE, false);
-
     ImGui::Render                     ();
     tbf::RenderFix::pDevice->EndScene ();
   }

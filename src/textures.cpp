@@ -1585,7 +1585,7 @@ TBFix_LoadQueuedTextures (void)
   if (resample_pool != nullptr)
     finished = resample_pool->getFinished ();
 
-  for (auto it = finished.begin (); it != finished.end (); it++) {
+  for (auto it = finished.begin (); it != finished.end (); /*it++*/) {
     tbf_tex_load_s* load =
       *it;
 
@@ -1638,6 +1638,8 @@ TBFix_LoadQueuedTextures (void)
       // Remove the temporary reference
       load->pDest->Release ();
     }
+
+    ++it;
 
     delete load;
   }
