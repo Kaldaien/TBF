@@ -187,7 +187,7 @@ tbf::FrameRateFix::Init (void)
 {
   //CommandProcessor* comm_proc = CommandProcessor::getInstance ();
 
-  InitializeCriticalSectionAndSpinCount (&alter_speed_cs, 1000UL);
+//  InitializeCriticalSectionAndSpinCount (&alter_speed_cs, 1000UL);
 
   target_fps = 0;
   bink_dll   = LoadLibrary (L"bink2w64.dll");
@@ -282,7 +282,7 @@ tbf::FrameRateFix::Init (void)
 void
 tbf::FrameRateFix::Shutdown (void)
 {
-  DeleteCriticalSection (&alter_speed_cs);
+  //DeleteCriticalSection (&alter_speed_cs);
 
   FreeLibrary (kernel32_dll);
   FreeLibrary (bink_dll);

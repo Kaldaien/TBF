@@ -784,8 +784,8 @@ tbf::SoundFix::Init (void)
 void
 tbf::SoundFix::Shutdown (void)
 {
-  if (! config.audio.enable_fix)
-    return;
+  ////if (! config.audio.enable_fix)
+    ////return;
 
   //TBF_RemoveHook (pfnCoCreateInstance);
   //TBF_RemoveHook (pfnDirectSoundCreate);
@@ -793,8 +793,10 @@ tbf::SoundFix::Shutdown (void)
   FreeLibrary (dsound_dll);
   FreeLibrary (ole32_dll);
 
-  audio_log->Log   (L"Closing log file...");
-  audio_log->close ();
+  if (audio_log) {
+    audio_log->Log   (L"Closing log file...");
+    audio_log->close ();
+  }
 }
 
 

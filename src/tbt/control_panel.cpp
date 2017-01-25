@@ -11,6 +11,7 @@
 #include "command.h"
 #include "render.h"
 #include "framerate.h"
+#include "sound.h"
 #include "hook.h"
 
 
@@ -166,24 +167,17 @@ TBFix_DrawConfigUI (void)
     ImGui::GetIO ();
 
   ImGui::SetNextWindowPosCenter       (ImGuiSetCond_Always);
-  ImGui::SetNextWindowSizeConstraints (ImVec2 (50, 50), ImGui::GetIO ().DisplaySize);
+  ImGui::SetNextWindowSizeConstraints (ImVec2 (665, 50), ImVec2 ( ImGui::GetIO ().DisplaySize.x * 0.95f,
+                                                                    ImGui::GetIO ().DisplaySize.y * 0.95f ) );
 
   if (was_reset) {
-    ImGui::SetNextWindowSize (ImVec2 (50, 50), ImGuiSetCond_Always);
+    ImGui::SetNextWindowSize (ImVec2 (665, 50), ImGuiSetCond_Always);
     was_reset = false;
   }
 
-  ImGui::Begin ("Tales of Berseria \"Fix\" Control Panel", &show_config, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders);
+  bool show_config = true;
 
-  if (tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures) {
-    ImGui::SameLine        ( ImGui::GetContentRegionAvailWidth () * 0.03333f );
-    ImGui::PushTextWrapPos ( ImGui::GetCursorPos ().x + ImGui::GetContentRegionAvailWidth () * 0.95f);
-    ImGui::PushStyleColor  ( ImGuiCol_Text, ImColor (0.8f, 0.7f, 0.1f, 1.0f));
-    ImGui::TextWrapped     ( "You have made changes that will not apply until you change Screen Modes in Graphics Settings, "
-                            "or by performing Alt + Tab with the game set to Fullscreen mode.\n" );
-    ImGui::PopStyleColor   ( );
-    ImGui::PopTextWrapPos  ( );
-  }
+  ImGui::Begin ("Tales of Berseria \"Fix\" Control Panel", &show_config, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders);
 
   ImGui::PushItemWidth (ImGui::GetWindowWidth () * 0.666f);
 
@@ -304,31 +298,49 @@ TBFix_DrawConfigUI (void)
 
   if (ImGui::CollapsingHeader ("Texture Options"))
   {
-    if (ImGui::Checkbox ("Dump Textures",    &config.textures.dump))     tbf::RenderFix::need_reset.graphics = true;
-    if (ImGui::Checkbox ("Generate Mipmaps", &config.textures.remaster)) tbf::RenderFix::need_reset.graphics = true;
-
-    if (ImGui::IsItemHovered ())
-      ImGui::SetTooltip ("Eliminates distant texture aliasing");
-
-    if (config.textures.remaster) {
-      ImGui::SameLine (150); 
-
-      if (ImGui::Checkbox ("(Uncompressed)", &config.textures.uncompressed)) tbf::RenderFix::need_reset.graphics = true;
+    if (ImGui::TreeNodeEx ("Quality Settings", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+      if (ImGui::Checkbox ("Generate Mipmaps", &config.textures.remaster)) tbf::RenderFix::need_reset.graphics = true;
 
       if (ImGui::IsItemHovered ())
-        ImGui::SetTooltip ("Uses more VRAM, but avoids texture compression artifacts on generated mipmaps.");
+        ImGui::SetTooltip ("Eliminates distant texture aliasing and shimmering caused by missing/incomplete mipmaps.");
+
+      if (config.textures.remaster)
+      {
+        ImGui::TreePush ("");
+
+        if (ImGui::Checkbox ("Do Not Compress Generated Mipmaps", &config.textures.uncompressed)) tbf::RenderFix::need_reset.graphics = true;
+
+        if (ImGui::IsItemHovered ())
+          ImGui::SetTooltip ("Uses more VRAM, but avoids texture compression artifacts on generated mipmaps.");
+
+        ImGui::Checkbox ("Show Loading Activity in OSD During Mipmap Generation", &config.textures.show_loading_text);
+        ImGui::TreePop  ();
+      }
+
+      ImGui::SliderFloat ("Mipmap LOD Bias", &config.textures.lod_bias, -3.0f, config.textures.uncompressed ? 16.0f : 3.0f);
+
+      if (ImGui::IsItemHovered ())
+      {
+        ImGui::BeginTooltip ();
+        ImGui::Text         ("Controls texture sharpness;  -3 = Sharpest (WILL shimmer),  0 = Neutral,  16 = Laughably blurry");
+        ImGui::EndTooltip   ();
+      }
+      ImGui::TreePop    ();
     }
 
-    ImGui::SliderFloat ("LOD Bias", &config.textures.lod_bias, -3.0f, config.textures.uncompressed ? 16.0f : 3.0f);
-
-    if (ImGui::IsItemHovered ())
+    if (ImGui::TreeNode ("Texture Modding"))
     {
-      ImGui::BeginTooltip ();
-      ImGui::Text         ("Controls texture sharpness;  -3 = Sharpest (WILL shimmer),  0 = Neutral,  16 = Laughably blurry");
-      ImGui::EndTooltip   ();
-    }
+      if (ImGui::Checkbox ("Dump Textures  (TBFix_Res\\dump\\textures\\<format>\\*.dds)",    &config.textures.dump))     tbf::RenderFix::need_reset.graphics = true;
 
-    ImGui::Checkbox ("Display Texture Resampling Indicator in OSD", &config.textures.show_loading_text);
+      if (ImGui::IsItemHovered ())
+      {
+        ImGui::BeginTooltip ();
+        ImGui::Text         ("Enabling this will cause the game to run slower and waste disk space, only enable if you know what you are doing.");
+        ImGui::EndTooltip   ();
+      }
+      ImGui::TreePop    ();
+    }
   }
 
 #if 0
@@ -363,8 +375,10 @@ TBFix_DrawConfigUI (void)
     ImGui::Combo ("Character Shadow Resolution",     &shadows.radio,     "Normal\0Enhanced\0High\0Ultra\0\0");
     ImGui::Combo ("Environmental Shadow Resolution", &env_shadows.radio, "Normal\0High\0Ultra\0\0");
 
-    ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.999f, 0.01f, 0.999f, 1.0f));
-    ImGui::TextWrapped    (" * Changes to these settings will produce weird results until you change Screen Mode in-game..." );
+    ImGui::Columns        (1);
+    ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.975f, 0.1f, 0.975f, 1.0f));
+    ImGui::Bullet         (); ImGui::SameLine ();
+    ImGui::TextWrapped    ("Changes to these settings will produce weird results until you change Screen Mode in-game..." );
     ImGui::PopStyleColor  ();
 
     if (env_shadows.radio != env_shadows.last_sel) {
@@ -380,41 +394,102 @@ TBFix_DrawConfigUI (void)
     }
   }
 
-  if (ImGui::CollapsingHeader ("Audio Configuration"))
-  {
-    ImGui::Checkbox ("Enable 7.1 Channel Audio Fix", &config.audio.enable_fix);
+  static bool need_restart = false;
 
-    if (config.audio.enable_fix) {
-      ImGui::RadioButton ("Stereo",       (int *)&config.audio.channels, 2);
-      ImGui::RadioButton ("Quadraphonic", (int *)&config.audio.channels, 4);
-      ImGui::RadioButton ("5.1 Surround", (int *)&config.audio.channels, 6);
+  if (ImGui::CollapsingHeader ("Audio Configuration"))
+  { 
+    if (tbf::SoundFix::wasapi_init) {
+      ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 16.0f);
+      ImGui::BeginChild  ("Audio Details", ImVec2 (0, 80), true);
+
+        ImGui::Columns   (3);
+        ImGui::Text      ("");                                                                     ImGui::NextColumn ();
+        ImGui::Text      ("Sample Rate");                                                          ImGui::NextColumn ();
+        ImGui::Text      ("Channel Setup");
+        ImGui::Columns   (1);
+        ImGui::Separator ();
+        ImGui::Columns   (3);
+        ImGui::Text      ( "Game (SoundCore)");                                                    ImGui::NextColumn ();
+        ImGui::Text      ( "%.2f kHz @ %lu-bit", (float)tbf::SoundFix::snd_core_fmt.nSamplesPerSec / 1000.0f,
+                                                   tbf::SoundFix::snd_core_fmt.wBitsPerSample );   ImGui::NextColumn ();
+        ImGui::Text      ( "%lu",                  tbf::SoundFix::snd_core_fmt.nChannels );
+        ImGui::Columns   (1);
+        ImGui::Separator ();
+        ImGui::Columns   (3);
+        ImGui::Text      ( "Device");                                                              ImGui::NextColumn ();
+        ImGui::Text      ( "%.2f kHz @ %lu-bit", (float)tbf::SoundFix::snd_device_fmt.nSamplesPerSec / 1000.0f,
+                                                   tbf::SoundFix::snd_device_fmt.wBitsPerSample ); ImGui::NextColumn ();
+        ImGui::Text      ( "%lu",                  tbf::SoundFix::snd_device_fmt.nChannels );
+        ImGui::Columns   (1);
+
+      ImGui::EndChild    ();
+      ImGui::PopStyleVar ();
+    }
+
+    need_restart |= ImGui::Checkbox ("Enable 7.1 Channel Audio Fix", &config.audio.enable_fix);
+
+    if (config.audio.enable_fix)
+    {
+      ImGui::TreePush ("");
+        need_restart |= ImGui::RadioButton ("Stereo",       (int *)&config.audio.channels, 2); ImGui::SameLine ();
+        need_restart |= ImGui::RadioButton ("Quadraphonic", (int *)&config.audio.channels, 4); ImGui::SameLine ();
+        need_restart |= ImGui::RadioButton ("5.1 Surround", (int *)&config.audio.channels, 6);
+      ImGui::TreePop  (  );
     }
   }
 
   ImGui::PopItemWidth ();
 
-  if (ImGui::Button ("Gamepad Config"))
+  ImGui::Separator (   );
+  ImGui::Columns   ( 2 );
+
+  if (ImGui::Button ("   Gamepad Config   "))
     ImGui::OpenPopup ("Gamepad Config");
 
   TBFix_GamepadConfigDlg ();
 
-  ImGui::SameLine();
+  ImGui::SameLine      ();
 
   //if (ImGui::Button ("Special K Config"))
     //show_gamepad_config ^= 1;
 
-  if (ImGui::Button ("Special K Config"))
+  if (ImGui::Button ("   Special K Config   "))
     show_special_k_cfg = (! show_special_k_cfg);
 
-  ImGui::SameLine ();
+  ImGui::SameLine (0.0f, 60.0f);
+
+  if (ImGui::Selectable ("...", show_test_window))
+    show_test_window = (! show_test_window);
+
+  ImGui::NextColumn ();
 
   if ( ImGui::Checkbox ("Pause Game While This Menu Is Open", &config.input.ui.pause) )
     TBFix_PauseGame (config.input.ui.pause);
 
-  ImGui::SameLine ();
+  bool extra_details = false;
 
-  if (ImGui::Selectable ("...", show_test_window))
-    show_test_window = (! show_test_window);
+ if (need_restart || tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures)
+   extra_details = true;
+
+  if (extra_details) {
+    ImGui::Columns    ( 1 );
+    ImGui::Separator  (   );
+
+    if (need_restart) {
+      ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 0.4f, 0.15f, 1.0f));
+      ImGui::BulletText     ("Game Restart Required");
+      ImGui::PopStyleColor  ();
+    }
+    
+    if (tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures) {
+      ImGui::PushStyleColor  (ImGuiCol_Text, ImVec4 (1.0f, 0.8f, 0.2f, 1.0f));
+      ImGui::Bullet          ( ); ImGui::SameLine ();
+      ImGui::TextWrapped     ( "You have made changes that will not apply until you change Screen Modes in Graphics Settings, "
+                              "or by performing Alt + Tab with the game set to Fullscreen mode.\n" );
+      ImGui::PopStyleColor   ( );
+      ImGui::PopTextWrapPos  ( );
+    }
+  }
 
   ImGui::End ();
 
@@ -432,6 +507,11 @@ TBFix_DrawConfigUI (void)
   {
     ImGui::Render                     ();
     tbf::RenderFix::pDevice->EndScene ();
+  }
+
+  if (! show_config)
+  {
+    TBFix_ToggleConfigUI ();
   }
 }
 

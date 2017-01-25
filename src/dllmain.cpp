@@ -176,7 +176,8 @@ DllMain (HMODULE hModule,
 
     case DLL_PROCESS_DETACH:
     {
-      if (dll_log != nullptr) {
+      if (dll_log != nullptr)
+      {
         tbf::SoundFix::Shutdown     ();
         //tbf::FileIO::Shutdown       ();
         //tbf::SteamFix::Shutdown     ();

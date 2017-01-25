@@ -2189,6 +2189,12 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     bool compressed = (fmt_real >= D3DFMT_DXT1 && fmt_real <= D3DFMT_DXT5);
 
     wchar_t wszPath [MAX_PATH];
+    _swprintf ( wszPath, L"%s\\dump",
+                  TBFIX_TEXTURE_DIR );
+
+    if (GetFileAttributesW (wszPath) != FILE_ATTRIBUTE_DIRECTORY)
+      CreateDirectoryW (wszPath, nullptr);
+
     _swprintf ( wszPath, L"%s\\dump\\textures",
                   TBFIX_TEXTURE_DIR );
 
