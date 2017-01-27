@@ -119,6 +119,14 @@ SKPlugIn_Init (HMODULE hModSpecialK)
   if (SKX_SetPluginName != nullptr)
     SKX_SetPluginName (plugin_name.c_str ());
 
+  static SK_UpdateSoftware_pfn SK_UpdateSoftware =
+    TBF_ImportFunctionFromSpecialK ( "SK_UpdateSoftware",
+                                       SK_UpdateSoftware );
+
+  static SK_FetchVersionInfo_pfn SK_FetchVersionInfo =
+    TBF_ImportFunctionFromSpecialK ( "SK_FetchVersionInfo",
+                                       SK_FetchVersionInfo );
+
   if (TBF_Init_MinHook () == MH_OK) {
     extern void TBFix_ImGui_Init (void);
                 TBFix_ImGui_Init ();
@@ -135,6 +143,18 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     CreateThread ( nullptr, 0,
       [](LPVOID user) ->
         DWORD {
+          if (! wcsstr (injector_dll.c_str (), L"SpecialK"))
+          {
+            if ( SK_FetchVersionInfo != nullptr &&
+                 SK_UpdateSoftware   != nullptr )
+            {
+              if (SK_FetchVersionInfo (L"TBF"))
+              {
+                SK_UpdateSoftware     (L"TBF");
+              }
+            }
+          }
+
           // Wait for Denuvo to finish its thing...
           Sleep                   (15000UL);
           tbf::FrameRateFix::Init ();
@@ -148,24 +168,6 @@ SKPlugIn_Init (HMODULE hModSpecialK)
 
     // Uncomment this when spawning a thread
     //CoUninitialize ();
-  }
-
-  static SK_UpdateSoftware_pfn SK_UpdateSoftware =
-    TBF_ImportFunctionFromSpecialK ( "SK_UpdateSoftware",
-                                       SK_UpdateSoftware );
-
-  static SK_FetchVersionInfo_pfn SK_FetchVersionInfo =
-    TBF_ImportFunctionFromSpecialK ( "SK_FetchVersionInfo",
-                                       SK_FetchVersionInfo );
-
-  if (! wcsstr (injector_dll.c_str (), L"SpecialK"))
-  {
-    if ( SK_FetchVersionInfo != nullptr &&
-         SK_UpdateSoftware   != nullptr ) {
-      if (SK_FetchVersionInfo (L"TBF")) {
-        SK_UpdateSoftware (L"TBF");
-      }
-    }
   }
 
   return TRUE;
