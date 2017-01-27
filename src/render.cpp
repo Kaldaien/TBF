@@ -585,22 +585,37 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
     =
     (SKX_DrawExternalOSD_pfn)GetProcAddress (hMod, "SKX_DrawExternalOSD");
 
-  extern bool __show_cache;
+  static DWORD dwFirstTime     = timeGetTime ();
+  static bool  show_disclaimer = true;
 
-  if (__show_cache) {
-    static std::string output;
+  if (show_disclaimer)
+  {
+    if (timeGetTime() > dwFirstTime + 10000UL)
+      show_disclaimer = false;
 
-    output  = "Texture Cache\n";
-    output += "-------------\n";
-    output += tbf::RenderFix::tex_mgr.osdStats ();
+    SKX_DrawExternalOSD ("ToBFix", "Press Ctrl + Shift + O         to toggle In-Game OSD\n"
+                                   "Press Ctrl + Shift + Backspace to access In-Game Config Menu");
+  }
 
-    output += mod_text;
+  else
+  {
+    extern bool __show_cache;
 
-    SKX_DrawExternalOSD ("ToBFix", output.c_str ());
+    if (__show_cache) {
+      static std::string output;
 
-    output = "";
-  } else
-    SKX_DrawExternalOSD ("ToBFix", mod_text.c_str ());
+      output  = "Texture Cache\n";
+      output += "-------------\n";
+      output += tbf::RenderFix::tex_mgr.osdStats ();
+
+      output += mod_text;
+
+      SKX_DrawExternalOSD ("ToBFix", output.c_str ());
+
+      output = "";
+    } else
+      SKX_DrawExternalOSD ("ToBFix", mod_text.c_str ());
+  }
 
   mod_text = "";
 

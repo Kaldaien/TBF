@@ -26,6 +26,7 @@
 #include <stdint.h>
 
 void*     TBF_Scan        (uint8_t* pattern, size_t len, uint8_t* mask = nullptr);
+void*     TBF_ScanEx (uint8_t* pattern, size_t len, uint8_t* mask, void* after);
 uintptr_t TBF_GetBaseAddr (void);
 
 #endif /* __TBF__SCANNER_H__ */

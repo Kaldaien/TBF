@@ -129,8 +129,22 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     //tbf::FileIO::Init       ();
     //tbf::SteamFix::Init     ();
     tbf::RenderFix::Init    ();
-    tbf::FrameRateFix::Init ();
     //tbf::KeyboardFix::Init  ();
+
+
+    CreateThread ( nullptr, 0,
+      [](LPVOID user) ->
+        DWORD {
+          // Wait for Denuvo to finish its thing...
+          Sleep                   (15000UL);
+          tbf::FrameRateFix::Init ();
+    
+          CloseHandle             (GetCurrentThread ());
+    
+          return 0;
+        },
+      nullptr, 0x00, nullptr );
+
 
     // Uncomment this when spawning a thread
     //CoUninitialize ();

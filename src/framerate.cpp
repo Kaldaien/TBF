@@ -36,7 +36,7 @@
 // @TODO: Develop a heuristic to scan for this memory address;
 //          hardcoding it is going to break stuff :)
 //
-uintptr_t TICK_ADDR_BASE = 0xB1B074;
+uintptr_t TICK_ADDR_BASE = 0xB15074;//0xB1B074;
 
 int32_t          tbf::FrameRateFix::tick_scale               = INT32_MAX; // 0 FPS
 
@@ -210,73 +210,62 @@ tbf::FrameRateFix::Init (void)
 
   TBF_ApplyQueuedHooks ();
 
-  //if (config.framerate.replace_limiter) {
-    /*
-      6D3610 0x48 0x83 0xec 0x38	; Namco Limiter
-      6D3610 0xc3 0x90 0x90 0x90	; No Limiter
+  //Tales of Berseria.Kaim::Thread::`default constructor closure'+251F60 - 48 83 EC 38           - sub rsp,38 { 56 }
+  //Tales of Berseria.Kaim::Thread::`default constructor closure'+251F64 - 8B 0D 3A691FFF        - mov ecx,["Tales of Berseria.exe"+B15074] { [1104.03] }
 
-      Tales of Berseria.exe+6D3610 - 48 83 EC 38           - sub rsp,38 { 56 }
 
-      0x48 0x83 0xec 0x38 0x8b 0x0d -------- 0x85 0xc9
-    */
+  uint8_t sig  [] = { 0x48, 0x83, 0xec, 0x38, 0X8B, 0x0d, 0x3A, 0x69, 0x1F, 0xFF, 0x85, 0xc9 };
+  uint8_t mask [] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff };
 
-    uint8_t sig  [] = { 0x48, 0x83, 0xec, 0x38,
-                        0x8b, 0x0d,             0xff, 0xff, 0xff, 0xff,
-                        0x85, 0xc9 };
-    uint8_t mask [] = { 0xff, 0xff, 0xff, 0xff,
-                        0xff, 0xff,             0x00, 0x00, 0x00, 0x00,
-                        0xff, 0xff };
+  void* limiter_addr =
+    TBF_Scan (sig, sizeof (sig), mask);
 
-    void* limiter_addr =
-      TBF_Scan (sig, sizeof (sig), mask);
 
-    if (limiter_addr != nullptr) {
-      dll_log->Log ( L"[FrameLimit] Scanned Namco's Framerate Limit Bug Address: %ph",
-                       limiter_addr );
-    } else {
-      dll_log->Log (L"[FrameLimit]  >> ERROR: Unable to find Framerate Limiter code!");
-    }
+  if (limiter_addr != nullptr) {
+    dll_log->Log ( L"[FrameLimit] Scanned Namco's Framerate Limit Bug Address: %ph",
+                     limiter_addr );
+  } else {
+    dll_log->Log (L"[FrameLimit]  >> ERROR: Unable to find Framerate Limiter code!");
+  }
 
-    if (limiter_addr != nullptr) {
-      //dll_log->LogEx (true, L"[FrameLimit]  * Installing variable rate simulation... ");
+  if (limiter_addr != nullptr) {
+    //dll_log->LogEx (true, L"[FrameLimit]  * Installing variable rate simulation... ");
 
 #if 0
-      uint8_t disable_inst [] = { 0xc3, 0x90, 0x90, 0x90 };
+    uint8_t disable_inst [] = { 0xc3, 0x90, 0x90, 0x90 };
 
-      TBF_InjectMachineCode ( limiter_addr,
-                                disable_inst,
-                                  sizeof (disable_inst),
-                                    PAGE_EXECUTE_READWRITE );
+    TBF_InjectMachineCode ( limiter_addr,
+                              disable_inst,
+                                sizeof (disable_inst),
+                                  PAGE_EXECUTE_READWRITE );
 
 #endif
 
-      TBF_CreateFuncHook ( L"NamcoLimiter",
-                             limiter_addr,
-                               NamcoLimiter_Detour,
-                    (LPVOID *)&NamcoLimiter_Original );
-      TBF_EnableHook    (limiter_addr);
+     TBF_CreateFuncHook ( L"NamcoLimiter",
+                            limiter_addr,
+                              NamcoLimiter_Detour,
+                   (LPVOID *)&NamcoLimiter_Original );
+     TBF_EnableHook    (limiter_addr);
 
 
-      MEMORY_BASIC_INFORMATION minfo;
-      DWORD*                   pTickAddr = 
-        (DWORD *)(TBF_GetBaseAddr () + TICK_ADDR_BASE);
+     DWORD*                   pTickAddr = 
+       (DWORD *)(TBF_GetBaseAddr () + TICK_ADDR_BASE);
 
-      VirtualQuery (pTickAddr, &minfo, sizeof (minfo));
+     __try
+     {
+       if ( *pTickAddr <= 2 )
+       {
+         variable_speed_installed = true;
+       }
+     }
 
-      if ( (minfo.Protect & PAGE_READWRITE) &&
-           *pTickAddr <= 2 )
-      {
-        variable_speed_installed = true;
-      }
-
-      else if (config.framerate.replace_limiter)
-      {
-        SK_GetCommandProcessor ()->ProcessCommandFormatted (
-                                     "TargetFPS %f",
-                                       60.0f );
-      }
-    }
-  //}
+     __except ( ( GetExceptionCode () == EXCEPTION_ACCESS_VIOLATION ) ? 
+              EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH )
+     {
+       dll_log->Log ( L"[Import Tbl] Access Violation While Attempting to "
+                      L"Install Variable Rate Limiter." );
+     }
+   }
 }
 
 void
