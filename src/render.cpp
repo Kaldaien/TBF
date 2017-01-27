@@ -282,9 +282,12 @@ SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
     }
 
     wchar_t wszDumpName [MAX_PATH];
-    _swprintf ( wszDumpName,
-                  L"TBFix_Res\\dump\\shaders\\%s_%08x.html",
-                    wszPrefix, crc32 );
+    ZeroMemory (wszDumpName, sizeof (wchar_t) * MAX_PATH);
+
+    swprintf_s ( wszDumpName,
+                   MAX_PATH, 
+                     L"TBFix_Res\\dump\\shaders\\%s_%08x.html",
+                       wszPrefix, crc32 );
 
     if (D3DXDisassembleShader == nullptr)
       D3DXDisassembleShader =
@@ -300,8 +303,7 @@ SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
         D3DXDisassembleShader ((DWORD *)pbFunc, TRUE, "", &pDisasm);
 
       if (SUCCEEDED (hr)) {
-        FILE* fDump =
-          _wfopen (wszDumpName, L"wb");
+        FILE* fDump = _wfsopen (wszDumpName,  L"Wb", _SH_DENYWR);
 
         if (fDump != NULL) {
           fwrite ( pDisasm->GetBufferPointer (),
@@ -963,7 +965,9 @@ TBF_AdjustViewport (IDirect3DDevice9* This, bool UI)
   vp9_orig.Height = tbf::RenderFix::height;
 
   DWORD width  = vp9_orig.Width;
-  DWORD height = (9.0f / 16.0f) * vp9_orig.Width;
+  DWORD height = static_cast <DWORD> (
+                    (9.0f / 16.0f) * static_cast <float> (vp9_orig.Width)
+                  );
 
   // We can't do this, so instead we need to sidebar the stuff
   if (height > vp9_orig.Height) {

@@ -119,7 +119,7 @@ TBFix_GamepadConfigDlg (void)
           _strdup ( gamepads_ [i].c_str () )
         );
 
-        if (! stricmp (gamepads.array [i], current_gamepad))
+        if (! _stricmp (gamepads.array [i], current_gamepad))
           gamepads.sel = i;
       }
     }
@@ -129,16 +129,18 @@ TBFix_GamepadConfigDlg (void)
   {
     int orig_sel = gamepads.sel;
 
-    if (ImGui::ListBox ("Gamepad\nIcons", &gamepads.sel, gamepads.array.data (), gamepads.array.size (), 3))
+    if (ImGui::ListBox ("Gamepad\nIcons", &gamepads.sel, gamepads.array.data (), (int)gamepads.array.size (), 3))
     {
       if (orig_sel != gamepads.sel)
       {
-        wchar_t pad[128] = { L'\0' };
+        wchar_t pad [128] = { };
 
-        swprintf(pad, L"%hs", gamepads.array[gamepads.sel]);
+        swprintf_s ( pad, 128,
+                       L"%hs",
+                         gamepads.array [gamepads.sel]
+                   );
 
-        config.input.gamepad.texture_set = pad;
-
+        config.input.gamepad.texture_set    = pad;
         tbf::RenderFix::need_reset.textures = true;
       }
 
@@ -183,13 +185,13 @@ TBFix_DrawConfigUI (void)
 
   if (ImGui::CollapsingHeader ("Framerate Control", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   {
-    int limiter =
-      config.framerate.replace_limiter ? 1 : 0;
+    bool limiter =
+      config.framerate.replace_limiter;
 
     const char* szLabel = (limiter == 0 ? "Framerate Limiter  (choose something else!)" : "Framerate Limiter");
 
-    ImGui::Combo (szLabel, &limiter, "Namco          (A.K.A. Stutterfest 2017)\0"
-                                     "Special K      (Precision Timing For The Win!)\0\0" );
+    ImGui::Combo (szLabel, (int *)&limiter, "Namco          (A.K.A. Stutterfest 2017)\0"
+                                              "Special K      (Precision Timing For The Win!)\0\0" );
 
     static float values [120]  = { 0 };
     static int   values_offset =   0;
@@ -232,15 +234,16 @@ TBFix_DrawConfigUI (void)
         min = val;
     }
 
-    static char szAvg [512];
+    static char szAvg [512] = { };
 
-    sprintf ( szAvg,
-                "Avg milliseconds per-frame: %6.3f  (Target: %6.3f)\n"
-                "    Extreme frametimes:      %6.3f min, %6.3f max\n\n\n\n"
-                "Variation:  %8.5f ms  ==>  %.1f FPS  +/-  %3.1f frames",
-                  sum / 120.0f, tbf::FrameRateFix::GetTargetFrametime (),
-                    min, max, max - min,
-                      1000.0f / (sum / 120.0f), (max - min) / (1000.0f / (sum / 120.0f)) );
+    sprintf_s ( szAvg,
+                  512,
+                    "Avg milliseconds per-frame: %6.3f  (Target: %6.3f)\n"
+                    "    Extreme frametimes:      %6.3f min, %6.3f max\n\n\n\n"
+                  "Variation:  %8.5f ms  ==>  %.1f FPS  +/-  %3.1f frames",
+                    sum / 120.0f, tbf::FrameRateFix::GetTargetFrametime (),
+                      min, max, max - min,
+                        1000.0f / (sum / 120.0f), (max - min) / (1000.0f / (sum / 120.0f)) );
 
     ImGui::PlotLines ( "",
                          values,

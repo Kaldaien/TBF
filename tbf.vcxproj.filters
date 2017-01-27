@@ -44,7 +44,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\tbt\control_panel.cpp">
-      <Filter>Source Files\Tales of Berseria Tweak</Filter>
+      <Filter>Source Files\ImGui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -96,11 +96,8 @@
     <ClInclude Include="include\input.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\imgui\imconfig.h">
-      <Filter>Header Files\imgui</Filter>
-    </ClInclude>
     <ClInclude Include="include\imgui\imgui.h">
-      <Filter>Header Files\imgui</Filter>
+      <Filter>Header Files\ImGui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -126,10 +123,10 @@
     <Filter Include="Resource Files">
       <UniqueIdentifier>{75d25c58-9b48-45cc-948e-40de7eb119d7}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Tales of Berseria Tweak">
+    <Filter Include="Source Files\ImGui">
       <UniqueIdentifier>{7614fb09-0ecb-419e-9843-a7a83f8f3521}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\imgui">
+    <Filter Include="Header Files\ImGui">
       <UniqueIdentifier>{9a0b79ba-cdc0-45eb-8818-c78ab4eab12c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>

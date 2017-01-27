@@ -592,8 +592,8 @@ D3D9SetDepthStencilSurface_Detour (
 }
 
 
-int debug_tex_id;
-uint32_t current_tex;
+size_t   debug_tex_id = 0UL;
+uint32_t current_tex  = 0ui32;
 
 COM_DECLSPEC_NOTHROW
 HRESULT
@@ -1548,7 +1548,7 @@ TBFix_LoadQueuedTextures (void)
       size_t queue_len = resample_pool->queueLength ();
 
       if (queue_len) {
-        sprintf (szFormatted, " (%lu queued)", queue_len);
+        sprintf (szFormatted, " (%zu queued)", queue_len);
         mod_text += szFormatted;
       }
 
@@ -1571,7 +1571,7 @@ TBFix_LoadQueuedTextures (void)
 
       if (config.textures.show_loading_text) {
         if (textures_to_stream.size ()) {
-          sprintf (szFormatted, " (%lu outstanding)", textures_to_stream.size ());
+          sprintf (szFormatted, " (%zu outstanding)", textures_to_stream.size ());
           mod_text += szFormatted;
         }
       }
@@ -2130,7 +2130,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
       load_op->pSrcData    = new uint8_t [SrcDataSize];
       load_op->SrcDataSize = SrcDataSize;
 
-      swprintf (load_op->wszFilename, L"Resample_%x.dds", checksum);
+      _swprintf (load_op->wszFilename, L"Resample_%x.dds", checksum);
 
       memcpy (load_op->pSrcData, pSrcData, SrcDataSize);
 
@@ -3051,7 +3051,7 @@ tbf::RenderFix::TextureManager::updateOSD (void)
   osd_stats = "";
 
   char szFormatted [64];
-  sprintf ( szFormatted, "%6lu Total Textures : %8.2f MiB",
+  sprintf ( szFormatted, "%6zu Total Textures : %8.2f MiB",
               numTextures () + numInjectedTextures (),
                 cache_total );
   osd_stats += szFormatted;
@@ -3066,7 +3066,7 @@ tbf::RenderFix::TextureManager::updateOSD (void)
 
   osd_stats += szFormatted;
 
-  sprintf ( szFormatted, "%6lu  Base Textures : %8.2f MiB    %s\n",
+  sprintf ( szFormatted, "%6zu  Base Textures : %8.2f MiB    %s\n",
               numTextures (),
                 cache_basic,
                   __remap_textures ? "" : "<----" );
@@ -3089,7 +3089,7 @@ tbf::RenderFix::TextureManager::updateOSD (void)
   if (debug_tex_id != 0x00) {
     osd_stats += "\n\n";
 
-    sprintf ( szFormatted, " Debug Texture : %08x",
+    sprintf ( szFormatted, " Debug Texture : %08zx",
                 debug_tex_id );
 
     osd_stats += szFormatted;
@@ -3097,7 +3097,7 @@ tbf::RenderFix::TextureManager::updateOSD (void)
 }
 
 std::vector <uint32_t> textures_used_last_dump;
-int tex_dbg_idx = 0;
+                size_t tex_dbg_idx              = 0UL;
 
 void
 TBFix_LogUsedTextures (void)

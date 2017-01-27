@@ -66,8 +66,10 @@ CalcCursorPos (LPPOINT pPoint)
   yscale = 1.0f;
 #endif
 
-  pPoint->x = (pPoint->x - xoff) * xscale;
-  pPoint->y = (pPoint->y - yoff) * yscale;
+  *pPoint = {
+    static_cast <LONG> ((static_cast <float> (pPoint->x) - xoff) * xscale),
+    static_cast <LONG> ((static_cast <float> (pPoint->y) - yoff) * yscale)
+  };
 
   return *pPoint;
 }
@@ -124,10 +126,10 @@ SK_TBF_PluginKeyPress ( BOOL Control,
 
     else if (vkCode == VK_OEM_6) {
       extern std::vector <uint32_t> textures_used_last_dump;
-      extern int                    tex_dbg_idx;
+      extern size_t                 tex_dbg_idx;
       ++tex_dbg_idx;
 
-      extern int debug_tex_id;
+      extern size_t debug_tex_id;
 
       if (tex_dbg_idx < 0 || (! textures_used_last_dump.size ())) {
         tex_dbg_idx  = -1;
@@ -146,8 +148,8 @@ SK_TBF_PluginKeyPress ( BOOL Control,
 
     else if (vkCode == VK_OEM_4) {
       extern std::vector <uint32_t> textures_used_last_dump;
-      extern int                    tex_dbg_idx;
-      extern int                    debug_tex_id;
+      extern size_t                   tex_dbg_idx;
+      extern size_t                   debug_tex_id;
 
       --tex_dbg_idx;
 

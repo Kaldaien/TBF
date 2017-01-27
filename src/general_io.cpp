@@ -270,19 +270,27 @@ OpenFile_Detour ( _In_    LPCSTR     lpFileName,
 {
   dll_log->Log (L"[  FileIO  ] [!] OpenFile (%hs, ...)", lpFileName);
 
-  HFILE hFile =
-    OpenFile_Original (lpFileName, lpReOpenBuff, uStyle);
+  HFILE  hFile  =
+      OpenFile_Original ( lpFileName,
+                            lpReOpenBuff,
+                              uStyle      );
 
-  if (hFile != 0) {
-    wchar_t wszFileName [MAX_PATH] = { L'\0' };
+  HANDLE Handle (UintToPtr (hFile));
 
-    GetFileNameFromHandle ((HANDLE)hFile, wszFileName, MAX_PATH);
+  if (Handle != nullptr)
+  {
+    wchar_t wszFileName [MAX_PATH] = 
+                                      { };
+
+    GetFileNameFromHandle ( Handle,
+                              wszFileName,
+                                MAX_PATH );
 
     if (wcslen (wszFileName))
-      tbf::tracer->addFile (wszFileName, (HANDLE)hFile);
+      tbf::tracer->addFile (wszFileName, Handle);
   }
 
-  return hFile;
+  return PtrToUint (Handle);
 }
 
 void

@@ -151,7 +151,7 @@ namespace RenderFix {
     void                     reset (void);
     void                     purge (void); // WIP
 
-    int                      numTextures (void) {
+    size_t                   numTextures (void) {
       return textures.size ();
     }
     int                      numInjectedTextures (void);
