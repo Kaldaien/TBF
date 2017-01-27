@@ -450,9 +450,6 @@ TBFix_DrawConfigUI (void)
 
   ImGui::SameLine      ();
 
-  //if (ImGui::Button ("Special K Config"))
-    //show_gamepad_config ^= 1;
-
   if (ImGui::Button ("   Special K Config   "))
     show_special_k_cfg = (! show_special_k_cfg);
 

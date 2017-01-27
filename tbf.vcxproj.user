@@ -7,9 +7,9 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LocalDebuggerCommand>C:\Windows\System32\rundll32.exe</LocalDebuggerCommand>
-    <LocalDebuggerWorkingDirectory>C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria Demo\</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>"C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria Demo\tbfix.dll", TBT_Main</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>"C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria\tbfix.dll", TBT_Main</LocalDebuggerCommandArguments>
     <LocalDebuggerAttach>false</LocalDebuggerAttach>
   </PropertyGroup>
 </Project>
