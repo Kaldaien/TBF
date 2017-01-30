@@ -1843,6 +1843,8 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
       return S_OK;
     }
+
+    tbf::RenderFix::tex_mgr.missTexture ();
   }
 
   bool resample = false;
@@ -1929,13 +1931,13 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     }
   }
 
-  bool will_replace = (load_op != nullptr || resample);
+  bool will_replace = config.textures.quick_load && (load_op != nullptr || resample);
 
   //tex_log->Log (L"D3DXCreateTextureFromFileInMemoryEx (... MipLevels=%lu ...)", MipLevels);
   hr =
     D3DXCreateTextureFromFileInMemoryEx ( pDevice,
                                                      pSrcData,         SrcDataSize,
-                                                       Width,          Height,    MipLevels,
+                                                       Width,          Height,    will_replace ? 1 : MipLevels,
                                                          Usage,        Format,    Pool,
                                                            Filter,     MipFilter, ColorKey,
                                                              pSrcInfo, pPalette,
@@ -2304,7 +2306,8 @@ tbf::RenderFix::TextureManager::refTexture (tbf::RenderFix::Texture* pTex)
                        pTex->load_time );
   }
 
-  time_saved += pTex->load_time;
+  InterlockedAdd64 (&bytes_saved, pTex->size);
+                    time_saved += pTex->load_time;
 
   updateOSD ();
 }
@@ -2749,7 +2752,9 @@ tbf::RenderFix::TextureManager::Init (void)
         GetProcAddress (hModD3D9, "D3D9CreateDepthStencilSurface_Override");
   }
 
-  time_saved = 0.0f;
+  InterlockedExchange64 (&bytes_saved, 0LL);
+
+  time_saved  = 0.0f;
 
   InitializeCriticalSectionAndSpinCount (&cs_tex_inject,   10000000);
   InitializeCriticalSectionAndSpinCount (&cs_tex_resample, 100000);

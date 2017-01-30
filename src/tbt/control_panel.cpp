@@ -7,9 +7,12 @@
 #include <dinput.h>
 #include <tchar.h>
 
+#include "DLL_VERSION.H"
+
 #include "config.h"
 #include "command.h"
 #include "render.h"
+#include "textures.h"
 #include "framerate.h"
 #include "sound.h"
 #include "hook.h"
@@ -163,7 +166,8 @@ ImGui_ImplDX9_NewFrame (void);
 void
 TBFix_DrawConfigUI (void)
 {
-  static bool was_reset = false;
+  static bool need_restart = false;
+  static bool was_reset    = false;
 
   ImGui_ImplDX9_NewFrame ();
 
@@ -181,19 +185,22 @@ TBFix_DrawConfigUI (void)
 
   bool show_config = true;
 
-  ImGui::Begin ("Tales of Berseria \"Fix\" Control Panel", &show_config, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders);
+  ImGui::Begin ( "Tales of Berseria \"Fix\" (v " TBF_VERSION_STR_A ") Control Panel",
+                   &show_config,
+                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders );
 
   ImGui::PushItemWidth (ImGui::GetWindowWidth () * 0.666f);
 
-  if (ImGui::CollapsingHeader ("Framerate Control", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
+  if (ImGui::CollapsingHeader ("Framerate", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   {
-    bool limiter =
-      config.framerate.replace_limiter;
+    ImGui::TreePush ("");
+    int limiter =
+      config.framerate.replace_limiter ? 1 : 0;
 
     const char* szLabel = (limiter == 0 ? "Framerate Limiter  (choose something else!)" : "Framerate Limiter");
 
-    ImGui::Combo (szLabel, (int *)&limiter, "Namco          (A.K.A. Stutterfest 2017)\0"
-                                              "Special K      (Precision Timing For The Win!)\0\0" );
+    ImGui::Combo (szLabel, &limiter, "Namco          (A.K.A. Stutterfest 2017)\0"
+                                       "Special K      (Precision Timing For The Win!)\0\0", 2 );
 
     static float values [120]  = { 0 };
     static int   values_offset =   0;
@@ -201,7 +208,7 @@ TBFix_DrawConfigUI (void)
     values [values_offset] = 1000.0f * ImGui::GetIO ().DeltaTime;
     values_offset = (values_offset + 1) % IM_ARRAYSIZE (values);
 
-    if (limiter != config.framerate.replace_limiter)
+    if ((bool)limiter != config.framerate.replace_limiter)
     {
       reset_frame_history              = true;
       config.framerate.replace_limiter = limiter;
@@ -299,12 +306,17 @@ TBFix_DrawConfigUI (void)
     //ImGui::Text ( "Application average %.3f ms/frame (%.1f FPS)",
                     //1000.0f / ImGui::GetIO ().Framerate,
                               //ImGui::GetIO ().Framerate );
+    ImGui::TreePop ();
   }
 
-  if (ImGui::CollapsingHeader ("Texture Options"))
+  if (ImGui::CollapsingHeader ("Textures", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   {
-    if (ImGui::TreeNodeEx ("Quality Settings", ImGuiTreeNodeFlags_DefaultOpen))
+    ImGui::TreePush ("");
+
+    if (ImGui::CollapsingHeader ("Quality"))
     {
+      ImGui::TreePush ("");
+
       if (ImGui::Checkbox ("Generate Mipmaps", &config.textures.remaster)) tbf::RenderFix::need_reset.graphics = true;
 
       if (ImGui::IsItemHovered ())
@@ -323,19 +335,132 @@ TBFix_DrawConfigUI (void)
         ImGui::TreePop  ();
       }
 
-      ImGui::SliderFloat ("Mipmap LOD Bias", &config.textures.lod_bias, -3.0f, config.textures.uncompressed ? 16.0f : 3.0f);
+      ImGui::SliderFloat ("Mipmap LOD Bias", &config.textures.lod_bias, -3.0f, /*config.textures.uncompressed ? 16.0f :*/ 3.0f);
 
       if (ImGui::IsItemHovered ())
       {
         ImGui::BeginTooltip ();
-        ImGui::Text         ("Controls texture sharpness;  -3 = Sharpest (WILL shimmer),  0 = Neutral,  16 = Laughably blurry");
+        ImGui::Text         ("Controls texture sharpness;  -3 = Sharpest (WILL shimmer),  0 = Neutral,  3 = Blurry");
         ImGui::EndTooltip   ();
       }
-      ImGui::TreePop    ();
+
+      ImGui::TreePop ();
     }
 
-    if (ImGui::TreeNode ("Texture Modding"))
+    if (ImGui::CollapsingHeader ("Performance", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
     {
+      extern bool __remap_textures;
+
+      ImGui::PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 15.0f);
+      ImGui::TreePush  ("");
+      ImGui::BeginChild  ("Texture Details", ImVec2 (0, 140), true);
+
+      ImGui::Columns   ( 3 );
+        ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 1.0f, 1.0f, 1.0f));
+        ImGui::Text    ( "          Size" );                                                                 ImGui::NextColumn ();
+        ImGui::Text    ( "      Activity" );                                                                 ImGui::NextColumn ();
+        ImGui::Text    ( "       Savings" );
+        ImGui::PopStyleColor  ();
+      ImGui::Columns   ( 1 );
+
+      ImGui::PushStyleColor
+                       ( ImGuiCol_Text, ImVec4 (0.75f, 0.75f, 0.75f, 1.0f) );
+
+      ImGui::Separator (   );
+
+      ImGui::Columns   ( 3 );
+        ImGui::Text    ( "%#6zu MiB Total",
+                                                       tbf::RenderFix::tex_mgr.cacheSizeTotal () >> 20ULL ); ImGui::NextColumn (); 
+        ImGui::TextColored
+                       (ImVec4 (0.3f, 1.0f, 0.3f, 1.0f),
+                         "%#5lu     Hits",             tbf::RenderFix::tex_mgr.getHitCount    ()          );  ImGui::NextColumn ();
+      ImGui::Columns   ( 1 );
+
+      ImGui::Separator (   );
+
+      ImColor  active   ( 1.0f,  1.0f,  1.0f, 1.0f);
+      ImColor  inactive (0.75f, 0.75f, 0.75f, 1.0f);
+      ImColor& color   = __remap_textures ? inactive : active;
+
+      ImGui::Columns   ( 3 );
+        ImGui::TextColored ( color,
+                               "%#6zu MiB Base",
+                                                       tbf::RenderFix::tex_mgr.cacheSizeBasic () >> 20ULL );  ImGui::NextColumn (); 
+        if (ImGui::IsItemClicked ())
+          __remap_textures = false;
+
+        ImGui::TextColored
+                       (ImVec4 (1.0f, 0.3f, 0.3f, 1.0f),
+                         "%#5lu   Misses",             tbf::RenderFix::tex_mgr.getMissCount   ()          );  ImGui::NextColumn ();
+        ImGui::Text    ( "Time:    %#7.01lf  s  ", tbf::RenderFix::tex_mgr.getTimeSaved       () / 1000.0f);
+      ImGui::Columns   ( 1 );
+
+      ImGui::Separator (   );
+
+      color = __remap_textures ? active : inactive;
+
+      ImGui::Columns   ( 3 );
+        ImGui::TextColored ( color,
+                               "%#6zu MiB Injected",
+                                                       tbf::RenderFix::tex_mgr.cacheSizeInjected () >> 20ULL ); ImGui::NextColumn (); 
+
+        if (ImGui::IsItemClicked ())
+          __remap_textures = true;
+
+        ImGui::TextColored (ImVec4 (0.555f, 0.555f, 1.0f, 1.0f),
+                         "%.2f  Hit/Miss",          (double)tbf::RenderFix::tex_mgr.getHitCount  () / 
+                                                     (double)tbf::RenderFix::tex_mgr.getMissCount()          ); ImGui::NextColumn ();
+        ImGui::Text    ( "Driver: %#7zu MiB  ",    tbf::RenderFix::tex_mgr.getByteSaved      () >> 20ULL );
+
+      ImGui::PopStyleColor
+                       (   );
+      ImGui::Columns   ( 1 );
+
+      ImGui::Separator (   );
+
+      ImGui::TreePush  ("");
+      ImGui::Checkbox  ("Enable Texture QuickLoad", &config.textures.quick_load);
+      ImGui::TreePop   (  );
+      
+      if (ImGui::IsItemHovered ())
+      {
+        ImGui::BeginTooltip  (  );
+          ImGui::TextColored ( ImVec4 (0.9f, 0.9f, 0.9f, 1.f), 
+                                 "Only read the first texture level-of-detail from disk and split generation of the rest across all available CPU cores." );
+          ImGui::Separator   (  );
+          ImGui::TreePush    ("");
+            ImGui::Bullet    (  ); ImGui::SameLine ();
+            ImGui::TextColored ( ImColor (0.95f, 0.75f, 0.25f, 1.0f), 
+                                   "Typically this reduces hitching and load-times, but some pop-in may "
+                                   "become visible on lower-end CPUs." );
+            ImGui::Bullet    (  ); ImGui::SameLine ();
+            ImGui::TextColored  ( ImColor (0.95f, 0.75f, 0.25f, 1.0f),
+                                   "Ideally, this should be used with texture compression disabled." );
+            ImGui::SameLine  (  );
+            ImGui::Text      ("[Quality/Generate Mipmaps]");
+          ImGui::TreePop     (  );
+        ImGui::EndTooltip    (  );
+      }
+
+      if (config.textures.quick_load) {
+        ImGui::SameLine ();
+
+        if (ImGui::SliderInt("# of Threads", &config.textures.worker_threads, 2, 10)) {
+          need_restart = true;
+        }
+
+        if (ImGui::IsItemHovered ())
+          ImGui::SetTooltip ("Lower is actually better, the only reason to adjust this would be if you have an absurd number of CPU cores and pop-in bothers you ;)");
+      }
+
+      ImGui::EndChild    ( );
+      ImGui::PopStyleVar ( );
+      ImGui::TreePop     ( );
+    }
+
+    if (ImGui::CollapsingHeader ("Modding"))
+    {
+      ImGui::TreePush ("");
       if (ImGui::Checkbox ("Dump Textures  (TBFix_Res\\dump\\textures\\<format>\\*.dds)",    &config.textures.dump))     tbf::RenderFix::need_reset.graphics = true;
 
       if (ImGui::IsItemHovered ())
@@ -344,8 +469,9 @@ TBFix_DrawConfigUI (void)
         ImGui::Text         ("Enabling this will cause the game to run slower and waste disk space, only enable if you know what you are doing.");
         ImGui::EndTooltip   ();
       }
-      ImGui::TreePop    ();
+      ImGui::TreePop ();
     }
+    ImGui::TreePop ();
   }
 
 #if 0
@@ -355,8 +481,9 @@ TBFix_DrawConfigUI (void)
   }
 #endif
 
-  if (ImGui::CollapsingHeader ("Shadow Quality"))
+  if (ImGui::CollapsingHeader ("Shadows"))
   {
+    ImGui::TreePush ("");
     struct shadow_imp_s
     {
       shadow_imp_s (int scale)
@@ -377,13 +504,12 @@ TBFix_DrawConfigUI (void)
     static shadow_imp_s shadows     (config.render.shadow_rescale);
     static shadow_imp_s env_shadows (config.render.env_shadow_rescale);
 
-    ImGui::Combo ("Character Shadow Resolution",     &shadows.radio,     "Normal\0Enhanced\0High\0Ultra\0\0");
-    ImGui::Combo ("Environmental Shadow Resolution", &env_shadows.radio, "Normal\0High\0Ultra\0\0");
+    ImGui::Combo      ("Character Shadow Resolution",     &shadows.radio,     "Normal\0Enhanced\0High\0Ultra\0\0");
+    ImGui::Combo      ("Environmental Shadow Resolution", &env_shadows.radio, "Normal\0High\0Ultra\0\0");
 
-    ImGui::Columns        (1);
-    ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.975f, 0.1f, 0.975f, 1.0f));
+    ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.85f, 0.25f, 0.855f, 1.0f));
     ImGui::Bullet         (); ImGui::SameLine ();
-    ImGui::TextWrapped    ("Changes to these settings will produce weird results until you change Screen Mode in-game..." );
+    ImGui::TextWrapped    ("Changes to these settings will produce weird results until you change Screen Resolution in-game..." );
     ImGui::PopStyleColor  ();
 
     if (env_shadows.radio != env_shadows.last_sel) {
@@ -397,9 +523,9 @@ TBFix_DrawConfigUI (void)
       shadows.last_sel                    =  shadows.radio;
       tbf::RenderFix::need_reset.graphics = true;
     }
-  }
 
-  static bool need_restart = false;
+    ImGui::TreePop ();
+  }
 
 #if 0
   if (ImGui::CollapsingHeader ("Audio Configuration"))
@@ -444,9 +570,12 @@ TBFix_DrawConfigUI (void)
     }
   }
 #endif
-  if (ImGui::CollapsingHeader ("Input Configuration"))
+
+  if (ImGui::CollapsingHeader ("Input"))
   {
+    ImGui::TreePush ("");
     ImGui::Checkbox ("Swap WASD and Arrow Keys", &config.keyboard.swap_wasd);
+    ImGui::TreePop  (  );
   }
 
   ImGui::PopItemWidth ();

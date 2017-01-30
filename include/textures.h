@@ -146,7 +146,12 @@ namespace RenderFix {
     void                     addTexture (uint32_t crc32, tbf::RenderFix::Texture* pTex, size_t size);
 
     // Record a cached reference
-    void                     refTexture (tbf::RenderFix::Texture* pTex);
+    void                     refTexture  (tbf::RenderFix::Texture* pTex);
+
+    // Similar, just call this to indicate a cache miss
+    void                     missTexture (void) {
+      InterlockedIncrement (&misses);
+    }
 
     void                     reset (void);
     void                     purge (void); // WIP
@@ -170,10 +175,19 @@ namespace RenderFix {
     std::string              osdStats  (void) { return osd_stats; }
     void                     updateOSD (void);
 
+
+    float                    getTimeSaved (void) { return time_saved;                               }
+    LONG64                   getByteSaved (void) { return InterlockedAdd64       (&bytes_saved, 0); }
+    ULONG                    getHitCount  (void) { return InterlockedExchangeAdd (&hits,   0UL);    }
+    ULONG                    getMissCount (void) { return InterlockedExchangeAdd (&misses, 0UL);    }
+
   private:
     std::unordered_map <uint32_t, tbf::RenderFix::Texture*> textures;
     float                                                   time_saved     = 0.0f;
+    LONG64                                                  bytes_saved    = 0LL;
+
     ULONG                                                   hits           = 0UL;
+    ULONG                                                   misses         = 0UL;
 
     LONG64                                                  basic_size     = 0LL;
     LONG64                                                  injected_size  = 0LL;

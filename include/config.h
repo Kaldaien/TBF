@@ -73,8 +73,9 @@ struct tbf_config_t
     bool     uncompressed        =  false;
     float    lod_bias            = -0.2666f;
     int32_t  max_cache_in_mib    =  2048L;
-    int32_t  worker_threads      =  6;
+    int32_t  worker_threads      =  3;
     bool     show_loading_text   =  false;
+    bool     quick_load          =  false;
   } textures;
 
   struct {

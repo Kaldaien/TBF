@@ -82,6 +82,7 @@ struct {
   tbf::ParameterInt*     cache_size;
   tbf::ParameterInt*     worker_threads;
   tbf::ParameterBool*    show_loading_text;
+  tbf::ParameterBool*    quick_load;
 } textures;
 
 
@@ -271,6 +272,16 @@ TBF_LoadConfig (std::wstring name)
       L"Texture.System",
         L"ShowLoadingIndicator" );
 
+  textures.quick_load = 
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Skip Mips")
+      );
+  textures.quick_load->register_to_ini (
+    render_ini,
+      L"Texture.System",
+        L"QuickLoad" );
+
 
   render.dump_shaders = 
     static_cast <tbf::ParameterBool *>
@@ -416,6 +427,7 @@ TBF_LoadConfig (std::wstring name)
   textures.cache_size->load        (config.textures.max_cache_in_mib);
   textures.worker_threads->load    (config.textures.worker_threads);
   textures.show_loading_text->load (config.textures.show_loading_text);
+  textures.quick_load->load        (config.textures.quick_load);
 
   if (empty)
     return false;
@@ -447,6 +459,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   textures.cache_size->store        (config.textures.max_cache_in_mib);
   textures.worker_threads->store    (config.textures.worker_threads);
   textures.show_loading_text->store (config.textures.show_loading_text);
+  textures.quick_load->store        (config.textures.quick_load);
 
   input.gamepad.texture_set->store (config.input.gamepad.texture_set);
 
