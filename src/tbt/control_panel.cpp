@@ -76,6 +76,8 @@ TBFix_ToggleConfigUI (void)
 
   if (config.input.ui.pause)
     TBFix_PauseGame (config.input.ui.visible);
+
+  TBF_SaveConfig ();
 }
 
 
@@ -348,7 +350,7 @@ TBFix_DrawConfigUI (void)
 
 #if 0
   if (ImGui::CollapsingHeader ("Shader Options"))
-  {
+  {It
     ImGui::Checkbox ("Dump Shaders", &config.render.dump_shaders);
   }
 #endif
@@ -399,6 +401,7 @@ TBFix_DrawConfigUI (void)
 
   static bool need_restart = false;
 
+#if 0
   if (ImGui::CollapsingHeader ("Audio Configuration"))
   { 
     if (tbf::SoundFix::wasapi_init) {
@@ -439,6 +442,11 @@ TBFix_DrawConfigUI (void)
         need_restart |= ImGui::RadioButton ("5.1 Surround", (int *)&config.audio.channels, 6);
       ImGui::TreePop  (  );
     }
+  }
+#endif
+  if (ImGui::CollapsingHeader ("Input Configuration"))
+  {
+    ImGui::Checkbox ("Swap WASD and Arrow Keys", &config.keyboard.swap_wasd);
   }
 
   ImGui::PopItemWidth ();

@@ -33,11 +33,13 @@ std::wstring TBF_VER_STR = TBF_VERSION_STR_W;
 std::wstring DEFAULT_BK2 = L"RAW\\MOVIE\\AM_TOZ_OP_001.BK2";
 
 static
-  iSK_INI*   dll_ini     = nullptr;
+  iSK_INI*   dll_ini      = nullptr;
 static
-  iSK_INI*   gamepad_ini = nullptr;
+  iSK_INI*   gamepad_ini  = nullptr;
 static
-  iSK_INI*   render_ini  = nullptr;
+  iSK_INI*   keyboard_ini = nullptr;
+static
+  iSK_INI*   render_ini   = nullptr;
 
 tbf_config_t config;
 
@@ -90,6 +92,7 @@ struct {
 
 struct {
   tbf::ParameterStringW* swap_keys;
+  tbf::ParameterBool*    swap_wasd;
 } keyboard;
 
 
@@ -119,9 +122,10 @@ TBF_LoadConfig (std::wstring name)
       );
 
   // Load INI File
-  wchar_t wszFullName   [ MAX_PATH + 2 ] = { L'\0' };
-  wchar_t wszPadName    [ MAX_PATH + 2 ] = { L'\0' };
-  wchar_t wszRenderName [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszFullName     [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszPadName      [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszRenderName   [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszKeyboardName [ MAX_PATH + 2 ] = { L'\0' };
 
   lstrcatW (wszFullName, SK_GetConfigPath ());
   lstrcatW (wszFullName,       name.c_str ());
@@ -135,6 +139,10 @@ TBF_LoadConfig (std::wstring name)
   lstrcatW (wszRenderName,  SK_GetConfigPath ());
   lstrcatW (wszRenderName, L"TBFix_Render.ini");
   render_ini = TBF_CreateINI (wszRenderName);
+
+  lstrcatW (wszKeyboardName,  SK_GetConfigPath ());
+  lstrcatW (wszKeyboardName, L"TBFix_Keyboard.ini");
+  keyboard_ini = TBF_CreateINI (wszKeyboardName);
 
   bool empty = dll_ini->get_sections ().empty ();
 
@@ -327,6 +335,17 @@ TBF_LoadConfig (std::wstring name)
         L"TextureSet" );
 
 
+  keyboard.swap_wasd =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool>(
+         L"Swap the WASD and Arrow Keys")
+    );
+  keyboard.swap_wasd->register_to_ini (
+    keyboard_ini,
+      L"Keyboard.Remap",
+        L"SwapArrowsWithWASD" );
+
+
   sys.version =
     static_cast <tbf::ParameterStringW *>
       (g_ParameterFactory.create_parameter <std::wstring> (
@@ -369,14 +388,17 @@ TBF_LoadConfig (std::wstring name)
   //sys.intro_video->load (config.system.intro_video);
   sys.injector->load    (config.system.injector);
 
-  if (gamepad_ini->get_sections ().empty () || render_ini->get_sections ().empty ()) {
+  if (gamepad_ini->get_sections ().empty () || render_ini->get_sections ().empty () || keyboard_ini->get_sections ().empty ())
+  {
     TBF_SaveConfig (name, false);
 
-    gamepad_ini->parse ();
-    render_ini->parse  ();
+    gamepad_ini->parse  ();
+    render_ini->parse   ();
+    keyboard_ini->parse ();
   }
 
   input.gamepad.texture_set->load  (config.input.gamepad.texture_set);
+  keyboard.swap_wasd->load         (config.keyboard.swap_wasd);
 
   render.rescale_shadows->load     (config.render.shadow_rescale);
   render.rescale_env_shadows->load (config.render.env_shadow_rescale);
@@ -428,13 +450,16 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   input.gamepad.texture_set->store (config.input.gamepad.texture_set);
 
+  keyboard.swap_wasd->store        (config.keyboard.swap_wasd);
+
   sys.version->store             (TBF_VER_STR);
   //sys.intro_video->store         (config.system.intro_video);
   sys.injector->store            (config.system.injector);
 
-  wchar_t wszFullName   [ MAX_PATH + 2 ] = { L'\0' };
-  wchar_t wszPadName    [ MAX_PATH + 2 ] = { L'\0' };
-  wchar_t wszRenderName [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszFullName     [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszPadName      [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszRenderName   [ MAX_PATH + 2 ] = { L'\0' };
+  wchar_t wszKeyboardName [ MAX_PATH + 2 ] = { L'\0' };
 
   lstrcatW ( wszFullName,
                SK_GetConfigPath () );
@@ -459,6 +484,13 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   render_ini->write (wszRenderName);
 
+  lstrcatW ( wszKeyboardName,
+               SK_GetConfigPath () );
+  lstrcatW ( wszKeyboardName,
+               L"TBFix_Keyboard.ini" );
+
+  keyboard_ini->write (wszKeyboardName);
+
   if (close_config) {
     if (dll_ini != nullptr) {
       delete dll_ini;
@@ -473,6 +505,11 @@ TBF_SaveConfig (std::wstring name, bool close_config)
     if (render_ini != nullptr) {
       delete render_ini;
       render_ini = nullptr;
+    }
+
+    if (keyboard_ini != nullptr) {
+      delete keyboard_ini;
+      keyboard_ini = nullptr;
     }
   }
 }

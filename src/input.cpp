@@ -188,3 +188,248 @@ void
 tbf::InputFix::Shutdown (void)
 {
 }
+
+typedef enum
+{
+    SDL_CONTROLLER_BUTTON_INVALID = -1,
+    SDL_CONTROLLER_BUTTON_A,
+    SDL_CONTROLLER_BUTTON_B,
+    SDL_CONTROLLER_BUTTON_X,
+    SDL_CONTROLLER_BUTTON_Y,
+    SDL_CONTROLLER_BUTTON_BACK,
+    SDL_CONTROLLER_BUTTON_GUIDE,
+    SDL_CONTROLLER_BUTTON_START,
+    SDL_CONTROLLER_BUTTON_LEFTSTICK,
+    SDL_CONTROLLER_BUTTON_RIGHTSTICK,
+    SDL_CONTROLLER_BUTTON_LEFTSHOULDER,
+    SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
+    SDL_CONTROLLER_BUTTON_DPAD_UP,
+    SDL_CONTROLLER_BUTTON_DPAD_DOWN,
+    SDL_CONTROLLER_BUTTON_DPAD_LEFT,
+    SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
+    SDL_CONTROLLER_BUTTON_MAX
+} SDL_GameControllerButton;
+
+
+typedef uint8_t     (__cdecl *SDL_GameControllerGetButton_pfn) ( LPVOID                   controller,
+                                                                 SDL_GameControllerButton button );
+                                                                          SDL_GameControllerGetButton_pfn SDL_GameControllerGetButton_Original = nullptr;
+
+typedef int         (__cdecl *SDL_ShowCursor_pfn)(int toggle);            SDL_ShowCursor_pfn SDL_ShowCursor_Original                       = nullptr;
+
+typedef const char* (__cdecl *SDL_GetHint_pfn) ( const char* name );      SDL_GetHint_pfn SDL_GetHint_Original                             = nullptr;
+typedef BOOL        (__cdecl *SDL_SetHint_pfn) ( const char* name,
+                                                 const char* value );     SDL_SetHint_pfn SDL_SetHint_Original                             = nullptr;
+
+typedef uint32_t    (__cdecl *SDL_GetMouseState_pfn) ( int* x,
+                                                       int* y );          SDL_GetMouseState_pfn SDL_GetMouseState_Original                 = nullptr;
+
+typedef uint32_t    (__cdecl *SDL_GetRelativeMouseState_pfn) ( int* x,
+                                                               int* y );  SDL_GetRelativeMouseState_pfn SDL_GetRelativeMouseState_Original = nullptr;
+
+typedef void        (__cdecl *SDL_WarpMouseInWindow_pfn) ( LPVOID window,
+                                                           int    x,
+                                                           int    y );    SDL_WarpMouseInWindow_pfn SDL_WarpMouseInWindow_Original         = nullptr;
+
+typedef
+    const uint8_t*  (__cdecl *SDL_GetKeyboardState_pfn) ( int* numkeys ); SDL_GetKeyboardState_pfn SDL_GetKeyboardState_Original           = nullptr;
+
+
+bool cursor_visible = false;
+
+int
+__cdecl
+SDL_ShowCursor_Detour (int toggle)
+{
+  if (toggle == 1)
+    cursor_visible = true;
+
+  if (toggle == 0)
+    cursor_visible = false;
+
+  return SDL_ShowCursor_Original (toggle);
+}
+
+uint8_t
+__cdecl
+SDL_GameControllerGetButton_Detour ( LPVOID                    controller,
+                                     SDL_GameControllerButton  button )
+{
+  return SDL_GameControllerGetButton_Original (controller, button);
+}
+
+const char*
+__cdecl
+SDL_GetHint_Detour ( const char* name )
+{
+  return SDL_GetHint_Original (name);
+}
+
+BOOL
+__cdecl
+SDL_SetHint_Detour ( const char* name, const char* value )
+{
+  if (! stricmp (name, "SDL_HINT_MOUSE_RELATIVE_MODE_WARP")) {
+    return TRUE;
+  }
+
+  return SDL_SetHint_Original (name, value);
+}
+
+uint32_t
+__cdecl
+SDL_GetMouseState_Detour ( int* x, int* y )
+{
+  uint32_t ret = SDL_GetMouseState_Original ( x, y );
+
+#if 0
+  if (! cursor_visible) {
+    if (x != nullptr)
+      *x = 0;
+
+    if (y != nullptr)
+      *y = 0;
+  }
+#endif
+
+  return ret;
+}
+
+const
+uint8_t*
+__cdecl
+SDL_GetKeyboardState_Detour ( int* numkeys )
+{
+  const uint8_t* ret = SDL_GetKeyboardState_Original (numkeys);
+
+  //26	0x01A	SDL_SCANCODE_W
+  //4	0x004	SDL_SCANCODE_A
+  //22	0x016	SDL_SCANCODE_S
+  //7	0x007	SDL_SCANCODE_D
+
+
+  //79	0x04F	SDL_SCANCODE_RIGHT
+  //80	0x050	SDL_SCANCODE_LEFT
+  //81	0x051	SDL_SCANCODE_DOWN
+  //82	0x052	SDL_SCANCODE_UP
+
+  if (config.keyboard.swap_wasd) {
+    int count = *numkeys;
+
+    static uint8_t keys [1024];
+
+    memcpy (keys, ret, *numkeys);
+
+    uint8_t up    = keys [82];
+    uint8_t down  = keys [81];
+    uint8_t left  = keys [80];
+    uint8_t right = keys [79];
+
+
+     keys [82] = keys [26];
+     keys [80] = keys [4];
+     keys [81] = keys [22];
+     keys [79] = keys [7];
+
+     keys [26] = up;
+     keys [22] = down;
+     keys [7]  = right;
+     keys [4]  = left;
+
+     return keys;
+  }
+
+  return ret;
+}
+
+typedef int (__cdecl *SDL_GetKeyFromScancode_pfn)(int scancode);
+SDL_GetKeyFromScancode_pfn SDL_GetKeyFromScancode_Original = nullptr;
+
+int
+__cdecl
+SDL_GetKeyFromScancode_Detour (int scancode)
+{
+  if (config.keyboard.swap_wasd)
+  {
+      if (scancode == 82)
+      return SDL_GetKeyFromScancode_Original (26);
+    else if (scancode == 81)
+      return SDL_GetKeyFromScancode_Original (22);
+    else if (scancode == 80)
+      return SDL_GetKeyFromScancode_Original (4);
+    else if (scancode == 79)
+      return SDL_GetKeyFromScancode_Original (7);
+    
+    else if (scancode == 26)
+      return SDL_GetKeyFromScancode_Original (82);
+    else if (scancode == 22)
+      return SDL_GetKeyFromScancode_Original (81);
+    else if (scancode == 4)
+      return SDL_GetKeyFromScancode_Original (80);
+    else if (scancode == 7)
+      return SDL_GetKeyFromScancode_Original (79);
+  }
+
+  return SDL_GetKeyFromScancode_Original (scancode);
+}
+
+typedef int16_t (__cdecl *SDL_GameControllerGetAxis_pfn) ( LPVOID joystick,
+                                                           int     axis );
+SDL_GameControllerGetAxis_pfn SDL_GameControllerGetAxis_Original = nullptr;
+
+int16_t
+__cdecl
+SDL_GameControllerGetAxis_Detour ( LPVOID controller,
+                                   int    axis )
+{
+  return SDL_GameControllerGetAxis_Original (controller, axis);
+}
+
+
+void
+TBF_InitSDLOverride (void)
+{
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GetHint",
+                       SDL_GetHint_Detour,
+            (LPVOID *)&SDL_GetHint_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_SetHint",
+                       SDL_SetHint_Detour,
+            (LPVOID *)&SDL_SetHint_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GetMouseState",
+                       SDL_GetMouseState_Detour,
+            (LPVOID *)&SDL_GetMouseState_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GetKeyboardState",
+                       SDL_GetKeyboardState_Detour,
+            (LPVOID *)&SDL_GetKeyboardState_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GetKeyFromScancode",
+                       SDL_GetKeyFromScancode_Detour,
+            (LPVOID *)&SDL_GetKeyFromScancode_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_ShowCursor",
+                       SDL_ShowCursor_Detour,
+            (LPVOID *)&SDL_ShowCursor_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GameControllerGetButton",
+                       SDL_GameControllerGetButton_Detour,
+            (LPVOID *)&SDL_GameControllerGetButton_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GameControllerGetAxis",
+                       SDL_GameControllerGetAxis_Detour,
+            (LPVOID *)&SDL_GameControllerGetAxis_Original);
+
+  TBF_ApplyQueuedHooks ();
+
+  SDL_SetHint_Original ("SDL_HINT_MOUSE_RELATIVE_MODE_WARP", "0");
+}

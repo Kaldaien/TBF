@@ -90,6 +90,7 @@ struct tbf_config_t
 
   struct {
     std::wstring swap_keys = L"";
+    bool         swap_wasd       = false;
   } keyboard;
 
   struct {

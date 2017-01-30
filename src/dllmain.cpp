@@ -139,6 +139,11 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     tbf::RenderFix::Init    ();
     //tbf::KeyboardFix::Init  ();
 
+    extern void
+    TBF_InitSDLOverride (void);
+
+    TBF_InitSDLOverride ();
+
 
     CreateThread ( nullptr, 0,
       [](LPVOID user) ->
