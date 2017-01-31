@@ -527,10 +527,19 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePop ();
   }
 
-#if 0
-  if (ImGui::CollapsingHeader ("Audio Configuration"))
+  if (ImGui::CollapsingHeader ("Input"))
+  {
+    ImGui::TreePush ("");
+    ImGui::Checkbox ("Swap WASD and Arrow Keys", &config.keyboard.swap_wasd);
+    ImGui::TreePop  (  );
+
+    ImGui::TreePop ();
+  }
+
+  if (ImGui::CollapsingHeader ("Audio Configuration", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   { 
-    if (tbf::SoundFix::wasapi_init) {
+    if (tbf::SoundFix::wasapi_init)
+    {
       ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 16.0f);
       ImGui::BeginChild  ("Audio Details", ImVec2 (0, 80), true);
 
@@ -558,77 +567,88 @@ TBFix_DrawConfigUI (void)
       ImGui::PopStyleVar ();
     }
 
-    need_restart |= ImGui::Checkbox ("Enable 7.1 Channel Audio Fix", &config.audio.enable_fix);
+    need_restart |= ImGui::Checkbox ("Enable Audio Fix", &config.audio.enable_fix);
 
     if (config.audio.enable_fix)
     {
       ImGui::TreePush ("");
         need_restart |= ImGui::RadioButton ("Stereo",       (int *)&config.audio.channels, 2); ImGui::SameLine ();
         need_restart |= ImGui::RadioButton ("Quadraphonic", (int *)&config.audio.channels, 4); ImGui::SameLine ();
-        need_restart |= ImGui::RadioButton ("5.1 Surround", (int *)&config.audio.channels, 6);
+        need_restart |= ImGui::RadioButton ("5.1 Surround", (int *)&config.audio.channels, 6); ImGui::SameLine ();
+        need_restart |= ImGui::RadioButton ("7.1 SUrround", (int *)&config.audio.channels, 8);
       ImGui::TreePop  (  );
-    }
-  }
-#endif
+      
+      ImGui::TreePush ("");
+      int sel;
+      
+      if   (config.audio.sample_hz == 48000)  sel = 1;
+      else                                    sel = 0;
+      
+      need_restart |= ImGui::Combo ("Sample Rate", &sel, " 44.1 kHz\0 48.0 kHz\0\0", 2);
+      
+      if (sel == 0)  config.audio.sample_hz = 44100;
+      else           config.audio.sample_hz = 48000;
+      
+      need_restart |= ImGui::Checkbox ("Use Compatibility Mode", &config.audio.compatibility);
+      
+      if (ImGui::IsItemHovered ())
+        ImGui::SetTooltip ("May reduce audio quality, but can help with some weird USB headsets and Windows 7 / Older.");
+      ImGui::TreePop ();
+     }
+   }
 
-  if (ImGui::CollapsingHeader ("Input"))
-  {
-    ImGui::TreePush ("");
-    ImGui::Checkbox ("Swap WASD and Arrow Keys", &config.keyboard.swap_wasd);
-    ImGui::TreePop  (  );
-  }
+   ImGui::PopItemWidth ();
 
-  ImGui::PopItemWidth ();
+   ImGui::Separator (   );
+   ImGui::Columns   ( 2 );
 
-  ImGui::Separator (   );
-  ImGui::Columns   ( 2 );
+   if (ImGui::Button ("   Gamepad Config   "))
+     ImGui::OpenPopup ("Gamepad Config");
 
-  if (ImGui::Button ("   Gamepad Config   "))
-    ImGui::OpenPopup ("Gamepad Config");
+   TBFix_GamepadConfigDlg ();
 
-  TBFix_GamepadConfigDlg ();
+   ImGui::SameLine      ();
 
-  ImGui::SameLine      ();
+   if (ImGui::Button ("   Special K Config   "))
+     show_special_k_cfg = (! show_special_k_cfg);
 
-  if (ImGui::Button ("   Special K Config   "))
-    show_special_k_cfg = (! show_special_k_cfg);
+   ImGui::SameLine (0.0f, 60.0f);
 
-  ImGui::SameLine (0.0f, 60.0f);
+   if (ImGui::Selectable ("...", show_test_window))
+     show_test_window = (! show_test_window);
 
-  if (ImGui::Selectable ("...", show_test_window))
-    show_test_window = (! show_test_window);
+   ImGui::NextColumn ();
 
-  ImGui::NextColumn ();
+   if ( ImGui::Checkbox ("Pause Game While This Menu Is Open", &config.input.ui.pause) )
+     TBFix_PauseGame (config.input.ui.pause);
 
-  if ( ImGui::Checkbox ("Pause Game While This Menu Is Open", &config.input.ui.pause) )
-    TBFix_PauseGame (config.input.ui.pause);
+   bool extra_details = false;
 
-  bool extra_details = false;
+   if (need_restart || tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures)
+     extra_details = true;
 
- if (need_restart || tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures)
-   extra_details = true;
+    if (extra_details) {
+      ImGui::Columns    ( 1 );
+      ImGui::Separator  (   );
 
-  if (extra_details) {
-    ImGui::Columns    ( 1 );
-    ImGui::Separator  (   );
-
-    if (need_restart) {
-      ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 0.4f, 0.15f, 1.0f));
-      ImGui::BulletText     ("Game Restart Required");
-      ImGui::PopStyleColor  ();
-    }
-    
-    if (tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures) {
-      ImGui::PushStyleColor  (ImGuiCol_Text, ImVec4 (1.0f, 0.8f, 0.2f, 1.0f));
-      ImGui::Bullet          ( ); ImGui::SameLine ();
-      ImGui::TextWrapped     ( "You have made changes that will not apply until you change Screen Modes in Graphics Settings, "
-                              "or by performing Alt + Tab with the game set to Fullscreen mode.\n" );
-      ImGui::PopStyleColor   ( );
-      ImGui::PopTextWrapPos  ( );
-    }
-  }
+      if (need_restart) {
+        ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 0.4f, 0.15f, 1.0f));
+        ImGui::BulletText     ("Game Restart Required");
+        ImGui::PopStyleColor  ();
+      }
+      
+      if (tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures) {
+        ImGui::PushStyleColor  (ImGuiCol_Text, ImVec4 (1.0f, 0.8f, 0.2f, 1.0f));
+        ImGui::Bullet          ( ); ImGui::SameLine ();
+        ImGui::TextWrapped     ( "You have made changes that will not apply until you change Screen Modes in Graphics Settings, "
+                                "or by performing Alt + Tab with the game set to Fullscreen mode.\n" );
+        ImGui::PopStyleColor   ( );
+        ImGui::PopTextWrapPos  ( );
+      }
+   }
 
   ImGui::End ();
+
 
   if (show_test_window) {
     ImGui::SetNextWindowPos (ImVec2 (650, 20), ImGuiSetCond_FirstUseEver);
@@ -651,7 +671,6 @@ TBFix_DrawConfigUI (void)
     TBFix_ToggleConfigUI ();
   }
 }
-
 
 
 typedef DWORD (*SK_ImGui_DrawFrame_pfn)(DWORD dwFlags, void* user);
