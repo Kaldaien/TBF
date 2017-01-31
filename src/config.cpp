@@ -429,7 +429,7 @@ TBF_LoadConfig (std::wstring name)
 
   framerate.replace_limiter->load  (config.framerate.replace_limiter);
   framerate.tolerance->load        (config.framerate.tolerance);
-  framerate.limit_addr->load       (config.framerate.limit_addr);
+  //framerate.limit_addr->load     (config.framerate.limit_addr);
 
   textures.remaster->load          (config.textures.remaster);
   textures.uncompressed->load      (config.textures.uncompressed);

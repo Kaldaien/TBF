@@ -197,10 +197,8 @@ TBFix_DrawConfigUI (void)
     int limiter =
       config.framerate.replace_limiter ? 1 : 0;
 
-    const char* szLabel = (limiter == 0 ? "Framerate Limiter  (choose something else!)" : "Framerate Limiter");
-
-    ImGui::Combo (szLabel, &limiter, "Namco          (A.K.A. Stutterfest 2017)\0"
-                                       "Special K      (Precision Timing For The Win!)\0\0", 2 );
+    ImGui::Combo ( "Framerate Limiter", &limiter, "Namco          (A.K.A. Stutterfest 2017)\0"
+                                                    "Special K      (Precision Timing For The Win!)\0\0", 2 );
 
     static float values [120]  = { 0 };
     static int   values_offset =   0;
@@ -266,17 +264,31 @@ TBFix_DrawConfigUI (void)
     ImGui::SameLine ();
 
     if (! config.framerate.replace_limiter) {
+      ImGui::BeginChild     ( "LimitDisclaimer", ImVec2 ( 330.0f, 80.0f ) );
       ImGui::TextColored ( ImVec4 (1.0f, 1.0f, 0.0f, 1.0f),
-                             "\n"
-                             "\n"
-                             " ... working limiters do not resemble EKGs!" );
+                             "Working limiters do not resemble seismographs!" );
+
+      ImGui::Separator      ();
+
+      ImGui::PushStyleColor ( ImGuiCol_Text, ImVec4 ( 0.666f, 0.666f, 0.666f, 1.0f ) );
+      ImGui::TextWrapped    ( "\nOnly use this limiter for reference purposes, or when making "
+                              "changes to the in-game framerate setting." );
+      ImGui::PopStyleColor  ();
+      ImGui::EndChild       ();
     }
 
     else {
-      ImGui::TextColored ( ImVec4 ( 0.2f, 1.0f, 0.2f, 1.0f),
-                             "\n"
-                             "\n"
-                             "This is how a framerate limiter should work." );
+      ImGui::BeginChild     ( "LimitDisclaimer", ImVec2 ( 310.0f, 80.0f ) );
+      ImGui::TextColored    ( ImVec4 ( 0.2f, 1.0f, 0.2f, 1.0f),
+                                "This is how a framerate limiter should work." );
+
+      ImGui::Separator      ();
+
+      ImGui::PushStyleColor ( ImGuiCol_Text, ImVec4 ( 0.666f, 0.666f, 0.666f, 1.0f ) );
+      ImGui::TextWrapped    ( "\nSelect Namco's Limiter before making any changes to framerate limit in-game,"
+                              " or the setting will not take effect." );
+      ImGui::PopStyleColor  ();
+      ImGui::EndChild       ();
 
       bool changed = ImGui::SliderFloat ( "Special K Framerate Tolerance", &config.framerate.tolerance, 0.005f, 0.5);
 
@@ -575,7 +587,7 @@ TBFix_DrawConfigUI (void)
         need_restart |= ImGui::RadioButton ("Stereo",       (int *)&config.audio.channels, 2); ImGui::SameLine ();
         need_restart |= ImGui::RadioButton ("Quadraphonic", (int *)&config.audio.channels, 4); ImGui::SameLine ();
         need_restart |= ImGui::RadioButton ("5.1 Surround", (int *)&config.audio.channels, 6); ImGui::SameLine ();
-        need_restart |= ImGui::RadioButton ("7.1 SUrround", (int *)&config.audio.channels, 8);
+        need_restart |= ImGui::RadioButton ("7.1 Surround", (int *)&config.audio.channels, 8);
       ImGui::TreePop  (  );
       
       ImGui::TreePush ("");

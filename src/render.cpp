@@ -1504,17 +1504,7 @@ D3D9Reset_Detour ( IDirect3DDevice9      *This,
   HRESULT hr =
     D3D9Reset_Original (This, pPresentationParameters);
 
-  if (SUCCEEDED (hr))
-  {
-    HWND hWnd = pPresentationParameters->hDeviceWindow;
-
-    DWORD dwStyle =
-      GetClassLong ( hWnd, GCL_STYLE );
-
-    dwStyle &= ~(CS_DBLCLKS);
-
-    SetClassLong ( hWnd, GCL_STYLE, dwStyle );
-  }
+  tbf::FrameRateFix::need_reset = true;
 
   return hr;
 }

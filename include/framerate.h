@@ -86,6 +86,9 @@ namespace tbf
     // True if the executable has been modified (at run-time) to allow 60 FPS
     extern bool             variable_speed_installed;
 
+    // Allow Namco's limiter to run one frame to propogate user setting changes
+    extern bool             need_reset;
+
     // This is actually setup in the SK DLL that loads this one
     extern uint32_t         target_fps;
 
