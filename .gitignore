@@ -8,3 +8,9 @@
 /x64/Release
 tbf.VC.db
 /tbf.VC.VC.opendb
+*.opendb
+*.db
+/.vs/tbf/v15/Browse.VC.db
+*.ipch
+*.ipch
+*.ipch

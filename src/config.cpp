@@ -55,6 +55,7 @@ struct {
 struct {
   tbf::ParameterBool*    replace_limiter;
   tbf::ParameterFloat*   tolerance;
+  tbf::ParameterInt64*   limit_addr;
 } framerate;
 
 struct {
@@ -334,6 +335,16 @@ TBF_LoadConfig (std::wstring name)
       L"Framerate.Fix",
         L"LimiterTolerance" );
 
+  framerate.limit_addr =
+    static_cast <tbf::ParameterInt64 *>
+      (g_ParameterFactory.create_parameter <int64_t> (
+        L"User-Selected Framerate Limit Address")
+      );
+  framerate.limit_addr->register_to_ini (
+    dll_ini,
+       L"TBFIX.System",
+         L"LimitAddress" );
+
 
   input.gamepad.texture_set =
     static_cast <tbf::ParameterStringW *>
@@ -418,6 +429,7 @@ TBF_LoadConfig (std::wstring name)
 
   framerate.replace_limiter->load  (config.framerate.replace_limiter);
   framerate.tolerance->load        (config.framerate.tolerance);
+  framerate.limit_addr->load       (config.framerate.limit_addr);
 
   textures.remaster->load          (config.textures.remaster);
   textures.uncompressed->load      (config.textures.uncompressed);
@@ -445,6 +457,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   framerate.replace_limiter->store  (config.framerate.replace_limiter);
   framerate.tolerance->store        (config.framerate.tolerance);
+  framerate.limit_addr->store       (config.framerate.limit_addr);
 
   render.dump_shaders->store        (config.render.dump_shaders);
 

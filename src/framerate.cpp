@@ -36,7 +36,7 @@
 // @TODO: Develop a heuristic to scan for this memory address;
 //          hardcoding it is going to break stuff :)
 //
-uintptr_t TICK_ADDR_BASE = 0xB15074;//0xB1B074;
+#define TICK_ADDR_BASE (uintptr_t)config.framerate.limit_addr
 
 int32_t          tbf::FrameRateFix::tick_scale               = INT32_MAX; // 0 FPS
 

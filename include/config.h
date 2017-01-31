@@ -42,6 +42,7 @@ struct tbf_config_t
     int      target          = 60;
     float    tolerance       = 0.05f;
     bool     reshade_fix     = false;
+    int64_t  limit_addr      = 0xBCC3FCULL;
   } framerate;
 
   struct {
