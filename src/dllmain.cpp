@@ -50,6 +50,41 @@ HMODULE hInjectorDLL = { 0 }; // Handle to Special K
 
 SKX_SetPluginName_pfn SKX_SetPluginName = nullptr;
 
+
+
+__declspec (dllexport)
+BOOL
+WINAPI
+SKPlugIn_Shutdown (LPVOID* lpReserved)
+{
+  UNREFERENCED_PARAMETER (lpReserved);
+
+  if (dll_log != nullptr)
+  {
+    tbf::SoundFix::Shutdown      ();
+    //tbf::FileIO::Shutdown      ();
+    //tbf::SteamFix::Shutdown    ();
+    tbf::FrameRateFix::Shutdown  ();
+    tbf::RenderFix::Shutdown     ();
+    //tbf::KeyboardFix::Shutdown ();
+  
+    TBF_SaveConfig     ();
+    TBF_UnInit_MinHook ();
+  
+  
+    dll_log->LogEx ( false, L"=========== (Version: v %s) "
+                            L"===========\n",
+                              TBF_VER_STR.c_str () );
+    dll_log->LogEx ( true,  L"End TBFix Plug-In\n" );
+    dll_log->LogEx ( false, L"------- [Tales of Berseria  \"Fix\"] "
+                            L"-------\n" );
+  
+    dll_log->close ();
+  }
+
+  return TRUE;
+}
+
 __declspec (dllexport)
 BOOL
 WINAPI
@@ -197,28 +232,6 @@ DllMain (HMODULE hModule,
 
     case DLL_PROCESS_DETACH:
     {
-      if (dll_log != nullptr)
-      {
-        tbf::SoundFix::Shutdown     ();
-        //tbf::FileIO::Shutdown       ();
-        //tbf::SteamFix::Shutdown     ();
-        tbf::RenderFix::Shutdown    ();
-        tbf::FrameRateFix::Shutdown ();
-        //tbf::KeyboardFix::Shutdown  ();
-
-        TBF_UnInit_MinHook ();
-        TBF_SaveConfig     ();
-
-
-        dll_log->LogEx ( false, L"=========== (Version: v %s) "
-                                L"===========\n",
-                                  TBF_VER_STR.c_str () );
-        dll_log->LogEx ( true,  L"End TBFix Plug-In\n" );
-        dll_log->LogEx ( false, L"------- [Tales of Berseria  \"Fix\"] "
-                                L"-------\n" );
-
-        dll_log->close ();
-      }
     } break;
   }
 

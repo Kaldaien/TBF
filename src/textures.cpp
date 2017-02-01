@@ -37,6 +37,13 @@
 
 #include "command.h"
 
+#include <lzma/7z.h>
+#include <lzma/7zAlloc.h>
+#include <lzma/7zBuf.h>
+#include <lzma/7zCrc.h>
+#include <lzma/7zFile.h>
+#include <lzma/7zVersion.h>
+
 #define TBFIX_TEXTURE_DIR L"TBFix_Res"
 #define TBFIX_TEXTURE_EXT L".dds"
 
@@ -58,21 +65,21 @@ typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
 );
 
 
-static D3DXSaveTextureToFile_pfn               D3DXSaveTextureToFile               = nullptr;
-static D3DXCreateTextureFromFileInMemoryEx_pfn D3DXCreateTextureFromFileInMemoryEx = nullptr;
+static D3DXSaveTextureToFile_pfn               D3DXSaveTextureToFile                        = nullptr;
+static D3DXCreateTextureFromFileInMemoryEx_pfn D3DXCreateTextureFromFileInMemoryEx_Original = nullptr;
 
-static BeginScene_pfn                          D3D9BeginScene                      = nullptr;
-static EndScene_pfn                            D3D9EndScene                        = nullptr;
-       SetRenderState_pfn                      D3D9SetRenderState                  = nullptr;
+static BeginScene_pfn                          D3D9BeginScene                               = nullptr;
+static EndScene_pfn                            D3D9EndScene                                 = nullptr;
+       SetRenderState_pfn                      D3D9SetRenderState                           = nullptr;
 
-static StretchRect_pfn                         D3D9StretchRect                     = nullptr;
-static CreateTexture_pfn                       D3D9CreateTexture                   = nullptr;
-static CreateRenderTarget_pfn                  D3D9CreateRenderTarget              = nullptr;
-static CreateDepthStencilSurface_pfn           D3D9CreateDepthStencilSurface       = nullptr;
+static StretchRect_pfn                         D3D9StretchRect                              = nullptr;
+static CreateTexture_pfn                       D3D9CreateTexture                            = nullptr;
+static CreateRenderTarget_pfn                  D3D9CreateRenderTarget                       = nullptr;
+static CreateDepthStencilSurface_pfn           D3D9CreateDepthStencilSurface                = nullptr;
 
-static SetTexture_pfn                          D3D9SetTexture                      = nullptr;
-static SetRenderTarget_pfn                     D3D9SetRenderTarget                 = nullptr;
-static SetDepthStencilSurface_pfn              D3D9SetDepthStencilSurface          = nullptr;
+static SetTexture_pfn                          D3D9SetTexture                               = nullptr;
+static SetRenderTarget_pfn                     D3D9SetRenderTarget                          = nullptr;
+static SetDepthStencilSurface_pfn              D3D9SetDepthStencilSurface                   = nullptr;
 
 extern uint32_t
 TBF_MakeShadowBitShift (uint32_t dim);
@@ -103,10 +110,10 @@ enum tbf_load_method_t {
 };
 
 struct tbf_tex_record_s {
-         int               archive = -1;
-         int               fileno  =  0UL;
-  enum   tbf_load_method_t method  = DontCare;
-         size_t            size    = 0UL;
+  unsigned int               archive = std::numeric_limits <unsigned int>::max ();
+           int               fileno  = 0UL;
+  enum     tbf_load_method_t method  = DontCare;
+           size_t            size    = 0UL;
 };
 
 bool pending_loads            (void);
@@ -126,6 +133,10 @@ std::set           <uint32_t>                   dumped_textures;
 // The set of textures used during the last frame
 std::vector        <uint32_t>                   textures_last_frame;
 std::set           <uint32_t>                   textures_used;
+
+// Textures that we will not allow injection for
+//   (primarily to speed things up, but also for EULA-related reasons).
+std::set           <uint32_t>                   inject_blacklist;
 
 std::wstring
 SK_D3D9_UsageToStr (DWORD dwUsage)
@@ -686,19 +697,52 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
                                                    L"%lu, %lu, %08Xh, %08Xh)",
                   Width, Height, Levels, Usage, Format, Pool, ppTexture,
                   pSharedHandle);
+
+  tex_log->Log ( L"[Load Trace] >> Creating Texture: "
+                L"(%d x %d), Format: %s, Usage: [%s], Pool: %s",
+                  Width, Height,
+                    SK_D3D9_FormatToStr (Format),
+                    SK_D3D9_UsageToStr  (Usage).c_str (),
+                    SK_D3D9_PoolToStr   (Pool) );
 #endif
 
-#if 0
-  //if (config.textures.log) {
-    tex_log->Log ( L"[Load Trace] >> Creating Texture: "
-                  L"(%d x %d), Format: %s, Usage: [%s], Pool: %s",
-                    Width, Height,
-                      SK_D3D9_FormatToStr (Format),
-                      SK_D3D9_UsageToStr  (Usage).c_str (),
-                      SK_D3D9_PoolToStr   (Pool) );
-  //}
-//#endif
-#endif
+  if (Usage == D3DUSAGE_RENDERTARGET && config.render.fix_map_res)
+  {
+    if (Width == tbf::RenderFix::width / 10 && Height == tbf::RenderFix::height / 10) {
+      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+    }
+    if (Width == tbf::RenderFix::width / 9  && Height == tbf::RenderFix::height / 9) {
+      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+    }
+    if (Width == tbf::RenderFix::width / 8  && Height == tbf::RenderFix::height / 8) {
+      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+    }
+    if (Width == tbf::RenderFix::width / 7  && Height == tbf::RenderFix::height / 7) {
+      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+    }
+    if (Width == tbf::RenderFix::width / 6  && Height == tbf::RenderFix::height / 6) {
+      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+    }
+    if (Width == tbf::RenderFix::width / 5  && Height == tbf::RenderFix::height / 5) {
+      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+    }
+    if (Width == tbf::RenderFix::width / 4  && Height == tbf::RenderFix::height / 4) {
+      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+    }
+    if (Width == tbf::RenderFix::width / 3  && Height == tbf::RenderFix::height / 3) {
+      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+    }
+    if (Width == tbf::RenderFix::width / 2  && Height == tbf::RenderFix::height / 2)
+    {
+      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+    }
+    //if (Width == 960 && Height == 540) {
+      //Width = 3840; Height = 2160;
+    //}
+    //if (Width == 640 && Height == 360) {
+      //Width = 3840; Height = 2160;
+    //}
+  }
 
   //
   // Model Shadows
@@ -1265,6 +1309,62 @@ private:
   HANDLE spool_thread_;
 } *resample_pool = nullptr;
 
+//
+// Split stream jobs into small and large in order to prevent
+//   starvation from wreaking havoc on load times.
+//
+//   This is a simple, but remarkably effective approach and
+//     further optimization work probably will not be done.
+//
+struct SK_StreamSplitter {
+  bool working (void) {
+    if (lrg_tex && lrg_tex->working ())
+      return true;
+
+    if (sm_tex && sm_tex->working ())
+      return true;
+
+    return false;
+  }
+
+  int queueLength (void) {
+    int len = 0;
+
+    if (lrg_tex) len += lrg_tex->queueLength ();
+    if (sm_tex)  len += sm_tex->queueLength  ();
+
+    return len;
+  }
+
+  std::vector <tbf_tex_load_s *> getFinished (void)
+  {
+    std::vector <tbf_tex_load_s *> results;
+
+    std::vector <tbf_tex_load_s *> lrg_loads;
+    std::vector <tbf_tex_load_s *> sm_loads;
+
+    if (lrg_tex) lrg_loads = lrg_tex->getFinished ();
+    if (sm_tex)  sm_loads  = sm_tex->getFinished  ();
+
+    results.insert (results.begin (), lrg_loads.begin (), lrg_loads.end ());
+    results.insert (results.begin (), sm_loads.begin  (), sm_loads.end  ());
+
+    return results;
+  }
+
+  void postJob (tbf_tex_load_s* job)
+  {
+    // A "Large" load is one >= 128 KiB
+    if (job->SrcDataSize > (128 * 1024))
+      lrg_tex->postJob (job);
+    else
+      sm_tex->postJob (job);
+  }
+
+  SK_TextureThreadPool* lrg_tex = nullptr;
+  SK_TextureThreadPool* sm_tex  = nullptr;
+} stream_pool;
+
 std::queue <TexLoadRef> textures_to_stream;
 
 std::map   <uint32_t, tbf_tex_load_s *>
@@ -1294,7 +1394,9 @@ pending_loads (void)
 {
   bool ret = false;
 
-  return resample_pool != nullptr && resample_pool->working ();
+  return
+    ( stream_pool.working () ||
+        ( resample_pool != nullptr && resample_pool->working () ) );
 
 //  EnterCriticalSection (&cs_tex_inject);
 //  ret = (! finished_loads.empty ());
@@ -1329,26 +1431,8 @@ pending_streams (void)
 {
   bool ret = false;
 
-  bool stream   = false;
-  bool resample = false;
-
-
-  if (InterlockedIncrement (&streaming) > 1)
-    stream = true;
-
-  InterlockedDecrement (&streaming);
-
-  if (stream)
+  if (streaming || stream_pool.queueLength () || (resample_pool && resample_pool->queueLength ()))
     ret = true;
-
-
-  if (InterlockedIncrement (&resampling) > 1)
-    resample = true;
-
-  InterlockedDecrement (&resampling);
-
-  if (resample || resample_pool->queueLength ())
-    return true;
 
   return ret;
 }
@@ -1438,19 +1522,34 @@ namespace streaming_memory {
 HRESULT
 InjectTexture (tbf_tex_load_s* load)
 {
-  D3DXIMAGE_INFO img_info = { 0 };
+  D3DXIMAGE_INFO img_info;
 
   bool           streamed;
-  DWORD          size = 0;
+  size_t         size = 0;
   HRESULT        hr = E_FAIL;
 
+  auto inject = injectable_textures.find (load->checksum);
+
+  if (inject == injectable_textures.end ())
+  {
+    tex_log->Log ( L"[Inject Tex]  >> Load Request for Checksum: %X "
+                   L"has no Injection Record !!",
+                     load->checksum );
+
+    return E_NOT_VALID_STATE;
+  }
+
+  const tbf_tex_record_s* inj_tex =
+    &(*inject).second;
+
   streamed =
-    injectable_textures [load->checksum].method == Streaming;
+    (inj_tex->method == Streaming);
 
   //
   // Load:  From Regular Filesystem
   //
-  if (injectable_textures [load->checksum].archive == -1) {
+  if ( inj_tex->archive == std::numeric_limits <unsigned int>::max () )
+  {
     HANDLE hTexFile =
       CreateFile ( load->wszFilename,
                      GENERIC_READ,
@@ -1465,14 +1564,15 @@ InjectTexture (tbf_tex_load_s* load)
 
     if (hTexFile != INVALID_HANDLE_VALUE) {
                 size = GetFileSize (hTexFile, nullptr);
-      load->pSrcData = new uint8_t [size];
 
-      if (load->pSrcData != nullptr) {
-        ReadFile (hTexFile, load->pSrcData, size, &read, nullptr);
+      if (streaming_memory::alloc (size)) {
+        load->pSrcData = streaming_memory::data [GetCurrentThreadId ()];
+
+        ReadFile (hTexFile, load->pSrcData, (DWORD)size, &read, nullptr);
 
         load->SrcDataSize = read;
 
-        if (streamed && size > (16 * 1024)) {
+        if (streamed && size > (32 * 1024)) {
           SetThreadPriority ( GetCurrentThread (),
                                 THREAD_PRIORITY_BELOW_NORMAL |
                                 THREAD_MODE_BACKGROUND_BEGIN );
@@ -1483,7 +1583,7 @@ InjectTexture (tbf_tex_load_s* load)
             load->SrcDataSize,
               &img_info );
 
-        hr = D3DXCreateTextureFromFileInMemoryEx (
+        hr = D3DXCreateTextureFromFileInMemoryEx_Original (
           load->pDevice,
             load->pSrcData, load->SrcDataSize,
               D3DX_DEFAULT, D3DX_DEFAULT, img_info.MipLevels,
@@ -1494,7 +1594,6 @@ InjectTexture (tbf_tex_load_s* load)
                         &img_info, nullptr,
                           &load->pSrc );
 
-        delete [] load->pSrcData;
         load->pSrcData = nullptr;
       } else {
         // OUT OF MEMORY ?!
@@ -1507,10 +1606,129 @@ InjectTexture (tbf_tex_load_s* load)
   //
   // Load:  From (Compressed) Archive (.7z or .zip)
   //
-  else {
+  else
+  {
+    wchar_t       arc_name [MAX_PATH];
+    CFileInStream arc_stream;
+    CLookToRead   look_stream;
+    ISzAlloc      thread_alloc;
+    ISzAlloc      thread_tmp_alloc;
+
+    FileInStream_CreateVTable (&arc_stream);
+    LookToRead_CreateVTable   (&look_stream, False);
+
+    look_stream.realStream = &arc_stream.s;
+    LookToRead_Init         (&look_stream);
+
+    thread_alloc.Alloc     = SzAlloc;
+    thread_alloc.Free      = SzFree;
+
+    thread_tmp_alloc.Alloc = SzAllocTemp;
+    thread_tmp_alloc.Free  = SzFreeTemp;
+
+    CSzArEx      arc;
+                 size   = inj_tex->size;
+    int          fileno = inj_tex->fileno;
+
+    if (inj_tex->archive <= archives.size ())
+      wcscpy (arc_name, archives [inj_tex->archive].c_str ());
+    else
+      wcscpy (arc_name, L"INVALID");
+
+    if (streamed && size > (32 * 1024)) {
+      SetThreadPriority ( GetCurrentThread (),
+                            THREAD_PRIORITY_LOWEST |
+                            THREAD_MODE_BACKGROUND_BEGIN );
+    }
+
+    if (InFile_OpenW (&arc_stream.file, arc_name))
+    {
+      tex_log->Log ( L"[Inject Tex]  ** Cannot open archive file: %s",
+                       arc_name );
+      return E_FAIL;
+    }
+
+    SzArEx_Init (&arc);
+
+    if (SzArEx_Open (&arc, &look_stream.s, &thread_alloc, &thread_tmp_alloc) != SZ_OK)
+    {
+      tex_log->Log ( L"[Inject Tex]  ** Cannot open archive file: %s",
+                       arc_name );
+      return E_FAIL;
+    }
+
+    if (streaming_memory::alloc (size))
+    {
+      load->pSrcData = streaming_memory::data [GetCurrentThreadId ()];
+
+      bool wait = true;
+
+      while (wait)
+      {
+        DWORD dwResult = WAIT_OBJECT_0;
+
+        if (streamed && size > (32 * 1024)) {
+          dwResult =
+            WaitForSingleObject ( decomp_semaphore, INFINITE );
+        }
+
+        switch (dwResult) 
+        {
+        case WAIT_OBJECT_0:
+        {
+          uint32_t block_idx     = 0xFFFFFFFF;
+          Byte*    out           = (Byte *)streaming_memory::data     [GetCurrentThreadId ()];
+          size_t   out_len       =         streaming_memory::data_len [GetCurrentThreadId ()];
+          size_t   offset        = 0;
+          size_t   decomp_size   = 0;
+
+          SzArEx_Extract ( &arc,          &look_stream.s, fileno,
+                           &block_idx,    &out,           &out_len,
+                           &offset,       &decomp_size,
+                           &thread_alloc, &thread_tmp_alloc );
+
+          if (streamed && size > (32 * 1024))
+            ReleaseSemaphore (decomp_semaphore, 1, nullptr);
+
+          wait = false;
+
+          load->pSrcData    = (Byte *)streaming_memory::data [GetCurrentThreadId ()] + offset;
+          load->SrcDataSize = (UINT)decomp_size;
+
+          D3DXGetImageInfoFromFileInMemory (
+            load->pSrcData,
+              load->SrcDataSize,
+                &img_info );
+
+          hr = D3DXCreateTextureFromFileInMemoryEx_Original (
+            load->pDevice,
+              load->pSrcData, load->SrcDataSize,
+                img_info.Width, img_info.Height, img_info.MipLevels,
+                  0, img_info.Format,
+                    D3DPOOL_DEFAULT,
+                      D3DX_DEFAULT, D3DX_DEFAULT,
+                        0,
+                          &img_info, nullptr,
+                            &load->pSrc );
+        } break;
+
+        default:
+          tex_log->Log ( L"[  Tex. Mgr  ] Unexpected Wait Status: %X (crc32=%x)",
+                           dwResult,
+                             load->checksum );
+          wait = false;
+          break; 
+        }
+      }
+
+      load->pSrcData = nullptr;
+    }
+
+    File_Close  (&arc_stream.file);
+    SzArEx_Free (&arc, &thread_alloc);
   }
 
-  if (streamed && size > (16 * 1024)) {
+  if (streamed && size > (32 * 1024)) {
     SetThreadPriority ( GetCurrentThread (),
                           THREAD_MODE_BACKGROUND_END );
   }
@@ -1534,7 +1752,7 @@ TBFix_LoadQueuedTextures (void)
     spin = 193;
 
   if (config.textures.show_loading_text) {
-    if (InterlockedExchangeAdd (&resampling, 0)) {
+    if (resample_pool->working ()) {
       mod_text += spin;
 
       char szFormatted [64];
@@ -1555,7 +1773,7 @@ TBFix_LoadQueuedTextures (void)
       mod_text += "\n\n";
     }
   
-    if (InterlockedExchangeAdd (&streaming, 0)) {
+    if (stream_pool.working ()) {
       mod_text += spin;
 
       char szFormatted [64];
@@ -1580,12 +1798,72 @@ TBFix_LoadQueuedTextures (void)
 
   int loads = 0;
 
-  std::vector <tbf_tex_load_s *> finished;
+  std::vector <tbf_tex_load_s *> finished_resamples;
+  std::vector <tbf_tex_load_s *> finished_streams = stream_pool.getFinished ();
 
   if (resample_pool != nullptr)
-    finished = resample_pool->getFinished ();
+    finished_resamples = resample_pool->getFinished ();
 
-  for (auto it = finished.begin (); it != finished.end (); /*it++*/) {
+  for (auto it = finished_resamples.begin (); it != finished_resamples.end (); /*it++*/) {
+    tbf_tex_load_s* load =
+      *it;
+
+    QueryPerformanceCounter (&load->end);
+
+    if (true) {
+      tex_log->Log ( L"[%s] Finished %s texture %08x (%5.2f MiB in %9.4f ms)",
+                       (load->type == tbf_tex_load_s::Stream) ? L"Inject Tex" :
+                         (load->type == tbf_tex_load_s::Immediate) ? L"Inject Tex" :
+                                                                     L" Resample ",
+                       (load->type == tbf_tex_load_s::Stream) ? L"streaming" :
+                         (load->type == tbf_tex_load_s::Immediate) ? L"loading" :
+                                                                     L"filtering",
+                         load->checksum,
+                           (double)load->SrcDataSize / (1024.0f * 1024.0f),
+                             1000.0f * (double)(load->end.QuadPart - load->start.QuadPart) /
+                                       (double)load->freq.QuadPart );
+    }
+
+    tbf::RenderFix::Texture* pTex =
+      tbf::RenderFix::tex_mgr.getTexture (load->checksum);
+
+    if (pTex != nullptr) {
+      pTex->load_time = (float)(1000.0 * (double)(load->end.QuadPart - load->start.QuadPart) /
+                                           (double)load->freq.QuadPart);
+    }
+
+    ISKTextureD3D9* pSKTex =
+      (ISKTextureD3D9 *)load->pDest;
+
+    if (pSKTex != nullptr) {
+      if (pSKTex->refs == 0 && load->pSrc != nullptr) {
+        tex_log->Log (L"[ Tex. Mgr ] >> Original texture no longer referenced, discarding new one!");
+        load->pSrc->Release ();
+      } else {
+        QueryPerformanceCounter (&pSKTex->last_used);
+
+        pSKTex->pTexOverride  = load->pSrc;
+        pSKTex->override_size = load->SrcDataSize;
+
+        tbf::RenderFix::tex_mgr.addInjected (load->SrcDataSize);
+      }
+
+      finished_streaming (load->checksum);
+
+      tbf::RenderFix::tex_mgr.updateOSD ();
+
+      ++loads;
+
+      // Remove the temporary reference
+      load->pDest->Release ();
+    }
+
+    ++it;
+
+    delete load;
+  }
+
+  for (auto it = finished_streams.begin (); it != finished_streams.end (); /*it++*/) {
     tbf_tex_load_s* load =
       *it;
 
@@ -1699,7 +1977,8 @@ TBFix_ReloadPadButtons (void)
                     L"TBFix_Res\\Gamepads\\%s\\Buttons.dds",
                       config.input.gamepad.texture_set.c_str () );
 
-      if (GetFileAttributesW (wszFile) != INVALID_FILE_ATTRIBUTES) {
+      if (GetFileAttributesW (wszFile) != INVALID_FILE_ATTRIBUTES)
+      {
         tex_log->LogEx (true, L"[Inject Tex] Injecting custom gamepad buttons... ");
 
         pD3DTex->GetDevice (&pDevice);
@@ -1795,7 +2074,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   // Injection would recurse slightly and cause impossible to diagnose reference counting problems
   //   with texture caching if we did not check for this!
   if (inject_thread) {
-    return D3DXCreateTextureFromFileInMemoryEx (
+    return D3DXCreateTextureFromFileInMemoryEx_Original (
       pDevice,
         pSrcData, SrcDataSize,
           Width, Height, MipLevels,
@@ -1935,7 +2214,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
   //tex_log->Log (L"D3DXCreateTextureFromFileInMemoryEx (... MipLevels=%lu ...)", MipLevels);
   hr =
-    D3DXCreateTextureFromFileInMemoryEx ( pDevice,
+    D3DXCreateTextureFromFileInMemoryEx_Original ( pDevice,
                                                      pSrcData,         SrcDataSize,
                                                        Width,          Height,    will_replace ? 1 : MipLevels,
                                                          Usage,        Format,    Pool,
@@ -2009,7 +2288,27 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
                     L"TBFix_Res\\Gamepads\\%s\\Buttons.dds",
                       config.input.gamepad.texture_set.c_str () );
 
-      if (GetFileAttributesW (wszFile) != INVALID_FILE_ATTRIBUTES) {
+      if (GetFileAttributesW (wszFile) != INVALID_FILE_ATTRIBUTES)
+      {
+        WIN32_FILE_ATTRIBUTE_DATA
+          file_attrib_data = { 0 };
+
+        GetFileAttributesEx ( wszFile,
+                                GetFileExInfoStandard,
+                                  &file_attrib_data );
+
+        tbf_tex_record_s rec;
+        rec.size    =  ULARGE_INTEGER { file_attrib_data.nFileSizeLow,
+                                          file_attrib_data.nFileSizeHigh }.QuadPart;
+        rec.archive = -1;
+        rec.method  =  Blocking;
+
+        if (! injectable_textures.count (checksum))
+          injectable_textures.insert (std::make_pair (checksum, rec));
+        else {
+          injectable_textures [checksum] = rec;
+        }
+
         tex_log->LogEx (true, L"[Inject Tex] Injecting custom gamepad buttons... ");
 
         load_op           = new tbf_tex_load_s;
@@ -2067,7 +2366,8 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
         textures_in_flight.insert ( std::make_pair ( load_op->checksum,
                                      load_op ) );
 
-        resample_pool->postJob (load_op);
+        stream_pool.postJob (load_op);
+        //resample_pool->postJob (load_op);
       }
 
       LeaveCriticalSection        (&cs_tex_stream);
@@ -2121,7 +2421,6 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     }
 #endif
 
-// Temporarily disabled while mipmap-related issues are debugged...
     else if (resample) {
       load_op              = new tbf_tex_load_s;
 
@@ -2382,6 +2681,17 @@ tbf::RenderFix::TextureManager::Init (void)
 
   tex_log = TBF_CreateLog (L"logs/textures.log");
 
+  CrcGenerateTable ();
+
+  CFileInStream arc_stream;
+  CLookToRead   look_stream;
+
+  FileInStream_CreateVTable (&arc_stream);
+  LookToRead_CreateVTable   (&look_stream, False);
+
+  look_stream.realStream = &arc_stream.s;
+  LookToRead_Init         (&look_stream);
+
   d3dx9_43_dll = LoadLibrary (L"D3DX9_43.DLL");
 
   //
@@ -2503,45 +2813,73 @@ tbf::RenderFix::TextureManager::Init (void)
       FindClose (hFind);
     }
 
-#if 0
     hFind = FindFirstFileW (TBFIX_TEXTURE_DIR L"\\inject\\*.*", &fd);
 
-    if (hFind != INVALID_HANDLE_VALUE) {
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
       int archive = 0;
 
-      do {
-        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
+      do
+      {
+        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES)
+        {
           wchar_t* wszArchiveNameLwr =
             _wcslwr (_wcsdup (fd.cFileName));
 
-          if ( wcsstr (wszArchiveNameLwr, L".zip") ||
-               wcsstr (wszArchiveNameLwr, L".7z") ) {
-            struct archive       *a;
-            struct archive_entry *entry;
-            int                   r, tex_count = 0;
+          if ( wcsstr (wszArchiveNameLwr, L".7z") )
+          {
+            int tex_count = 0;
 
-            a = archive_read_new ();
+            CSzArEx       arc;
+            ISzAlloc      thread_alloc;
+            ISzAlloc      thread_tmp_alloc;
 
-            archive_read_support_filter_all (a);
-            archive_read_support_format_all (a);
+            thread_alloc.Alloc     = SzAlloc;
+            thread_alloc.Free      = SzFree;
+
+            thread_tmp_alloc.Alloc = SzAllocTemp;
+            thread_tmp_alloc.Free  = SzFreeTemp;
 
             wchar_t wszQualifiedArchiveName [MAX_PATH];
             _swprintf ( wszQualifiedArchiveName,
                           L"%s\\inject\\%s",
-                            TSFIX_TEXTURE_DIR,
+                            TBFIX_TEXTURE_DIR,
                               fd.cFileName );
 
-            r = archive_read_open_filename_w (a, wszQualifiedArchiveName, 10240);
+            if (InFile_OpenW (&arc_stream.file, wszQualifiedArchiveName))
+            {
+              tex_log->Log ( L"[Inject Tex]  ** Cannot open archive file: %s",
+                               wszQualifiedArchiveName );
+              continue;
+            }
 
-            if (r == ARCHIVE_OK) {
-              int fileno = 0;
+            SzArEx_Init (&arc);
 
-              while (archive_read_next_header (a, &entry) == ARCHIVE_OK) {
+            if ( SzArEx_Open ( &arc,
+                                 &look_stream.s,
+                                   &thread_alloc,
+                                     &thread_tmp_alloc ) == SZ_OK )
+            {
+              uint32_t i;
+
+              wchar_t wszEntry [MAX_PATH];
+
+              for (i = 0; i < arc.NumFiles; i++)
+              {
+                if (SzArEx_IsDir (&arc, i))
+                  continue;
+
+                SzArEx_GetFileNameUtf16 (&arc, i, (UInt16 *)wszEntry);
+
+                // Truncate to 32-bits --> there's no way in hell a texture will ever be >= 2 GiB
+                size_t fileSize = SzArEx_GetFileSize (&arc, i);
+
                 wchar_t* wszFullName =
-                  _wcslwr (_wcsdup (archive_entry_pathname_w (entry)));
+                  _wcslwr (_wcsdup (wszEntry));
 
-                if ( wcsstr ( wszFullName, TSFIX_TEXTURE_EXT) ) {
-                  tsf_load_method_t method = DontCare;
+                if ( wcsstr ( wszFullName, TBFIX_TEXTURE_EXT) )
+                {
+                  tbf_load_method_t method = DontCare;
 
                   uint32_t checksum;
                   wchar_t* wszUnqualifiedEntry =
@@ -2555,13 +2893,12 @@ tbf::RenderFix::TextureManager::Init (void)
                   if (*wszUnqualifiedEntry == L'/')
                     ++wszUnqualifiedEntry;
 
-                  swscanf (wszUnqualifiedEntry, L"%x" TSFIX_TEXTURE_EXT, &checksum);
+                  swscanf (wszUnqualifiedEntry, L"%x" TBFIX_TEXTURE_EXT, &checksum);
 
                   // Already got this texture...
-                  if (injectable_textures.count (checksum)) {
+                  if ( injectable_textures.count (checksum) ||
+                       inject_blacklist.count    (checksum) ) {
                     free (wszFullName);
-                    archive_read_data_skip (a);
-                    ++fileno;
                     continue;
                   }
 
@@ -2570,10 +2907,10 @@ tbf::RenderFix::TextureManager::Init (void)
                   else if (wcsstr (wszFullName, L"blocking"))
                     method = Blocking;
 
-                  tsf_tex_record_s rec;
-                  rec.size    = (uint32_t)archive_entry_size (entry);
+                  tbf_tex_record_s rec;
+                  rec.size    = (uint32_t)fileSize;
                   rec.archive = archive;
-                  rec.fileno  = fileno;
+                  rec.fileno  = i;
                   rec.method  = method;
 
                   injectable_textures.insert (std::make_pair (checksum, rec));
@@ -2585,28 +2922,24 @@ tbf::RenderFix::TextureManager::Init (void)
                 }
 
                 free (wszFullName);
-
-                archive_read_data_skip (a);
-                ++fileno;
               }
 
-              if (tex_count == 0) {
-              } else {
+              if (tex_count > 0) {
                 ++archive;
                 archives.push_back (wszQualifiedArchiveName);
               }
-
-              r = archive_read_free (a);
             }
 
-            free (wszArchiveNameLwr);
+            SzArEx_Free (&arc, &thread_alloc);
+            File_Close  (&arc_stream.file);
           }
+
+          free (wszArchiveNameLwr);
         }
       } while (FindNextFileW (hFind, &fd) != 0);
 
       FindClose (hFind);
     }
-#endif
 
     tex_log->LogEx ( false, L" %lu files (%3.1f MiB)\n",
                        files, (double)liSize.QuadPart / (1024.0 * 1024.0) );
@@ -2707,7 +3040,7 @@ tbf::RenderFix::TextureManager::Init (void)
   TBF_CreateDLLHook ( L"D3DX9_43.DLL",
                         "D3DXCreateTextureFromFileInMemoryEx",
                          D3DXCreateTextureFromFileInMemoryEx_Detour,
-              (LPVOID *)&D3DXCreateTextureFromFileInMemoryEx );
+              (LPVOID *)&D3DXCreateTextureFromFileInMemoryEx_Original );
 
   D3DXSaveTextureToFile =
     (D3DXSaveTextureToFile_pfn)
@@ -2766,7 +3099,10 @@ tbf::RenderFix::TextureManager::Init (void)
                           config.textures.worker_threads,
                             nullptr );
 
-  resample_pool = new SK_TextureThreadPool ();
+  resample_pool       = new SK_TextureThreadPool ();
+
+  stream_pool.lrg_tex = new SK_TextureThreadPool ();
+  stream_pool.sm_tex  = new SK_TextureThreadPool ();
 
   SK_ICommandProcessor& command =
     *SK_GetCommandProcessor ();
@@ -3174,7 +3510,7 @@ ResampleTexture (tbf_tex_load_s* load)
 
   if (img_info.Depth == 1) {
     hr =
-    D3DXCreateTextureFromFileInMemoryEx (
+    D3DXCreateTextureFromFileInMemoryEx_Original (
       load->pDevice,
           load->pSrcData, load->SrcDataSize,
             img_info.Width, img_info.Height, 0,
@@ -3230,10 +3566,10 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
   // Ghetto sync. barrier, since Windows 7 does not support them...
   while ( InterlockedCompareExchange (
             &num_threads_init,
-              config.textures.worker_threads,
-                config.textures.worker_threads
-          ) < (ULONG)config.textures.worker_threads ) {
-    Sleep (15);
+              config.textures.worker_threads * 3,
+                config.textures.worker_threads * 3
+          ) < (ULONG)config.textures.worker_threads * 3 ) {
+    SwitchToThread ();
   }
 
   SK_TextureWorkerThread* pThread =
@@ -3302,7 +3638,10 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
 
     }
 
-    else if (dwWaitStatus == (wait.mem_trim)) {
+    else if (dwWaitStatus == (wait.mem_trim))
+    {
+      // Yay for magic numbers :P   ==> (8 MiB Min Size, 5 Seconds Between Trims)
+      //
       const size_t   MIN_SIZE = 8192 * 1024;
       const uint32_t MIN_AGE  = 5000UL;
 

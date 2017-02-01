@@ -72,6 +72,7 @@ struct {
   tbf::ParameterInt*     rescale_env_shadows;
 
   tbf::ParameterBool*    dump_shaders;
+  tbf::ParameterBool*    fix_map_res;
 } render;
 
 struct {
@@ -315,6 +316,16 @@ TBF_LoadConfig (std::wstring name)
       L"Shadow.Quality",
         L"RescaleEnvShadows" );
 
+  render.fix_map_res =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool>(
+      L"Fix crazy low-resolution map menu...")
+    );
+  render.fix_map_res->register_to_ini (
+    render_ini,
+      L"Resolution.Experimental",
+        L"FixMap" );
+
   framerate.replace_limiter =
     static_cast <tbf::ParameterBool *>
       (g_ParameterFactory.create_parameter <bool> (
@@ -426,6 +437,7 @@ TBF_LoadConfig (std::wstring name)
   render.rescale_env_shadows->load (config.render.env_shadow_rescale);
 
   render.dump_shaders->load        (config.render.dump_shaders);
+  render.fix_map_res->load         (config.render.fix_map_res);
 
   framerate.replace_limiter->load  (config.framerate.replace_limiter);
   framerate.tolerance->load        (config.framerate.tolerance);
@@ -463,6 +475,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   render.rescale_shadows->store     (config.render.shadow_rescale);
   render.rescale_env_shadows->store (config.render.env_shadow_rescale);
+  render.fix_map_res->store         (config.render.fix_map_res);
 
   textures.remaster->store          (config.textures.remaster);
   textures.uncompressed->store      (config.textures.uncompressed);

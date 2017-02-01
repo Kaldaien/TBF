@@ -44,7 +44,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LinkIncremental>true</LinkIncremental>
+    <LinkIncremental>false</LinkIncremental>
     <TargetName>tbfix</TargetName>
     <OutDir>C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria\</OutDir>
   </PropertyGroup>
@@ -67,12 +67,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <CreateHotpatchableImage>false</CreateHotpatchableImage>
-      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OmitFramePointers>false</OmitFramePointers>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <AdditionalIncludeDirectories>include\</AdditionalIncludeDirectories>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -85,8 +86,9 @@
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>false</DataExecutionPrevention>
-      <SupportUnloadOfDelayLoadedDLL>true</SupportUnloadOfDelayLoadedDLL>
+      <SupportUnloadOfDelayLoadedDLL>false</SupportUnloadOfDelayLoadedDLL>
       <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
+      <EntryPointSymbol>DllMain</EntryPointSymbol>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -96,10 +98,10 @@
       </PrecompiledHeader>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <IntrinsicFunctions>false</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;TBF_EXPORTS;%(PreprocessorDefinitions);IMGUI_DISABLE_INCLUDE_IMCONFIG_H</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <StringPooling>false</StringPooling>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <ControlFlowGuard>false</ControlFlowGuard>
@@ -107,7 +109,7 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <OmitFramePointers>false</OmitFramePointers>
       <AdditionalIncludeDirectories>include\</AdditionalIncludeDirectories>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -120,12 +122,14 @@
       <LargeAddressAware>true</LargeAddressAware>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>false</DataExecutionPrevention>
-      <SupportUnloadOfDelayLoadedDLL>true</SupportUnloadOfDelayLoadedDLL>
+      <SupportUnloadOfDelayLoadedDLL>false</SupportUnloadOfDelayLoadedDLL>
       <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies);C:\Program Files (x86)\Steam\steamapps\common\Tales of Berseria\d3d9.lib</AdditionalDependencies>
       <DelayLoadDLLs>
       </DelayLoadDLLs>
+      <EntryPointSymbol>
+      </EntryPointSymbol>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -162,6 +166,47 @@
     <ClCompile Include="src\hook.cpp" />
     <ClCompile Include="src\input.cpp" />
     <ClCompile Include="src\ini.cpp" />
+    <ClCompile Include="src\lzma\7zAlloc.c" />
+    <ClCompile Include="src\lzma\7zArcIn.c" />
+    <ClCompile Include="src\lzma\7zBuf.c" />
+    <ClCompile Include="src\lzma\7zBuf2.c" />
+    <ClCompile Include="src\lzma\7zCrc.c" />
+    <ClCompile Include="src\lzma\7zCrcOpt.c" />
+    <ClCompile Include="src\lzma\7zDec.c" />
+    <ClCompile Include="src\lzma\7zFile.c" />
+    <ClCompile Include="src\lzma\7zStream.c" />
+    <ClCompile Include="src\lzma\Aes.c" />
+    <ClCompile Include="src\lzma\AesOpt.c" />
+    <ClCompile Include="src\lzma\Alloc.c" />
+    <ClCompile Include="src\lzma\Bcj2.c" />
+    <ClCompile Include="src\lzma\Bcj2Enc.c" />
+    <ClCompile Include="src\lzma\Bra.c" />
+    <ClCompile Include="src\lzma\Bra86.c" />
+    <ClCompile Include="src\lzma\BraIA64.c" />
+    <ClCompile Include="src\lzma\CpuArch.c" />
+    <ClCompile Include="src\lzma\Delta.c" />
+    <ClCompile Include="src\lzma\LzFind.c" />
+    <ClCompile Include="src\lzma\LzFindMt.c" />
+    <ClCompile Include="src\lzma\Lzma2Dec.c" />
+    <ClCompile Include="src\lzma\Lzma2Enc.c" />
+    <ClCompile Include="src\lzma\Lzma86Dec.c" />
+    <ClCompile Include="src\lzma\Lzma86Enc.c" />
+    <ClCompile Include="src\lzma\LzmaDec.c" />
+    <ClCompile Include="src\lzma\LzmaEnc.c" />
+    <ClCompile Include="src\lzma\LzmaLib.c" />
+    <ClCompile Include="src\lzma\MtCoder.c" />
+    <ClCompile Include="src\lzma\Ppmd7.c" />
+    <ClCompile Include="src\lzma\Ppmd7Dec.c" />
+    <ClCompile Include="src\lzma\Ppmd7Enc.c" />
+    <ClCompile Include="src\lzma\Sha256.c" />
+    <ClCompile Include="src\lzma\Sort.c" />
+    <ClCompile Include="src\lzma\Threads.c" />
+    <ClCompile Include="src\lzma\Xz.c" />
+    <ClCompile Include="src\lzma\XzCrc64.c" />
+    <ClCompile Include="src\lzma\XzCrc64Opt.c" />
+    <ClCompile Include="src\lzma\XzDec.c" />
+    <ClCompile Include="src\lzma\XzEnc.c" />
+    <ClCompile Include="src\lzma\XzIn.c" />
     <ClCompile Include="src\tbt\control_panel.cpp" />
     <ClCompile Include="src\textures.cpp" />
     <Text Include="include\keyboard.h" />

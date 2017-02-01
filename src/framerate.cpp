@@ -77,10 +77,6 @@ extern "C" unsigned int hde64_disasm(const void *code, hde64s *hs);
 
 
 
-//
-// @TODO: Develop a heuristic to scan for this memory address;
-//          hardcoding it is going to break stuff :)
-//
 volatile uintptr_t TICK_ADDR_BASE = 0x0UL;
 
 int32_t            tbf::FrameRateFix::tick_scale               = INT32_MAX; // 0 FPS

@@ -856,11 +856,34 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   if (This != tbf::RenderFix::pDevice)
     return D3D9SetViewport_Original (This, pViewport);
 
+  // In-Game Map
+  //
+  //
+  if ( config.render.fix_map_res && (
+       ( pViewport->Width == tbf::RenderFix::width/2  && pViewport->Height == tbf::RenderFix::height/2  ) ||
+       ( pViewport->Width == tbf::RenderFix::width/3  && pViewport->Height == tbf::RenderFix::height/3  ) || 
+       ( pViewport->Width == tbf::RenderFix::width/4  && pViewport->Height == tbf::RenderFix::height/4  ) ||
+       ( pViewport->Width == tbf::RenderFix::width/5  && pViewport->Height == tbf::RenderFix::height/5  ) ||
+       ( pViewport->Width == tbf::RenderFix::width/6  && pViewport->Height == tbf::RenderFix::height/6  ) || 
+       ( pViewport->Width == tbf::RenderFix::width/7  && pViewport->Height == tbf::RenderFix::height/7  ) ||
+       ( pViewport->Width == tbf::RenderFix::width/8  && pViewport->Height == tbf::RenderFix::height/8  ) || 
+       ( pViewport->Width == tbf::RenderFix::width/9  && pViewport->Height == tbf::RenderFix::height/9  ) ||
+       ( pViewport->Width == tbf::RenderFix::width/10 && pViewport->Height == tbf::RenderFix::height/10 ) ) )
+  {
+    D3DVIEWPORT9 rescaled_map = *pViewport;
+
+    rescaled_map.Width  = tbf::RenderFix::width;
+    rescaled_map.Height = tbf::RenderFix::height;
+
+    return D3D9SetViewport_Original (This, &rescaled_map);
+  }
+
   //
   // Adjust Character Drop Shadows
   //
   if (pViewport->Width == pViewport->Height &&
-     (pViewport->Width == 64 || pViewport->Width == 128 || pViewport->Width == 256)) {
+     (pViewport->Width == 64 || pViewport->Width == 128 || pViewport->Width == 256))
+{
     D3DVIEWPORT9 rescaled_shadow = *pViewport;
 
     uint32_t shift = TBF_MakeShadowBitShift (pViewport->Width);

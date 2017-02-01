@@ -65,6 +65,7 @@ struct tbf_config_t
     int32_t   shadow_rescale     = -2;
     int32_t   env_shadow_rescale =  1;
     bool      dump_shaders       = false;
+    bool      fix_map_res        = false;
   } render;
 
   struct {
@@ -75,6 +76,7 @@ struct tbf_config_t
     float    lod_bias            = -0.2666f;
     int32_t  max_cache_in_mib    =  2048L;
     int32_t  worker_threads      =  3;
+    int32_t  max_decomp_jobs     =  6;
     bool     show_loading_text   =  false;
     bool     quick_load          =  false;
   } textures;

@@ -325,6 +325,25 @@ TBFix_DrawConfigUI (void)
   {
     ImGui::TreePush ("");
 
+    if (ImGui::CollapsingHeader ("Experimental")) {
+      ImGui::TreePush ("");
+
+      need_restart |= ImGui::Checkbox ("Enable map menu resolution fix", &config.render.fix_map_res);
+
+      if (ImGui::IsItemHovered ())
+      {
+        ImGui::BeginTooltip ();
+        ImGui::Text       ( "This feature is experimental and only works at 16:9 resolutions, I am not positive that it"
+                            " will not break something unrelated." );
+        ImGui::Separator  ();
+        ImGui::Bullet     (); ImGui::SameLine ();
+        ImGui::Text       ("That is where you come in, my faithful guinea pig >:)" );
+        ImGui::EndTooltip ();
+      }
+
+      ImGui::TreePop      ();
+    }
+
     if (ImGui::CollapsingHeader ("Quality"))
     {
       ImGui::TreePush ("");
@@ -481,7 +500,41 @@ TBFix_DrawConfigUI (void)
         ImGui::Text         ("Enabling this will cause the game to run slower and waste disk space, only enable if you know what you are doing.");
         ImGui::EndTooltip   ();
       }
-      ImGui::TreePop ();
+
+      ImGui::BeginChild ("ModDescription", ImVec2 (750, 325), true);
+        ImGui::TextColored    (ImVec4 (0.9f, 0.7f, 0.5f, 1.0f), "Texture Modding Overview"); ImGui::SameLine ();
+        ImGui::Text           ("    (Documentation Pending)");
+
+        ImGui::Separator      ();
+
+        ImGui::TextWrapped    ("\nReplacement textures go in (TBFix_Res\\inject\\textures\\{blocking|streaming}\\<checksum>.dds)\n\n");
+
+        ImGui::TreePush ("");
+          ImGui::BulletText ("Blocking textures have a high performance penalty, but zero chance of visible pop-in.");
+          ImGui::BulletText ("Streaming textures will replace the game's original texture whenever Disk/CPU loads finish.");
+          ImGui::TreePush   ("");
+            ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.6f, 0.9f, 0.2f, 1.0f));
+            ImGui::BulletText     ("Use streaming whenever possible or performance will bite you in the ass.");
+            ImGui::PopStyleColor  ();
+          ImGui::TreePop    (  );
+        ImGui::TreePop  ();
+
+        ImGui::TextWrapped    ("\n\nLoading modified textures from separate files is inefficient; entire groups of textures may also be packaged into \".7z\" files (See TBFix_Res\\inject\\00_License.7z as an example, and use low/no compression ratio or you will kill the game's performance).\n");
+
+        ImGui::Separator      ();
+
+        ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.9f, 0.6f, 0.3f, 1.0f));
+        ImGui::TextWrapped    ( "\n\nA more detailed synopsis will follow in future versions, for now please refer to the GitHub release notes for Tales of Symphonia "
+                                "\"Fix\" v 0.9.0 for a thorough description on authoring texture mods.\n\n" );
+        ImGui::PopStyleColor  ();
+
+        ImGui::Separator      ();
+
+        ImGui::Bullet         (); ImGui::SameLine ();
+        ImGui::TextWrapped    ( "\nIf texture mods are enabled, you can click on the Injected and Base buttons on the texture cache "
+                                  "summary pannel to compare modified and unmodified." );
+      ImGui::EndChild         ();
+      ImGui::TreePop          ();
     }
     ImGui::TreePop ();
   }
@@ -544,12 +597,12 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePush ("");
     ImGui::Checkbox ("Swap WASD and Arrow Keys", &config.keyboard.swap_wasd);
     ImGui::TreePop  (  );
-
-    ImGui::TreePop ();
   }
 
   if (ImGui::CollapsingHeader ("Audio Configuration", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   { 
+    ImGui::TreePush ("");
+
     if (tbf::SoundFix::wasapi_init)
     {
       ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 16.0f);
@@ -607,6 +660,8 @@ TBFix_DrawConfigUI (void)
         ImGui::SetTooltip ("May reduce audio quality, but can help with some weird USB headsets and Windows 7 / Older.");
       ImGui::TreePop ();
      }
+
+     ImGui::TreePop ();
    }
 
    ImGui::PopItemWidth ();
