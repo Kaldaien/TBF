@@ -126,19 +126,19 @@ SK_TBF_PluginKeyPress ( BOOL Control,
 
     else if (vkCode == VK_OEM_6) {
       extern std::vector <uint32_t> textures_used_last_dump;
-      extern size_t                 tex_dbg_idx;
+      extern uint32_t               tex_dbg_idx;
       ++tex_dbg_idx;
 
-      extern size_t debug_tex_id;
+      extern uint32_t debug_tex_id;
 
-      if (tex_dbg_idx < 0 || (! textures_used_last_dump.size ())) {
+      if ((int32_t)tex_dbg_idx < 0 || (! textures_used_last_dump.size ())) {
         tex_dbg_idx  = -1;
         debug_tex_id =  0;
       } else {
         if (tex_dbg_idx >= textures_used_last_dump.size ())
-          tex_dbg_idx = max (0, textures_used_last_dump.size () - 1);
+          tex_dbg_idx = max (0, (uint32_t)textures_used_last_dump.size () - 1);
 
-        debug_tex_id = (int)textures_used_last_dump [tex_dbg_idx];
+        debug_tex_id = textures_used_last_dump [tex_dbg_idx];
       }
 
       tbf::RenderFix::tex_mgr.updateOSD ();
@@ -148,19 +148,19 @@ SK_TBF_PluginKeyPress ( BOOL Control,
 
     else if (vkCode == VK_OEM_4) {
       extern std::vector <uint32_t> textures_used_last_dump;
-      extern size_t                   tex_dbg_idx;
-      extern size_t                   debug_tex_id;
+      extern uint32_t               tex_dbg_idx;
+      extern uint32_t               debug_tex_id;
 
       --tex_dbg_idx;
 
-      if (tex_dbg_idx < 0 || (! textures_used_last_dump.size ())) {
+      if ((int32_t)tex_dbg_idx < 0 || (! textures_used_last_dump.size ())) {
         tex_dbg_idx  = -1;
         debug_tex_id =  0;
       } else {
         if (tex_dbg_idx >= textures_used_last_dump.size ())
-          tex_dbg_idx = max (0, textures_used_last_dump.size () - 1);
+          tex_dbg_idx = max (0, (uint32_t)textures_used_last_dump.size () - 1);
 
-        debug_tex_id = (int)textures_used_last_dump [tex_dbg_idx];
+        debug_tex_id = textures_used_last_dump [tex_dbg_idx];
       }
 
       tbf::RenderFix::tex_mgr.updateOSD ();

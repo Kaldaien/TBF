@@ -603,7 +603,7 @@ D3D9SetDepthStencilSurface_Detour (
 }
 
 
-size_t   debug_tex_id = 0UL;
+uint32_t debug_tex_id = 0UL;
 uint32_t current_tex  = 0ui32;
 
 COM_DECLSPEC_NOTHROW
@@ -3430,7 +3430,7 @@ tbf::RenderFix::TextureManager::updateOSD (void)
   if (debug_tex_id != 0x00) {
     osd_stats += "\n\n";
 
-    sprintf ( szFormatted, " Debug Texture : %08zx",
+    sprintf ( szFormatted, " Debug Texture : %08x",
                 debug_tex_id );
 
     osd_stats += szFormatted;
@@ -3438,7 +3438,7 @@ tbf::RenderFix::TextureManager::updateOSD (void)
 }
 
 std::vector <uint32_t> textures_used_last_dump;
-                size_t tex_dbg_idx              = 0UL;
+             uint32_t  tex_dbg_idx              = 0UL;
 
 void
 TBFix_LogUsedTextures (void)

@@ -534,7 +534,94 @@ TBFix_DrawConfigUI (void)
         ImGui::TextWrapped    ( "\nIf texture mods are enabled, you can click on the Injected and Base buttons on the texture cache "
                                   "summary pannel to compare modified and unmodified." );
       ImGui::EndChild         ();
-      ImGui::TreePop          ();
+
+      ImGui::SameLine ();
+
+      ImGui::BeginChild       ("DebugTexture", ImVec2 (300, 325));
+
+      static std::vector <std::string> list_contents;
+      static bool                      list_dirty     = false;
+      static int                       sel            =     0;
+
+      extern std::vector <uint32_t> textures_used_last_dump;
+      extern              uint32_t  tex_dbg_idx;
+      extern              uint32_t  debug_tex_id;
+
+      if (list_dirty)
+      {
+             list_contents.clear ();
+                  sel = tex_dbg_idx;
+
+        for ( auto it : textures_used_last_dump )
+        {
+          char szDesc [16] = { };
+
+          sprintf (szDesc, "%08x", it);
+
+          list_contents.push_back (szDesc);
+        }
+      }
+
+      if (ImGui::Button ("Refresh Texture List"))
+      {
+        SK_ICommandProcessor& command =
+          *SK_GetCommandProcessor ();
+
+        command.ProcessCommandLine ("Textures.Trace true");
+
+        tbf::RenderFix::tex_mgr.updateOSD ();
+
+        list_dirty = true;
+      }
+
+      if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("Refreshes the set of texture checksums used in the last frame drawn.");
+
+      ImGui::SameLine ();
+
+      if (ImGui::Button ("Clear Debug Flag"))
+      {
+        sel                         = -1;
+        debug_tex_id                =  0;
+        textures_used_last_dump.clear ();
+      }
+
+      if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("Exits texture deubg mode.");
+
+      if ( ImGui::ListBox (
+            "", &sel,
+              [](void *data, int idx, const char **out_data) -> 
+                bool {
+                  *out_data = list_contents [idx].c_str ();
+
+                  return true;
+                },
+              nullptr,
+            textures_used_last_dump.size (),
+          textures_used_last_dump.size () )
+        )
+      {
+        if ((int32_t)tex_dbg_idx < 0 || (! textures_used_last_dump.size ())) {
+          tex_dbg_idx  = -1;
+          debug_tex_id =  0;
+        } else {
+            tex_dbg_idx = sel;
+
+          debug_tex_id = textures_used_last_dump [sel];
+        }
+      }
+
+      if (ImGui::IsItemHovered ())
+      {
+        ImGui::BeginTooltip ();
+        ImGui::TextColored (ImVec4 (0.7f, 0.9f, 0.3f, 1.0f), "The \"debug\" texture will appear black to make identifying textures to modify easier.");
+        ImGui::Separator  ();
+        ImGui::BulletText ("Press Ctrl + Shift + [ to select the previous texture from this list");
+        ImGui::BulletText ("Press Ctrl + Shift + ] to select the next texture from this list");
+        ImGui::EndTooltip ();
+      }
+
+      ImGui::EndChild ();
+      ImGui::TreePop  ();
     }
     ImGui::TreePop ();
   }
