@@ -110,7 +110,8 @@ SKPlugIn_Init (HMODULE hModSpecialK)
                           L"===========",
                             TBF_VER_STR.c_str () );
 
-  if (! TBF_LoadConfig ()) {
+  if (! TBF_LoadConfig ())
+  {
     config.audio.channels            =  6;
     config.audio.sample_hz           = -1;
     config.audio.compatibility       = false;
@@ -137,6 +138,7 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     config.system.injector           = injector_dll;
 
     // Save a new config if none exists
+    TBF_LoadConfig (L"tbfix_default");
     TBF_SaveConfig ();
   }
 
@@ -166,7 +168,8 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     extern void TBFix_ImGui_Init (void);
                 TBFix_ImGui_Init ();
 
-    CoInitializeEx (nullptr, COINIT_MULTITHREADED);
+    bool success = 
+      SUCCEEDED (CoInitializeEx (nullptr, COINIT_MULTITHREADED));
 
     tbf::SoundFix::Init     ();
     //tbf::FileIO::Init       ();
@@ -206,8 +209,8 @@ SKPlugIn_Init (HMODULE hModSpecialK)
       nullptr, 0x00, nullptr );
 
 
-    // Uncomment this when spawning a thread
-    //CoUninitialize ();
+    if (success)
+      CoUninitialize ();
   }
 
   return TRUE;

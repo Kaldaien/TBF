@@ -303,7 +303,7 @@ tbf::FrameRateFix::Init (void)
       uintptr_t off =
         (uintptr_t)(dis.disp.disp32 + rip + 0x6) & ( 0x00FFFFFFUL );
       
-      dll_log->Log ( L"[FrameLimit] Framerate Limiter Preference at Addr.: (Base+%ph)", off);
+      dll_log->Log ( L"[FrameLimit] Framerate Limiter Preference at Addr.: (Base+%ph)", (LPVOID *)off);
       
       config.framerate.limit_addr = off;
       TICK_ADDR_BASE              = off;

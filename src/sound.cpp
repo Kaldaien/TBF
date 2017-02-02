@@ -186,7 +186,7 @@ HRESULT
 WINAPI DSound_GetSpeakerConfig (IDirectSound *This, 
                           _Out_ LPDWORD       pdwSpeakerConfig)
 {
-  audio_log->Log ( L"[!] %s (%08Xh, %08Xh) - "
+  audio_log->Log ( L"[!] %s (%ph, %ph) - "
                    L"[Calling Thread: 0x%04x]",
                      L"IDirectSound::GetSpeakerConfig",
                        This,
@@ -217,7 +217,7 @@ HRESULT
 WINAPI DSound_SetSpeakerConfig (IDirectSound *This, 
                           _In_  DWORD         dwSpeakerConfig)
 {
-  audio_log->Log ( L"[!] %s (%08Xh, %08Xh) - "
+  audio_log->Log ( L"[!] %s (%ph, %ul) - "
                    L"[Calling Thread: 0x%04x]",
                      L"IDirectSound::SetSpeakerConfig",
                        This, dwSpeakerConfig,
@@ -247,7 +247,7 @@ HRESULT
 WINAPI DSound_GetSpeakerConfig8 (IDirectSound8 *This, 
                            _Out_ LPDWORD        pdwSpeakerConfig)
 {
-  audio_log->Log ( L"[!] %s (%08Xh, %08Xh) - "
+  audio_log->Log ( L"[!] %s (%ph, %ph) - "
                    L"[Calling Thread: 0x%04x]",
                      L"IDirectSound8::GetSpeakerConfig",
                        This, pdwSpeakerConfig,
@@ -284,7 +284,7 @@ DirectSoundCreate_Detour (_In_opt_   LPCGUID        pcGuidDevice,
   //new_session                  = false;
   //g_DeviceFormat.Format.cbSize = 0;
 
-  audio_log->Log ( L"[!] %s (%08Xh, %08Xh, %08Xh) - "
+  audio_log->Log ( L"[!] %s (%ph, %ph, %ph) - "
                    L"[Calling Thread: 0x%04x]",
                      L"DirectSoundCreate",
                        pcGuidDevice, ppDS, pUnkOuter,
@@ -361,7 +361,7 @@ STDMETHODCALLTYPE
 IAudioClient_GetMixFormat_Detour (IAudioClient       *This,
                            _Out_  WAVEFORMATEX      **ppDeviceFormat)
 {
-  audio_log->Log (L" [!] IAudioClient::GetMixFormat (%08Xh)", This);
+  audio_log->Log (L" [!] IAudioClient::GetMixFormat (%ph)", This);
 
   if (new_session) {
     audio_log->Log ( L" >> Overriding  -  "
@@ -778,7 +778,7 @@ tbf::SoundFix::Init (void)
 
   TBF_EnableHook (pfnCoCreateInstance);
 
-  audio_log->LogEx (false, L"%06Xh\n", pfnCoCreateInstance);
+  audio_log->LogEx (false, L"%ph\n", pfnCoCreateInstance);
 }
 
 void

@@ -269,7 +269,7 @@ BOOL
 __cdecl
 SDL_SetHint_Detour ( const char* name, const char* value )
 {
-  if (! stricmp (name, "SDL_HINT_MOUSE_RELATIVE_MODE_WARP")) {
+  if (! _stricmp (name, "SDL_HINT_MOUSE_RELATIVE_MODE_WARP")) {
     return TRUE;
   }
 

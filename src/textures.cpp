@@ -123,7 +123,7 @@ void TBFix_LoadQueuedTextures (void);
 #include <set>
 #include <queue>
 #include <vector>
-#include <unordered_set>>
+#include <unordered_set>
 #include <unordered_map>
 
 // All of the enumerated textures in TBFix_Textures/inject/...
@@ -508,7 +508,7 @@ D3D9CreateRenderTarget_Detour (IDirect3DDevice9     *This,
                                HANDLE               *pSharedHandle)
 {
   tex_log->Log (L"[Unexpected][!] IDirect3DDevice9::CreateRenderTarget (%lu, %lu, "
-                       L"%lu, %lu, %lu, %lu, %08Xh, %08Xh)",
+                       L"%lu, %lu, %lu, %lu, %ph, %ph)",
                   Width, Height, Format, MultiSample, MultisampleQuality,
                   Lockable, ppSurface, pSharedHandle);
 
@@ -531,7 +531,7 @@ D3D9CreateDepthStencilSurface_Detour (IDirect3DDevice9     *This,
                                       HANDLE               *pSharedHandle)
 {
   tex_log->Log (L"[Unexpected][!] IDirect3DDevice9::CreateDepthStencilSurface (%lu, %lu, "
-                       L"%lu, %lu, %lu, %lu, %08Xh, %08Xh)",
+                       L"%lu, %lu, %lu, %lu, %ph, %ph)",
                   Width, Height, Format, MultiSample, MultisampleQuality,
                   Discard, ppSurface, pSharedHandle);
 
@@ -683,12 +683,15 @@ D3D9SetTexture_Detour (
 #endif
   }
 
-  return D3D9SetTexture (This, Sampler, pTexture);
+  if (pTexture == nullptr)
+    return S_OK;
+
+  else
+    return D3D9SetTexture(This, Sampler, pTexture);
 }
 
 D3DXSaveSurfaceToFile_pfn D3DXSaveSurfaceToFileW = nullptr;
-
-IDirect3DSurface9* pOld     = nullptr;
+IDirect3DSurface9*        pOld                   = nullptr;
 
 COM_DECLSPEC_NOTHROW
 HRESULT
@@ -1541,13 +1544,13 @@ namespace streaming_memory {
 HRESULT
 InjectTexture (tbf_tex_load_s* load)
 {
-  D3DXIMAGE_INFO img_info;
+  D3DXIMAGE_INFO img_info = {    };
+  bool           streamed =  false;
+  size_t         size     =      0;
+  HRESULT        hr       = E_FAIL;
 
-  bool           streamed;
-  size_t         size = 0;
-  HRESULT        hr = E_FAIL;
-
-  auto inject = injectable_textures.find (load->checksum);
+  auto inject =
+    injectable_textures.find (load->checksum);
 
   if (inject == injectable_textures.end ())
   {
@@ -1581,17 +1584,20 @@ InjectTexture (tbf_tex_load_s* load)
 
     DWORD read = 0UL;
 
-    if (hTexFile != INVALID_HANDLE_VALUE) {
-                size = GetFileSize (hTexFile, nullptr);
+    if (hTexFile != INVALID_HANDLE_VALUE)
+    {
+      size = GetFileSize (hTexFile, nullptr);
 
-      if (streaming_memory::alloc (size)) {
+      if (streaming_memory::alloc (size))
+      {
         load->pSrcData = streaming_memory::data [GetCurrentThreadId ()];
 
         ReadFile (hTexFile, load->pSrcData, (DWORD)size, &read, nullptr);
 
         load->SrcDataSize = read;
 
-        if (streamed && size > (32 * 1024)) {
+        if (streamed && size > (32 * 1024))
+        {
           SetThreadPriority ( GetCurrentThread (),
                                 THREAD_PRIORITY_BELOW_NORMAL |
                                 THREAD_MODE_BACKGROUND_BEGIN );
@@ -1614,7 +1620,9 @@ InjectTexture (tbf_tex_load_s* load)
                           &load->pSrc );
 
         load->pSrcData = nullptr;
-      } else {
+      }
+
+      else {
         // OUT OF MEMORY ?!
       }
 
@@ -1627,7 +1635,7 @@ InjectTexture (tbf_tex_load_s* load)
   //
   else
   {
-    wchar_t       arc_name [MAX_PATH];
+    wchar_t       arc_name [MAX_PATH] = { };
     CFileInStream arc_stream;
     CLookToRead   look_stream;
     ISzAlloc      thread_alloc;
@@ -1654,7 +1662,8 @@ InjectTexture (tbf_tex_load_s* load)
     else
       wcscpy (arc_name, L"INVALID");
 
-    if (streamed && size > (32 * 1024)) {
+    if (streamed && size > (32 * 1024))
+    {
       SetThreadPriority ( GetCurrentThread (),
                             THREAD_PRIORITY_LOWEST |
                             THREAD_MODE_BACKGROUND_BEGIN );
@@ -1679,14 +1688,14 @@ InjectTexture (tbf_tex_load_s* load)
     if (streaming_memory::alloc (size))
     {
       load->pSrcData = streaming_memory::data [GetCurrentThreadId ()];
-
-      bool wait = true;
+      bool wait      = true;
 
       while (wait)
       {
         DWORD dwResult = WAIT_OBJECT_0;
 
-        if (streamed && size > (32 * 1024)) {
+        if (streamed && size > (32 * 1024))
+        {
           dwResult =
             WaitForSingleObject ( decomp_semaphore, INFINITE );
         }
@@ -1747,7 +1756,8 @@ InjectTexture (tbf_tex_load_s* load)
     SzArEx_Free (&arc, &thread_alloc);
   }
 
-  if (streamed && size > (32 * 1024)) {
+  if (streamed && size > (32 * 1024))
+  {
     SetThreadPriority ( GetCurrentThread (),
                           THREAD_MODE_BACKGROUND_END );
   }
@@ -1877,9 +1887,10 @@ TBFix_LoadQueuedTextures (void)
     tbf::RenderFix::Texture* pTex =
       tbf::RenderFix::tex_mgr.getTexture (load->checksum);
 
-    if (pTex != nullptr) {
+    if (pTex != nullptr)
+    {
       pTex->load_time = (float)(1000.0 * (double)(load->end.QuadPart - load->start.QuadPart) /
-                                           (double)load->freq.QuadPart);
+                                          (double)load->freq.QuadPart);
     }
 
     ISKTextureD3D9* pSKTex =
@@ -2084,7 +2095,8 @@ TBFix_ReloadPadButtons (void)
           textures_in_flight [load_op->checksum]->pDest =
             pD3DTex;
 
-          if (tbf::RenderFix::tex_mgr.getTexture (load_op->checksum)  != nullptr) {
+          if (tbf::RenderFix::tex_mgr.getTexture (load_op->checksum)  != nullptr)
+          {
             for ( int i = 0;
                       i < tbf::RenderFix::tex_mgr.getTexture (load_op->checksum)->refs;
                     ++i ) {
@@ -2095,12 +2107,14 @@ TBFix_ReloadPadButtons (void)
           ////tsf::RenderFix::tex_mgr.removeTexture (pTexOrig);
         }
 
-        else {
+        else
+        {
           textures_in_flight.insert ( std::make_pair ( load_op->checksum,
                                        load_op ) );
 
           resample_pool->postJob (load_op);
         }
+
         current_tex = pSKTex->tex_crc32;
         LeaveCriticalSection (&cs_tex_stream);
       }
@@ -2155,7 +2169,8 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
                       ppTexture );
   }
 
-  if (resample_blacklist_init == false) {
+  if (resample_blacklist_init == false)
+  {
     // Do Not Resample Logos
     resample_blacklist.insert (0xfa3d03df);
     resample_blacklist.insert (0x545908bb);
@@ -2164,8 +2179,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   }
 
   // Performance statistics for caching system
-  LARGE_INTEGER start, end;
-
+         LARGE_INTEGER start, end;
   static LARGE_INTEGER freq = { 0LL };
 
   if (freq.QuadPart == 0LL)
@@ -2180,11 +2194,13 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   if (Usage == D3DUSAGE_DYNAMIC || Usage == D3DUSAGE_RENDERTARGET)
     checksum = 0x00;
 
-  if (config.textures.cache && checksum != 0x00) {
+  if (config.textures.cache && checksum != 0x00)
+  {
     tbf::RenderFix::Texture* pTex =
       tbf::RenderFix::tex_mgr.getTexture (checksum);
 
-    if (pTex != nullptr) {
+    if (pTex != nullptr)
+    {
       tbf::RenderFix::tex_mgr.refTexture (pTex);
 
       *ppTexture = pTex->d3d9_tex;
@@ -2262,7 +2278,8 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
       record.method = Streaming;
 
     // If -1, load from disk...
-    if (record.archive == -1) {
+    if (record.archive == -1)
+    {
       if (record.method == Streaming)
         _swprintf ( wszInjectFileName, L"%s\\inject\\textures\\streaming\\%08x%s",
                       TBFIX_TEXTURE_DIR,
@@ -2286,12 +2303,16 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
     wcscpy (load_op->wszFilename, wszInjectFileName);
 
-    if (load_op->type == tbf_tex_load_s::Stream) {
+    if (load_op->type == tbf_tex_load_s::Stream)
+    {
       if ((! remap_stream))
         tex_log->LogEx ( false, L"streaming\n" );
       else
         tex_log->LogEx ( false, L"in-flight already\n" );
-    } else {
+    }
+
+    else
+    {
       tex_log->LogEx ( false, L"blocking (deferred)\n" );
     }
   }
@@ -2308,17 +2329,20 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
                                                              pSrcInfo, pPalette,
                                                                ppTexture );
 
-  if (SUCCEEDED (hr)) {
+  if (SUCCEEDED (hr))
+  {
     new ISKTextureD3D9 (ppTexture, SrcDataSize, checksum);
 
     const uint32_t license_crc32 = 0x86c4b6d0UL;
 
-    if (checksum == license_crc32) {
+    if (checksum == license_crc32)
+    {
       wchar_t wszFile [MAX_PATH + 2] = { L'\0' };
 
       lstrcatW ( wszFile, L"TBFix_Res\\license.dds" );
 
-      if (GetFileAttributesW (wszFile) != INVALID_FILE_ATTRIBUTES) {
+      if (GetFileAttributesW (wszFile) != INVALID_FILE_ATTRIBUTES)
+      {
         tex_log->LogEx (true, L"[Inject Tex] Injecting custom license disclaimer... ");
 
         load_op           = new tbf_tex_load_s;
@@ -3358,7 +3382,7 @@ tbf::RenderFix::TextureManager::purge (void)
     reclaimed  += base_size;
   }
 
-  tex_log->Log ( L"[ Tex. Mgr ]   %4d textures (%4d remain)",
+  tex_log->Log ( L"[ Tex. Mgr ]   %4d textures (%4zu remain)",
                    released,
                      textures.size () );
 
@@ -3589,7 +3613,7 @@ ResampleTexture (tbf_tex_load_s* load)
   QueryPerformanceFrequency (&load->freq);
   QueryPerformanceCounter   (&load->start);
 
-  D3DXIMAGE_INFO img_info;
+  D3DXIMAGE_INFO img_info = { };
 
   D3DXGetImageInfoFromFileInMemory (
     load->pSrcData,
@@ -3612,7 +3636,10 @@ ResampleTexture (tbf_tex_load_s* load)
                     0,
                       nullptr, nullptr,
                         &load->pSrc );
-  } else {
+  }
+
+  else
+  {
     tex_log->Log (L"[ Tex. Mgr ] Will not resample cubemap...");
   }
 
@@ -3629,7 +3656,8 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
   {
     DWORD dwThreadId = GetCurrentThreadId ();
 
-    if (! streaming_memory::data_len.count (dwThreadId)) {
+    if (! streaming_memory::data_len.count (dwThreadId))
+    {
       streaming_memory::data_len [dwThreadId] = 0;
       streaming_memory::data     [dwThreadId] = nullptr;
       streaming_memory::data_age [dwThreadId] = 0;
@@ -3659,7 +3687,8 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
             &num_threads_init,
               config.textures.worker_threads * 3,
                 config.textures.worker_threads * 3
-          ) < (ULONG)config.textures.worker_threads * 3 ) {
+          ) < (ULONG)config.textures.worker_threads * 3 )
+  {
     SwitchToThread ();
   }
 
@@ -3687,7 +3716,8 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
 
       start_load ();
       {
-        if (pStream->type == tbf_tex_load_s::Resample) {
+        if (pStream->type == tbf_tex_load_s::Resample)
+        {
           InterlockedIncrement      (&resampling);
 
           QueryPerformanceFrequency (&pStream->freq);
@@ -3704,7 +3734,10 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
             pThread->pool_->postFinished (pStream);
 
           pThread->finishJob ();
-        } else {
+        }
+
+        else
+        {
           InterlockedIncrement        (&streaming);
           InterlockedExchangeAdd      (&streaming_bytes, pStream->SrcDataSize);
 
@@ -3741,14 +3774,17 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
       streaming_memory::trim (MIN_SIZE, timeGetTime () - MIN_AGE);
 
       size_t now    =  streaming_memory::data_len [GetCurrentThreadId ()];
-      if (before != now) {
-        tex_log->Log ( L"[ Mem. Mgr ]  Trimmed %9lu bytes of temporary memory for tid=%x",
+
+      if (before != now)
+      {
+        tex_log->Log ( L"[ Mem. Mgr ]  Trimmed %9lzu bytes of temporary memory for tid=%x",
                          before - now,
                            GetCurrentThreadId () );
       }
     }
 
-    else if (dwWaitStatus != (wait.thread_end)) {
+    else if (dwWaitStatus != (wait.thread_end))
+    {
       dll_log->Log ( L"[ Tex. Mgr ] Unexpected Worker Thread Wait Status: %X",
                        dwWaitStatus );
     }

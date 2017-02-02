@@ -1,6 +1,8 @@
 // ImGui - standalone example application for DirectX 9
 // If you are new to ImGui, see examples/README.txt and documentation at the top of imgui.cpp.
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <imgui/imgui.h>
 #include <d3d9.h>
 #define DIRECTINPUT_VERSION 0x0800
