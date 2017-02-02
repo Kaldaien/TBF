@@ -85,6 +85,7 @@ struct {
   tbf::ParameterInt*     worker_threads;
   tbf::ParameterBool*    show_loading_text;
   tbf::ParameterBool*    quick_load;
+  tbf::ParameterBool*    clamp_npot_coords;
 } textures;
 
 
@@ -284,6 +285,16 @@ TBF_LoadConfig (std::wstring name)
       L"Texture.System",
         L"QuickLoad" );
 
+  textures.clamp_npot_coords = 
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Clamp Coordinates of NPOT Textures (cannot be filtered correctly)")
+      );
+  textures.clamp_npot_coords->register_to_ini (
+    render_ini,
+      L"Texture.System",
+        L"ClampNonPowerOf2Coords" );
+
 
   render.dump_shaders = 
     static_cast <tbf::ParameterBool *>
@@ -452,6 +463,7 @@ TBF_LoadConfig (std::wstring name)
   textures.worker_threads->load    (config.textures.worker_threads);
   textures.show_loading_text->load (config.textures.show_loading_text);
   textures.quick_load->load        (config.textures.quick_load);
+  textures.clamp_npot_coords->load (config.textures.clamp_npot_coords);
 
   if (empty)
     return false;
@@ -486,6 +498,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   textures.worker_threads->store    (config.textures.worker_threads);
   textures.show_loading_text->store (config.textures.show_loading_text);
   textures.quick_load->store        (config.textures.quick_load);
+  textures.clamp_npot_coords->store (config.textures.clamp_npot_coords);
 
   input.gamepad.texture_set->store (config.input.gamepad.texture_set);
 

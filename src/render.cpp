@@ -132,24 +132,27 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
                    //Sampler, Type, Value );
 
   // Pending removal - these are not configurable tweaks and not particularly useful
-  if (Type == D3DSAMP_MIPFILTER ||
-      Type == D3DSAMP_MINFILTER ||
-      Type == D3DSAMP_MAGFILTER ||
-      Type == D3DSAMP_MIPMAPLODBIAS) {
+  if ( Type == D3DSAMP_MIPFILTER ||
+       Type == D3DSAMP_MINFILTER ||
+       Type == D3DSAMP_MAGFILTER ||
+       Type == D3DSAMP_MIPMAPLODBIAS )
+  {
     //dll_log->Log (L" [!] IDirect3DDevice9::SetSamplerState (...)");
 
-    if (Type <= 8) {
+    if (Type <= 8)
+    {
       //dll_log->Log (L" %s Filter: %x", Type == D3DSAMP_MIPFILTER ? L"Mip" : Type == D3DSAMP_MINFILTER ? L"Min" : L"Mag", Value);
       if (Type == D3DSAMP_MIPFILTER && Value != D3DTEXF_NONE) {
         Value = D3DTEXF_LINEAR;
       }
 
-      if (Type == D3DSAMP_MAGFILTER ||
-          Type == D3DSAMP_MINFILTER)
-        if (Value != D3DTEXF_POINT)
+      if ( Type == D3DSAMP_MAGFILTER ||
+           Type == D3DSAMP_MINFILTER )
+        if ( Value != D3DTEXF_POINT )
           Value = D3DTEXF_ANISOTROPIC;
 
-      if (Type == D3DSAMP_MIPMAPLODBIAS) {
+      if (Type == D3DSAMP_MIPMAPLODBIAS)
+      {
         float fMax = config.textures.lod_bias;
 
         Value = *reinterpret_cast <DWORD *> (&fMax);
@@ -157,8 +160,8 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
     }
   }
 
-  if (Type == D3DSAMP_MAXMIPLEVEL)
-    Value = 0;
+  //if (Type == D3DSAMP_MAXMIPLEVEL)
+    //Value = 0;
 
   return D3D9SetSamplerState_Original (This, Sampler, Type, Value);
 }
@@ -601,25 +604,36 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
   else
   {
-    extern bool __show_cache;
+    extern bool  __show_cache;
+    extern DWORD last_queue_update;
 
-    if (__show_cache) {
-      static std::string output;
+    if (last_queue_update + 250 < timeGetTime ())
+      mod_text = "";
+
+    if (__show_cache)
+    {
+      std::string output;
 
       output  = "Texture Cache\n";
       output += "-------------\n";
       output += tbf::RenderFix::tex_mgr.osdStats ();
 
-      output += mod_text;
+      if (! mod_text.empty ()) {
+        output += "\n";
+        output += mod_text;
+      }
 
       SKX_DrawExternalOSD ("ToBFix", output.c_str ());
 
       output = "";
-    } else
-      SKX_DrawExternalOSD ("ToBFix", mod_text.c_str ());
-  }
+    }
 
-  mod_text = "";
+    else if (config.textures.show_loading_text)
+      SKX_DrawExternalOSD ("ToBFix", mod_text.c_str ());
+
+    else
+      SKX_DrawExternalOSD ("ToBFix", "");
+  }
 
   HRESULT hr = D3D9EndScene_Original (This);
 
@@ -872,8 +886,8 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   {
     D3DVIEWPORT9 rescaled_map = *pViewport;
 
-    rescaled_map.Width  = tbf::RenderFix::width;
-    rescaled_map.Height = tbf::RenderFix::height;
+    rescaled_map.Width  *= 2;//tbf::RenderFix::width;
+    rescaled_map.Height *= 2;//tbf::RenderFix::height;
 
     return D3D9SetViewport_Original (This, &rescaled_map);
   }

@@ -79,6 +79,7 @@ struct tbf_config_t
     int32_t  max_decomp_jobs     =  6;
     bool     show_loading_text   =  false;
     bool     quick_load          =  false;
+    bool     clamp_npot_coords   =  false;
   } textures;
 
   struct {

@@ -30,7 +30,7 @@ bool show_config        = true;
 bool show_special_k_cfg = false;
 bool show_test_window   = false;
 
-ImVec4 clear_col = ImColor(114, 144, 154);
+ImVec4 clear_col = ImColor (114, 144, 154);
 
 struct {
   std::vector <const char*> array;
@@ -328,7 +328,8 @@ TBFix_DrawConfigUI (void)
     if (ImGui::CollapsingHeader ("Experimental")) {
       ImGui::TreePush ("");
 
-      need_restart |= ImGui::Checkbox ("Enable map menu resolution fix", &config.render.fix_map_res);
+      tbf::RenderFix::need_reset.graphics |=
+        ImGui::Checkbox ("Enable map menu resolution fix", &config.render.fix_map_res);
 
       if (ImGui::IsItemHovered ())
       {
@@ -339,6 +340,13 @@ TBFix_DrawConfigUI (void)
         ImGui::Bullet     (); ImGui::SameLine ();
         ImGui::Text       ("That is where you come in, my faithful guinea pig >:)" );
         ImGui::EndTooltip ();
+      }
+
+      ImGui::Checkbox ("Clamp Non-Power-Of-Two Texture Coordinates", &config.textures.clamp_npot_coords);
+
+      if (ImGui::IsItemHovered ())
+      {
+        ImGui::SetTooltip ("Fixes blurring and black line artifacts on key UI elements, but may break third-party overlays...");
       }
 
       ImGui::TreePop      ();
@@ -562,7 +570,7 @@ TBFix_DrawConfigUI (void)
         }
       }
 
-      if (ImGui::Button ("Refresh Texture List"))
+      if (ImGui::Button ("Refresh Textures"))
       {
         SK_ICommandProcessor& command =
           *SK_GetCommandProcessor ();
@@ -578,14 +586,18 @@ TBFix_DrawConfigUI (void)
 
       ImGui::SameLine ();
 
-      if (ImGui::Button ("Clear Debug Flag"))
+      if (ImGui::Button ("Clear Debug"))
       {
         sel                         = -1;
         debug_tex_id                =  0;
         textures_used_last_dump.clear ();
       }
 
-      if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("Exits texture deubg mode.");
+      if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("Exits texture debug mode.");
+
+      //if (ImGui::Button ("Dump Selected"))
+      //{
+      //}
 
       if ( ImGui::ListBox (
             "", &sel,

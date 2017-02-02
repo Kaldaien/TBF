@@ -181,6 +181,22 @@ namespace RenderFix {
     ULONG                    getHitCount  (void) { return InterlockedExchangeAdd (&hits,   0UL);    }
     ULONG                    getMissCount (void) { return InterlockedExchangeAdd (&misses, 0UL);    }
 
+
+
+    BOOL                     isTexturePowerOfTwo (UINT sampler)
+    {
+      return sampler_flags [sampler < 255 ? sampler : 255].power_of_two;
+    }
+
+    // Sttate of the active texture for each sampler,
+    //   needed to correct some texture coordinate address
+    //     problems in the base game.
+    struct
+    {
+      BOOL power_of_two;
+    } sampler_flags [256] = { 0 };
+
+
   private:
     std::unordered_map <uint32_t, tbf::RenderFix::Texture*> textures;
     float                                                   time_saved     = 0.0f;

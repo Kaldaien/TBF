@@ -123,20 +123,22 @@ void TBFix_LoadQueuedTextures (void);
 #include <set>
 #include <queue>
 #include <vector>
+#include <unordered_set>>
 #include <unordered_map>
 
 // All of the enumerated textures in TBFix_Textures/inject/...
 std::unordered_map <uint32_t, tbf_tex_record_s> injectable_textures;
 std::vector        <std::wstring>               archives;
-std::set           <uint32_t>                   dumped_textures;
+std::unordered_set <uint32_t>                   dumped_textures;
 
 // The set of textures used during the last frame
 std::vector        <uint32_t>                   textures_last_frame;
 std::set           <uint32_t>                   textures_used;
+std::unordered_set <uint32_t>                   non_power_of_two_textures;
 
 // Textures that we will not allow injection for
 //   (primarily to speed things up, but also for EULA-related reasons).
-std::set           <uint32_t>                   inject_blacklist;
+std::unordered_set <uint32_t>                   inject_blacklist;
 
 std::wstring
 SK_D3D9_UsageToStr (DWORD dwUsage)
@@ -627,7 +629,8 @@ D3D9SetTexture_Detour (
 
   void* dontcare;
   if ( pTexture != nullptr &&
-       pTexture->QueryInterface (IID_SKTextureD3D9, &dontcare) == S_OK ) {
+       pTexture->QueryInterface (IID_SKTextureD3D9, &dontcare) == S_OK )
+  {
     ISKTextureD3D9* pSKTex =
       (ISKTextureD3D9 *)pTexture;
 
@@ -657,12 +660,28 @@ D3D9SetTexture_Detour (
 
     if (pSKTex->tex_crc32 == (uint32_t)debug_tex_id)
       pTexture = nullptr;
-  }
+
+    if (pTexture != nullptr)
+    {
+      //
+      // Fix UI Blurring and Artifacts on Certain Textures
+      //
+      if (config.textures.clamp_npot_coords)
+      {
+        if (non_power_of_two_textures.count (pSKTex->tex_crc32))
+        {
+          This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
+          This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
+          This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP );
+        }
+      }
+    }
 
 #if 0
   if (pTexture != nullptr) tsf::RenderFix::active_samplers.insert (Sampler);
   else                     tsf::RenderFix::active_samplers.erase  (Sampler);
 #endif
+  }
 
   return D3D9SetTexture (This, Sampler, pTexture);
 }
@@ -706,49 +725,11 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
                     SK_D3D9_PoolToStr   (Pool) );
 #endif
 
-  if (Usage == D3DUSAGE_RENDERTARGET && config.render.fix_map_res)
-  {
-    if (Width == tbf::RenderFix::width / 10 && Height == tbf::RenderFix::height / 10) {
-      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-    }
-    if (Width == tbf::RenderFix::width / 9  && Height == tbf::RenderFix::height / 9) {
-      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-    }
-    if (Width == tbf::RenderFix::width / 8  && Height == tbf::RenderFix::height / 8) {
-      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-    }
-    if (Width == tbf::RenderFix::width / 7  && Height == tbf::RenderFix::height / 7) {
-      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-    }
-    if (Width == tbf::RenderFix::width / 6  && Height == tbf::RenderFix::height / 6) {
-      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-    }
-    if (Width == tbf::RenderFix::width / 5  && Height == tbf::RenderFix::height / 5) {
-      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-    }
-    if (Width == tbf::RenderFix::width / 4  && Height == tbf::RenderFix::height / 4) {
-      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-    }
-    if (Width == tbf::RenderFix::width / 3  && Height == tbf::RenderFix::height / 3) {
-      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-    }
-    if (Width == tbf::RenderFix::width / 2  && Height == tbf::RenderFix::height / 2)
-    {
-      Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-    }
-    //if (Width == 960 && Height == 540) {
-      //Width = 3840; Height = 2160;
-    //}
-    //if (Width == 640 && Height == 360) {
-      //Width = 3840; Height = 2160;
-    //}
-  }
-
   //
   // Model Shadows
   //
   if (Width == Height && (Width == 64 || Width == 128 || Width == 256) &&
-                          Usage == D3DUSAGE_RENDERTARGET) {
+                          (Usage == D3DUSAGE_RENDERTARGET || Usage == D3DUSAGE_DEPTHSTENCIL)) {
     //tex_log->Log (L"[Shadow Mgr] (Model Resolution: (%lu x %lu)", Width, Height);
     // Assert (Levels == 1)
     //
@@ -762,7 +743,7 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
   }
 
   else if (Width == Height && (Height == 512 || Height == 1024 || Height == 2048 || Height == 4096) &&
-                          Usage == D3DUSAGE_RENDERTARGET) {
+                          (Usage == D3DUSAGE_RENDERTARGET || Usage == D3DUSAGE_DEPTHSTENCIL)) {
       //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
       uint32_t shift = config.render.env_shadow_rescale;
 
@@ -783,15 +764,51 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     }
   }
 
-  else if (Usage == D3DUSAGE_DEPTHSTENCIL) {
-    if (Width == Height && (Height == 512 || Height == 1024 || Height == 2048 || Height == 4096)) {
-      //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
-      uint32_t shift = config.render.env_shadow_rescale;
-
-      Width  <<= shift;
-      Height <<= shift;
+  else if ((Usage == D3DUSAGE_RENDERTARGET || Usage == D3DUSAGE_DEPTHSTENCIL) && config.render.fix_map_res)
+  {
+    if (Width == tbf::RenderFix::width / 11 && Height == tbf::RenderFix::height / 11) {
+      Width *= 2; Height *= 2;
     }
+    else if (Width == tbf::RenderFix::width / 10 && Height == tbf::RenderFix::height / 10) {
+      Width *= 2; Height *= 2;
+    }
+    else if (Width == tbf::RenderFix::width / 9  && Height == tbf::RenderFix::height / 9) {
+      Width *= 2; Height *= 2;
+    }
+    else if (Width == tbf::RenderFix::width / 8  && Height == tbf::RenderFix::height / 8) {
+      Width *= 2; Height *= 2;
+    }
+    else if (Width == tbf::RenderFix::width / 7  && Height == tbf::RenderFix::height / 7) {
+      Width *= 2; Height *= 2;
+    }
+    else if (Width == tbf::RenderFix::width / 6  && Height == tbf::RenderFix::height / 6) {
+      Width *= 2; Height *= 2;
+    }
+    else if (Width == tbf::RenderFix::width / 5  && Height == tbf::RenderFix::height / 5) {
+      Width *= 2; Height *= 2;
+    }
+    else if (Width == tbf::RenderFix::width / 4  && Height == tbf::RenderFix::height / 4) {
+      Width *= 2; Height *= 2;
+    }
+    else if (Width == tbf::RenderFix::width / 3  && Height == tbf::RenderFix::height / 3) {
+      Width *= 2; Height *= 2;
+    }
+    else if (Width == tbf::RenderFix::width / 2  && Height == tbf::RenderFix::height / 2)
+    {
+      Width *= 2; Height *= 2;
+    }
+    //if (Width == 960 && Height == 540) {
+      //Width = 3840; Height = 2160;
+    //}
+    //if (Width == 640 && Height == 360) {
+      //Width = 3840; Height = 2160;
+    //}
+
+    int levels = Levels;
+
+    // ASSERT: Levels == 1
   }
+
 
   int levels = Levels;
 
@@ -1316,7 +1333,8 @@ private:
 //   This is a simple, but remarkably effective approach and
 //     further optimization work probably will not be done.
 //
-struct SK_StreamSplitter {
+struct SK_StreamSplitter
+{
   bool working (void) {
     if (lrg_tex && lrg_tex->working ())
       return true;
@@ -1327,8 +1345,9 @@ struct SK_StreamSplitter {
     return false;
   }
 
-  int queueLength (void) {
-    int len = 0;
+  size_t queueLength (void)
+  {
+    size_t len = 0;
 
     if (lrg_tex) len += lrg_tex->queueLength ();
     if (sm_tex)  len += sm_tex->queueLength  ();
@@ -1384,7 +1403,7 @@ CRITICAL_SECTION              cs_tex_inject;
 
 std::set <DWORD> inject_tids;
 
-volatile  LONG streaming       = 0UL;
+volatile  LONG streaming       = 0L;
 volatile ULONG streaming_bytes = 0L;
 
 volatile  LONG resampling      = 0L;
@@ -1431,7 +1450,7 @@ pending_streams (void)
 {
   bool ret = false;
 
-  if (streaming || stream_pool.queueLength () || (resample_pool && resample_pool->queueLength ()))
+  if (InterlockedExchangeAdd (&streaming, 0) || stream_pool.queueLength () || (resample_pool && resample_pool->queueLength ()))
     ret = true;
 
   return ret;
@@ -1736,65 +1755,94 @@ InjectTexture (tbf_tex_load_s* load)
   return hr;
 }
 
+CRITICAL_SECTION osd_cs           = { };
+DWORD           last_queue_update =   0;
+
+void
+TBFix_UpdateQueueOSD (void)
+{
+  if (config.textures.show_loading_text)
+  {
+    DWORD dwTime = timeGetTime ();
+
+    //if (TryEnterCriticalSection (&osd_cs))
+    {
+      extern std::string mod_text;
+
+      LONG resample_count = InterlockedExchangeAdd (&resampling, 0); size_t queue_len = resample_pool->queueLength ();
+      LONG stream_count   = InterlockedExchangeAdd (&streaming,  0); size_t to_stream = textures_to_stream.size    ();
+
+      bool is_resampling = (resample_pool->working () || resample_count || queue_len);
+      bool is_streaming  = (stream_pool.working    () || stream_count   || to_stream);
+
+      static std::string resampling_text; static DWORD dwLastResample = 0;
+      static std::string streaming_text;  static DWORD dwLastStream   = 0;
+      
+      if (is_resampling)
+      {
+        int count = queue_len + resample_count;
+
+            char szFormatted [64];
+        sprintf (szFormatted, "  Resampling: %li texture", count);
+
+        resampling_text  = szFormatted;
+        resampling_text += (count != 1) ? 's' : ' ';
+
+        if (queue_len)
+        {
+          sprintf (szFormatted, " (%zu queued)", queue_len);
+          resampling_text += szFormatted;
+        }
+
+        resampling_text += "\n";
+
+        if (count)
+          dwLastResample = dwTime;
+      }
+      
+      if (is_streaming)
+      {
+        int count = stream_count + to_stream;
+
+            char szFormatted [64];
+        sprintf (szFormatted, "  Streaming:  %li texture", count);
+
+        streaming_text  = szFormatted;
+        streaming_text += (count != 1) ? 's' : ' ';
+
+        sprintf (szFormatted, " [%7.2f MiB]", (double)InterlockedExchangeAdd (&streaming_bytes, 0) / (1024.0f * 1024.0f));
+        streaming_text += szFormatted;
+
+        if (to_stream)
+        {
+          sprintf (szFormatted, " (%zu queued)", to_stream);
+          streaming_text += szFormatted;
+        }
+
+        if (count)
+          dwLastStream = dwTime;
+      }
+
+      if (dwLastResample < dwTime - 150)
+        resampling_text = "";
+
+      if (dwLastStream < dwTime - 150)
+        streaming_text = "";
+
+      mod_text = resampling_text + streaming_text;
+
+      if (mod_text != "")
+        last_queue_update = dwTime;
+      
+      //LeaveCriticalSection (&osd_cs);
+    }
+  }
+}
+
 void
 TBFix_LoadQueuedTextures (void)
 {
-  extern std::string mod_text;
-  mod_text = "";
-
-  static DWORD         dwTime = timeGetTime ();
-  static unsigned char spin    = 193;
-
-  if (dwTime < timeGetTime ()-100UL)
-    spin++;
-
-  if (spin > 199)
-    spin = 193;
-
-  if (config.textures.show_loading_text) {
-    if (resample_pool->working ()) {
-      mod_text += spin;
-
-      char szFormatted [64];
-      sprintf (szFormatted, "  Resampling: %li texture", InterlockedExchangeAdd (&resampling, 0));
-
-      mod_text += szFormatted;
-
-      if (InterlockedExchangeAdd (&resampling, 0) > 1)
-        mod_text += 's';
-
-      size_t queue_len = resample_pool->queueLength ();
-
-      if (queue_len) {
-        sprintf (szFormatted, " (%zu queued)", queue_len);
-        mod_text += szFormatted;
-      }
-
-      mod_text += "\n\n";
-    }
-  
-    if (stream_pool.working ()) {
-      mod_text += spin;
-
-      char szFormatted [64];
-      sprintf (szFormatted, "  Streaming: %li texture", InterlockedExchangeAdd (&streaming, 0));
-
-      mod_text += szFormatted;
-
-      if (InterlockedExchangeAdd (&streaming, 0) > 1)
-        mod_text += 's';
-
-      sprintf (szFormatted, " [%7.2f MiB]", (double)InterlockedExchangeAdd (&streaming_bytes, 0) / (1024.0f * 1024.0f));
-      mod_text += szFormatted;
-
-      if (config.textures.show_loading_text) {
-        if (textures_to_stream.size ()) {
-          sprintf (szFormatted, " (%zu outstanding)", textures_to_stream.size ());
-          mod_text += szFormatted;
-        }
-      }
-    }
-  }
+  TBFix_UpdateQueueOSD ();
 
   int loads = 0;
 
@@ -1804,13 +1852,15 @@ TBFix_LoadQueuedTextures (void)
   if (resample_pool != nullptr)
     finished_resamples = resample_pool->getFinished ();
 
-  for (auto it = finished_resamples.begin (); it != finished_resamples.end (); /*it++*/) {
+  for (auto it = finished_resamples.begin (); it != finished_resamples.end (); /*it++*/)
+  {
     tbf_tex_load_s* load =
       *it;
 
     QueryPerformanceCounter (&load->end);
 
-    if (true) {
+    if (true)
+    {
       tex_log->Log ( L"[%s] Finished %s texture %08x (%5.2f MiB in %9.4f ms)",
                        (load->type == tbf_tex_load_s::Stream) ? L"Inject Tex" :
                          (load->type == tbf_tex_load_s::Immediate) ? L"Inject Tex" :
@@ -1835,11 +1885,16 @@ TBFix_LoadQueuedTextures (void)
     ISKTextureD3D9* pSKTex =
       (ISKTextureD3D9 *)load->pDest;
 
-    if (pSKTex != nullptr) {
-      if (pSKTex->refs == 0 && load->pSrc != nullptr) {
+    if (pSKTex != nullptr)
+    {
+      if (pSKTex->refs == 0 && load->pSrc != nullptr)
+      {
         tex_log->Log (L"[ Tex. Mgr ] >> Original texture no longer referenced, discarding new one!");
         load->pSrc->Release ();
-      } else {
+      }
+
+      else
+      {
         QueryPerformanceCounter (&pSKTex->last_used);
 
         pSKTex->pTexOverride  = load->pSrc;
@@ -1863,13 +1918,15 @@ TBFix_LoadQueuedTextures (void)
     delete load;
   }
 
-  for (auto it = finished_streams.begin (); it != finished_streams.end (); /*it++*/) {
+  for (auto it = finished_streams.begin (); it != finished_streams.end (); /*it++*/)
+  {
     tbf_tex_load_s* load =
       *it;
 
     QueryPerformanceCounter (&load->end);
 
-    if (true) {
+    if (true)
+    {
       tex_log->Log ( L"[%s] Finished %s texture %08x (%5.2f MiB in %9.4f ms)",
                        (load->type == tbf_tex_load_s::Stream) ? L"Inject Tex" :
                          (load->type == tbf_tex_load_s::Immediate) ? L"Inject Tex" :
@@ -1886,7 +1943,8 @@ TBFix_LoadQueuedTextures (void)
     tbf::RenderFix::Texture* pTex =
       tbf::RenderFix::tex_mgr.getTexture (load->checksum);
 
-    if (pTex != nullptr) {
+    if (pTex != nullptr)
+    {
       pTex->load_time = (float)(1000.0 * (double)(load->end.QuadPart - load->start.QuadPart) /
                                            (double)load->freq.QuadPart);
     }
@@ -1894,11 +1952,16 @@ TBFix_LoadQueuedTextures (void)
     ISKTextureD3D9* pSKTex =
       (ISKTextureD3D9 *)load->pDest;
 
-    if (pSKTex != nullptr) {
-      if (pSKTex->refs == 0 && load->pSrc != nullptr) {
+    if (pSKTex != nullptr)
+    {
+      if (pSKTex->refs == 0 && load->pSrc != nullptr)
+      {
         tex_log->Log (L"[ Tex. Mgr ] >> Original texture no longer referenced, discarding new one!");
         load->pSrc->Release ();
-      } else {
+      }
+
+      else
+      {
         QueryPerformanceCounter (&pSKTex->last_used);
 
         pSKTex->pTexOverride  = load->pSrc;
@@ -1927,7 +1990,8 @@ TBFix_LoadQueuedTextures (void)
   //
   static uint64_t last_size = 0ULL;
 
-  if (last_size != tbf::RenderFix::tex_mgr.cacheSizeTotal () ) {
+  if (last_size != tbf::RenderFix::tex_mgr.cacheSizeTotal () )
+  {
     last_size = tbf::RenderFix::tex_mgr.cacheSizeTotal ();
 
     if ( last_size >
@@ -1935,8 +1999,12 @@ TBFix_LoadQueuedTextures (void)
       __need_purge = true;
   }
 
-  if ((! InterlockedExchangeAdd (&streaming, 0)) && (! InterlockedExchangeAdd (&resampling, 0)) && (! pending_loads ())) {
-    if (__need_purge) {
+  if ( (! InterlockedExchangeAdd (&streaming,  0)) &&
+       (! InterlockedExchangeAdd (&resampling, 0)) &&
+       (! pending_loads ()) )
+  {
+    if (__need_purge)
+    {
       tbf::RenderFix::tex_mgr.purge ();
       __need_purge = false;
     }
@@ -1946,8 +2014,9 @@ TBFix_LoadQueuedTextures (void)
 }
 
 #include <set>
+
 std::set <uint32_t> resample_blacklist;
-bool resample_blacklist_init = false;
+bool                resample_blacklist_init = false;
 
 void
 TBFix_ReloadPadButtons (void)
@@ -2134,21 +2203,38 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
         (! injectable_textures.count (checksum)) )
     Usage = D3DUSAGE_DYNAMIC;
 
+
+  D3DXIMAGE_INFO info = { 0 };
+  D3DXGetImageInfoFromFileInMemory (pSrcData, SrcDataSize, &info);
+
+
+  bool power_of_two_in_one_way =  
+    (! (info.Width  & (info.Width  - 1)))  !=  (! (info.Height & (info.Height - 1)));
+
+
+  // Textures that would be incorrectly filtered if resampled
+  if (power_of_two_in_one_way)
+    non_power_of_two_textures.insert (checksum);
+
+
   // Generate complete mipmap chains for best image quality
   //  (will increase load-time on uncached textures)
-  if ((Pool == D3DPOOL_DEFAULT) && config.textures.remaster) {
-    D3DXIMAGE_INFO info = { 0 };
-    D3DXGetImageInfoFromFileInMemory (pSrcData, SrcDataSize, &info);
+  if ((Pool == D3DPOOL_DEFAULT) && config.textures.remaster)
+  {
+    if (true)
+    {
+      bool power_of_two_in =
+        (! (info.Width  & (info.Width  - 1)))  &&  (! (info.Height & (info.Height - 1)));
 
-    D3DFORMAT fmt_real = info.Format;
+      bool power_of_two_out =
+        (! (Width  & (Width  - 1)))            &&  (! (Height & (Height - 1)));
 
-    if (true) {//fmt_real == D3DFMT_DXT1 ||
-        //fmt_real == D3DFMT_DXT3 ||
-        //fmt_real == D3DFMT_DXT5) {
-      if (/*info.Width >= 128 && info.Height >= 128 && */ info.MipLevels > 1 || config.textures.uncompressed) {
-        // Don't resample faces
-        if ( resample_blacklist.count (checksum) == 0 )
+      if (power_of_two_in && power_of_two_out)
+      {
+        if (info.MipLevels > 1 || config.textures.uncompressed)
+        {
           resample = true;
+        }
       }
     }
   }
@@ -2210,7 +2296,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     }
   }
 
-  bool will_replace = config.textures.quick_load && (load_op != nullptr || resample);
+  bool will_replace = config.textures.quick_load && resample;
 
   //tex_log->Log (L"D3DXCreateTextureFromFileInMemoryEx (... MipLevels=%lu ...)", MipLevels);
   hr =
@@ -2674,6 +2760,7 @@ void
 tbf::RenderFix::TextureManager::Init (void)
 {
   InitializeCriticalSectionAndSpinCount (&cs_cache, 16384UL);
+  InitializeCriticalSectionAndSpinCount (&osd_cs,   2UL);
 
   // Create the directory to store dumped textures
   if (config.textures.dump)
@@ -2997,50 +3084,52 @@ tbf::RenderFix::TextureManager::Init (void)
                        files, (double)liSize.QuadPart / (1024.0 * 1024.0) );
   }
 
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9SetRenderState_Override",
                         D3D9SetRenderState_Detour,
               (LPVOID*)&D3D9SetRenderState );
 
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9BeginScene_Override",
                         D3D9BeginScene_Detour,
               (LPVOID*)&D3D9BeginScene );
 
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9StretchRect_Override",
                         D3D9StretchRect_Detour,
               (LPVOID*)&D3D9StretchRect );
 
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9CreateDepthStencilSurface_Override",
                         D3D9CreateDepthStencilSurface_Detour,
               (LPVOID*)&D3D9CreateDepthStencilSurface );
 
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9CreateTexture_Override",
                         D3D9CreateTexture_Detour,
               (LPVOID*)&D3D9CreateTexture );
 
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9SetTexture_Override",
                         D3D9SetTexture_Detour,
               (LPVOID*)&D3D9SetTexture );
 
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9SetRenderTarget_Override",
                         D3D9SetRenderTarget_Detour,
               (LPVOID*)&D3D9SetRenderTarget );
 
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9SetDepthStencilSurface_Override",
                         D3D9SetDepthStencilSurface_Detour,
               (LPVOID*)&D3D9SetDepthStencilSurface );
 
-  TBF_CreateDLLHook ( L"D3DX9_43.DLL",
+  TBF_CreateDLLHook2 ( L"D3DX9_43.DLL",
                         "D3DXCreateTextureFromFileInMemoryEx",
                          D3DXCreateTextureFromFileInMemoryEx_Detour,
               (LPVOID *)&D3DXCreateTextureFromFileInMemoryEx_Original );
+
+  TBF_ApplyQueuedHooks ();
 
   D3DXSaveTextureToFile =
     (D3DXSaveTextureToFile_pfn)
@@ -3155,6 +3244,7 @@ tbf::RenderFix::TextureManager::Shutdown (void)
   DeleteCriticalSection (&cs_tex_inject);
 
   DeleteCriticalSection (&cs_cache);
+  DeleteCriticalSection (&osd_cs);
 
   CloseHandle (decomp_semaphore);
 
@@ -3508,7 +3598,8 @@ ResampleTexture (tbf_tex_load_s* load)
 
   HRESULT hr = E_FAIL;
 
-  if (img_info.Depth == 1) {
+  if (img_info.Depth == 1)
+  {
     hr =
     D3DXCreateTextureFromFileInMemoryEx_Original (
       load->pDevice,
@@ -3597,33 +3688,33 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
       start_load ();
       {
         if (pStream->type == tbf_tex_load_s::Resample) {
-          InterlockedIncrement   (&resampling);
+          InterlockedIncrement      (&resampling);
 
           QueryPerformanceFrequency (&pStream->freq);
           QueryPerformanceCounter   (&pStream->start);
 
           HRESULT hr =
-            ResampleTexture (pStream);//InjectTexture (pStream);
+            ResampleTexture (pStream);
 
-          QueryPerformanceCounter (&pStream->end);
+          QueryPerformanceCounter   (&pStream->end);
 
-          InterlockedDecrement   (&resampling);
+          InterlockedDecrement      (&resampling);
 
           if (SUCCEEDED (hr))
             pThread->pool_->postFinished (pStream);
 
           pThread->finishJob ();
         } else {
-          InterlockedIncrement   (&streaming);
-          InterlockedExchangeAdd (&streaming_bytes, pStream->SrcDataSize);
+          InterlockedIncrement        (&streaming);
+          InterlockedExchangeAdd      (&streaming_bytes, pStream->SrcDataSize);
 
-          QueryPerformanceFrequency (&pStream->freq);
-          QueryPerformanceCounter   (&pStream->start);
+          QueryPerformanceFrequency   (&pStream->freq);
+          QueryPerformanceCounter     (&pStream->start);
 
           HRESULT hr =
             InjectTexture (pStream);
 
-          QueryPerformanceCounter (&pStream->end);
+          QueryPerformanceCounter     (&pStream->end);
 
           InterlockedExchangeSubtract (&streaming_bytes, pStream->SrcDataSize);
           InterlockedDecrement        (&streaming);
