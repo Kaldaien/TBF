@@ -192,32 +192,6 @@ tbf::InputFix::Shutdown (void)
 {
 }
 
-typedef enum
-{
-    SDL_CONTROLLER_BUTTON_INVALID = -1,
-    SDL_CONTROLLER_BUTTON_A,
-    SDL_CONTROLLER_BUTTON_B,
-    SDL_CONTROLLER_BUTTON_X,
-    SDL_CONTROLLER_BUTTON_Y,
-    SDL_CONTROLLER_BUTTON_BACK,
-    SDL_CONTROLLER_BUTTON_GUIDE,
-    SDL_CONTROLLER_BUTTON_START,
-    SDL_CONTROLLER_BUTTON_LEFTSTICK,
-    SDL_CONTROLLER_BUTTON_RIGHTSTICK,
-    SDL_CONTROLLER_BUTTON_LEFTSHOULDER,
-    SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
-    SDL_CONTROLLER_BUTTON_DPAD_UP,
-    SDL_CONTROLLER_BUTTON_DPAD_DOWN,
-    SDL_CONTROLLER_BUTTON_DPAD_LEFT,
-    SDL_CONTROLLER_BUTTON_DPAD_RIGHT,
-    SDL_CONTROLLER_BUTTON_MAX
-} SDL_GameControllerButton;
-
-
-typedef uint8_t     (__cdecl *SDL_GameControllerGetButton_pfn) ( LPVOID                   controller,
-                                                                 SDL_GameControllerButton button );
-                                                                          SDL_GameControllerGetButton_pfn SDL_GameControllerGetButton_Original = nullptr;
-
 typedef int         (__cdecl *SDL_ShowCursor_pfn)(int toggle);            SDL_ShowCursor_pfn SDL_ShowCursor_Original                       = nullptr;
 
 typedef const char* (__cdecl *SDL_GetHint_pfn) ( const char* name );      SDL_GetHint_pfn SDL_GetHint_Original                             = nullptr;
@@ -253,13 +227,6 @@ SDL_ShowCursor_Detour (int toggle)
   return SDL_ShowCursor_Original (toggle);
 }
 
-uint8_t
-__cdecl
-SDL_GameControllerGetButton_Detour ( LPVOID                    controller,
-                                     SDL_GameControllerButton  button )
-{
-  return SDL_GameControllerGetButton_Original (controller, button);
-}
 
 const char*
 __cdecl
@@ -372,17 +339,10 @@ SDL_GetKeyFromScancode_Detour (int scancode)
   return SDL_GetKeyFromScancode_Original (scancode);
 }
 
-typedef int16_t (__cdecl *SDL_GameControllerGetAxis_pfn) ( LPVOID joystick,
-                                                           int     axis );
-SDL_GameControllerGetAxis_pfn SDL_GameControllerGetAxis_Original = nullptr;
 
-int16_t
-__cdecl
-SDL_GameControllerGetAxis_Detour ( LPVOID controller,
-                                   int    axis )
-{
-  return SDL_GameControllerGetAxis_Original (controller, axis);
-}
+typedef int (__cdecl *SDL_NumJoysticks_pfn)(void);
+
+SDL_NumJoysticks_pfn SDL_NumJoysticks_Original = nullptr;
 
 typedef BOOL (__cdecl *SDL_IsGameController_pfn)(int joystick_index);
 SDL_IsGameController_pfn SDL_IsGameController_Original = nullptr;
@@ -391,15 +351,11 @@ BOOL
 __cdecl
 SDL_IsGameController_Detour (int joystick_index)
 {
-  if ((tbf::InputFix::ai_fix.num_virtual > 0) && joystick_index >= tbf::InputFix::ai_fix.first_virtual && joystick_index < (tbf::InputFix::ai_fix.first_virtual + tbf::InputFix::ai_fix.num_virtual))
-    return FALSE;
+  //if ((tbf::InputFix::ai_fix.num_virtual > 0) && joystick_index >= tbf::InputFix::ai_fix.first_virtual && joystick_index <= (tbf::InputFix::ai_fix.first_virtual + tbf::InputFix::ai_fix.num_virtual))
+    //return FALSE;
 
   return SDL_IsGameController_Original (joystick_index);
 }
-
-typedef int (__cdecl *SDL_NumJoysticks_pfn)(void);
-
-SDL_NumJoysticks_pfn SDL_NumJoysticks_Original = nullptr;
 
 int
 __cdecl
@@ -477,6 +433,23 @@ SDL_JoystickClose_Detour (struct SDL_Joystick* joystick)
 
   SDL_JoystickClose_Original (joystick);
 }
+
+struct SDL_GameController;
+
+
+typedef                void (__cdecl *SDL_GameControllerClose_pfn)(SDL_GameController* controller);
+typedef             int16_t (__cdecl *SDL_GameControllerGetAxis_pfn)(SDL_GameController* controller, DWORD dwAxis);
+typedef             uint8_t (__cdecl *SDL_GameControllerGetButton_pfn)(SDL_GameController* controller, DWORD dwButton);
+typedef       SDL_Joystick* (__cdecl *SDL_GameControllerGetJoystick_pfn)(SDL_GameController* controller);
+typedef               char* (__cdecl *SDL_GameControllerMapping_pfn)(SDL_GameController* controller);
+typedef SDL_GameController* (__cdecl *SDL_GameControllerOpen_pfn)(int joystick_index);
+
+SDL_GameControllerClose_pfn       SDL_GameControllerClose_Original       = nullptr;
+SDL_GameControllerGetAxis_pfn     SDL_GameControllerGetAxis_Original     = nullptr;
+SDL_GameControllerGetButton_pfn   SDL_GameControllerGetButton_Original   = nullptr;
+SDL_GameControllerGetJoystick_pfn SDL_GameControllerGetJoystick_Original = nullptr;
+SDL_GameControllerMapping_pfn     SDL_GameControllerMapping_Original     = nullptr;
+SDL_GameControllerOpen_pfn        SDL_GameControllerOpen_Original        = nullptr;
 
 
 typedef        int16_t          (__cdecl *SDL_JoystickGetAxis_pfn)(struct SDL_Joystick* joystick, int axis);
@@ -580,6 +553,69 @@ SDL_JoystickNumAxes_Detour (struct SDL_Joystick* joystick)
   return SDL_JoystickNumAxes_Original (joystick);
 }
 
+
+void
+__cdecl
+SDL_GameControllerClose_Detour (SDL_GameController* gamecontroller)
+{
+  if (gamecontroller == (SDL_GameController*)tbf::InputFix::ai_fix.pVirtual)
+    return;
+
+  return SDL_GameControllerClose_Original (gamecontroller);
+}
+
+SDL_GameController*
+__cdecl
+SDL_GameControllerOpen_Detour (int device_index)
+{
+  dll_log->Log (L"Open Controller: %lu", device_index);
+
+  if ((tbf::InputFix::ai_fix.num_virtual > 0) && device_index >= tbf::InputFix::ai_fix.first_virtual && device_index < tbf::InputFix::ai_fix.first_virtual + tbf::InputFix::ai_fix.num_virtual)
+    return SDL_GameControllerOpen_Original (0);
+
+  return SDL_GameControllerOpen_Original (0);
+}
+
+int16_t
+__cdecl
+SDL_GameControllerGetAxis_Detour (SDL_GameController* controller, DWORD dwAxis)
+{
+  if (controller == (SDL_GameController*)tbf::InputFix::ai_fix.pVirtual)
+    return 0;
+
+  return SDL_GameControllerGetAxis_Original (controller, dwAxis);
+}
+
+uint8_t
+__cdecl
+SDL_GameControllerGetButton_Detour (SDL_GameController* controller, DWORD dwButton)
+{
+  if (controller == (SDL_GameController*)tbf::InputFix::ai_fix.pVirtual)
+    return 0;
+
+  return SDL_GameControllerGetButton_Original (controller, dwButton);
+}
+
+char*
+__cdecl
+SDL_GameControllerMapping_Detour (SDL_GameController* controller)
+{
+  if (controller == (SDL_GameController*)tbf::InputFix::ai_fix.pVirtual)
+    return "TBFix Fake Map";
+
+  return SDL_GameControllerMapping_Original (controller);
+}
+
+SDL_Joystick*
+__cdecl
+SDL_GameControllerGetJoystick_Detour (SDL_GameController* controller)
+{
+  if (controller == (SDL_GameController*)tbf::InputFix::ai_fix.pVirtual)
+    return (SDL_Joystick *)controller;
+
+  return SDL_GameControllerGetJoystick_Original (controller);
+}
+
 void
 TBF_InitSDLOverride (void)
 {
@@ -612,16 +648,6 @@ TBF_InitSDLOverride (void)
                        "SDL_ShowCursor",
                        SDL_ShowCursor_Detour,
             (LPVOID *)&SDL_ShowCursor_Original);
-
-  TBF_CreateDLLHook2 ( L"SDL2.dll",
-                       "SDL_GameControllerGetButton",
-                       SDL_GameControllerGetButton_Detour,
-            (LPVOID *)&SDL_GameControllerGetButton_Original);
-
-  TBF_CreateDLLHook2 ( L"SDL2.dll",
-                       "SDL_GameControllerGetAxis",
-                       SDL_GameControllerGetAxis_Detour,
-            (LPVOID *)&SDL_GameControllerGetAxis_Original);
 
 
 
@@ -660,6 +686,37 @@ TBF_InitSDLOverride (void)
                        "SDL_JoystickGetAttached",
                        SDL_JoystickGetAttached_Detour,
             (LPVOID *)&SDL_JoystickGetAttached_Original);
+
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GameControllerOpen",
+                       SDL_GameControllerOpen_Detour,
+            (LPVOID *)&SDL_GameControllerOpen_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GameControllerClose",
+                       SDL_GameControllerClose_Detour,
+            (LPVOID *)&SDL_GameControllerClose_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GameControllerMapping",
+                       SDL_GameControllerMapping_Detour,
+            (LPVOID *)&SDL_GameControllerMapping_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GameControllerGetAxis",
+                       SDL_GameControllerGetAxis_Detour,
+            (LPVOID *)&SDL_GameControllerGetAxis_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GameControllerGetButton",
+                       SDL_GameControllerGetButton_Detour,
+            (LPVOID *)&SDL_GameControllerGetButton_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GameControllerGetJoystick",
+                       SDL_GameControllerGetJoystick_Detour,
+            (LPVOID *)&SDL_GameControllerGetJoystick_Original);
 
 
   TBF_CreateDLLHook2 ( L"SDL2.dll",
