@@ -37,11 +37,11 @@ namespace tbf
     void Shutdown ();
     
     struct ai_fix_s {
-      int  num_virtual   = 0;
-      int  first_virtual = 1;
-    
-      SDL_Joystick*    pVirtual             = (SDL_Joystick *)(LPVOID)0xDEADBEEFULL;
-      SDL_JoystickGUID virtual_guid { 0xff };
+      struct virtual_joys {
+        SDL_Joystick*    handle = (SDL_Joystick *)(LPVOID)0xDEADBEEFULL;
+        SDL_JoystickGUID guid { 0xff };
+      } joysticks [8];
+
     } extern ai_fix;
   };
 };
