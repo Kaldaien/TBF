@@ -340,10 +340,60 @@ SDL_GetKeyFromScancode_Detour (int scancode)
 }
 
 
-typedef int (__cdecl *SDL_NumJoysticks_pfn)(void);
+struct SDL_GameController;
 
-SDL_NumJoysticks_pfn SDL_NumJoysticks_Original = nullptr;
+typedef                void     (__cdecl *SDL_JoystickUpdate_pfn)(void);
+typedef                int      (__cdecl *SDL_NumJoysticks_pfn)(void);
+typedef          const char*    (__cdecl *SDL_JoystickNameForIndex_pfn)(int device_index);
+typedef                BOOL     (__cdecl *SDL_JoystickGetAttached_pfn)(struct SDL_Joystick* joystick);
+typedef        SDL_Joystick*    (__cdecl *SDL_JoystickOpen_pfn)(int device_index);
+typedef                void     (__cdecl *SDL_JoystickClose_pfn)(struct SDL_Joystick* joystick);
+typedef          const char*    (__cdecl *SDL_JoystickName_pfn)(struct SDL_Joystick* joystick);
+                                
+typedef                void     (__cdecl *SDL_GameControllerUpdate_pfn)(void);
+typedef SDL_GameController*     (__cdecl *SDL_GameControllerOpen_pfn)(int joystick_index);
+typedef                void     (__cdecl *SDL_GameControllerClose_pfn)(SDL_GameController* controller);
+typedef             int16_t     (__cdecl *SDL_GameControllerGetAxis_pfn)(SDL_GameController* controller, DWORD dwAxis);
+typedef             uint8_t     (__cdecl *SDL_GameControllerGetButton_pfn)(SDL_GameController* controller, DWORD dwButton);
+typedef       SDL_Joystick*     (__cdecl *SDL_GameControllerGetJoystick_pfn)(SDL_GameController* controller);
+typedef               char*     (__cdecl *SDL_GameControllerMapping_pfn)(SDL_GameController* controller);
 
+typedef        int16_t          (__cdecl *SDL_JoystickGetAxis_pfn)(struct SDL_Joystick* joystick, int axis);
+typedef        uint8_t          (__cdecl *SDL_JoystickGetButton_pfn)(struct SDL_Joystick* joystick, int button);
+typedef struct SDL_JoystickGUID (__cdecl *SDL_JoystickGetDeviceGUID_pfn)(struct SDL_Joystick* joystick);
+typedef        void             (__cdecl *SDL_JoystickGetGUIDString_pfn)(SDL_JoystickGUID guid, char* pszGUID, int cbGUID);
+typedef        uint8_t          (__cdecl *SDL_JoystickGetHat_pfn)(struct SDL_Joystick* joystick, int hat);
+typedef        int              (__cdecl *SDL_JoystickNumAxes_pfn)(struct SDL_Joystick* joystick);
+typedef        int              (__cdecl *SDL_JoystickNumButtons_pfn)(struct SDL_Joystick* joystick);
+typedef        int              (__cdecl *SDL_JoystickNumHats_pfn)(struct SDL_Joystick* joystick);
+
+SDL_GameControllerUpdate_pfn      SDL_GameControllerUpdate_Original      = nullptr;
+SDL_GameControllerOpen_pfn        SDL_GameControllerOpen_Original        = nullptr;
+SDL_GameControllerClose_pfn       SDL_GameControllerClose_Original       = nullptr;
+SDL_GameControllerGetAxis_pfn     SDL_GameControllerGetAxis_Original     = nullptr;
+SDL_GameControllerGetButton_pfn   SDL_GameControllerGetButton_Original   = nullptr;
+SDL_GameControllerGetJoystick_pfn SDL_GameControllerGetJoystick_Original = nullptr;
+SDL_GameControllerMapping_pfn     SDL_GameControllerMapping_Original     = nullptr;
+
+SDL_JoystickUpdate_pfn            SDL_JoystickUpdate_Original            = nullptr;
+SDL_NumJoysticks_pfn              SDL_NumJoysticks_Original              = nullptr;
+SDL_JoystickName_pfn              SDL_JoystickName_Original              = nullptr;
+SDL_JoystickNameForIndex_pfn      SDL_JoystickNameForIndex_Original      = nullptr;
+SDL_JoystickGetAttached_pfn       SDL_JoystickGetAttached_Original       = nullptr;
+SDL_JoystickOpen_pfn              SDL_JoystickOpen_Original              = nullptr;
+SDL_JoystickClose_pfn             SDL_JoystickClose_Original             = nullptr;
+
+SDL_JoystickGetAxis_pfn           SDL_JoystickGetAxis_Original           = nullptr;  
+SDL_JoystickGetButton_pfn         SDL_JoystickGetButton_Original         = nullptr;
+SDL_JoystickGetDeviceGUID_pfn     SDL_JoystickGetDeviceGUID_Original     = nullptr;
+SDL_JoystickGetGUIDString_pfn     SDL_JoystickGetGUIDString_Original     = nullptr;
+SDL_JoystickGetHat_pfn            SDL_JoystickGetHat_Original            = nullptr;
+SDL_JoystickNumAxes_pfn           SDL_JoystickNumAxes_Original           = nullptr;
+SDL_JoystickNumButtons_pfn        SDL_JoystickNumButtons_Original        = nullptr;
+SDL_JoystickNumHats_pfn           SDL_JoystickNumHats_Original           = nullptr;
+
+
+#if 0
 typedef BOOL (__cdecl *SDL_IsGameController_pfn)(int joystick_index);
 SDL_IsGameController_pfn SDL_IsGameController_Original = nullptr;
 
@@ -356,6 +406,27 @@ SDL_IsGameController_Detour (int joystick_index)
 
   return SDL_IsGameController_Original (joystick_index);
 }
+#endif
+
+void
+__cdecl
+SDL_JoystickUpdate_Detour (void)
+{
+  tbf::InputFix::ai_fix.first_virtual = SDL_NumJoysticks_Original ();
+  tbf::InputFix::ai_fix.num_virtual   = std::min (3 - tbf::InputFix::ai_fix.first_virtual, config.input.gamepad.virtual_controllers);
+
+  SDL_JoystickUpdate_Original ();
+}
+
+void
+__cdecl
+SDL_GameControllerUpdate_Detour (void)
+{
+  tbf::InputFix::ai_fix.first_virtual = SDL_NumJoysticks_Original ();
+  tbf::InputFix::ai_fix.num_virtual   = std::min (3 - tbf::InputFix::ai_fix.first_virtual, config.input.gamepad.virtual_controllers);
+
+  SDL_GameControllerUpdate_Original ();
+}
 
 int
 __cdecl
@@ -367,10 +438,6 @@ SDL_NumJoysticks_Detour (void)
   return std::min (4, SDL_NumJoysticks_Original () + tbf::InputFix::ai_fix.num_virtual);
 }
 
-
-typedef const char* (__cdecl *SDL_JoystickName_pfn)(struct SDL_Joystick* joystick);
-SDL_JoystickName_pfn SDL_JoystickName_Original = nullptr;
-
 const char*
 __cdecl
 SDL_JoystickName_Detour (struct SDL_Joystick* joystick)
@@ -380,9 +447,6 @@ SDL_JoystickName_Detour (struct SDL_Joystick* joystick)
 
   return SDL_JoystickName_Original (joystick);
 }
-
-typedef const char* (__cdecl *SDL_JoystickNameForIndex_pfn)(int device_index);
-SDL_JoystickNameForIndex_pfn SDL_JoystickNameForIndex_Original = nullptr;
 
 const char*
 __cdecl
@@ -394,9 +458,6 @@ SDL_JoystickNameForIndex_Detour (int device_index)
   return SDL_JoystickNameForIndex_Original (device_index);
 }
 
-typedef BOOL (__cdecl *SDL_JoystickGetAttached_pfn)(struct SDL_Joystick* joystick);
-SDL_JoystickGetAttached_pfn SDL_JoystickGetAttached_Original = nullptr;
-
 BOOL
 __cdecl
 SDL_JoystickGetAttached_Detour (struct SDL_Joystick* joystick)
@@ -406,9 +467,6 @@ SDL_JoystickGetAttached_Detour (struct SDL_Joystick* joystick)
 
   return SDL_JoystickGetAttached_Original (joystick);
 }
-
-typedef struct SDL_Joystick* (__cdecl *SDL_JoystickOpen_pfn)(int device_index);
-SDL_JoystickOpen_pfn SDL_JoystickOpen_Original = nullptr;
 
 struct SDL_Joystick*
 __cdecl
@@ -420,10 +478,6 @@ SDL_JoystickOpen_Detour (int device_index)
   return SDL_JoystickOpen_Original (device_index);
 }
 
-
-typedef void (__cdecl *SDL_JoystickClose_pfn)(struct SDL_Joystick* joystick);
-SDL_JoystickClose_pfn SDL_JoystickClose_Original = nullptr;
-
 void
 __cdecl
 SDL_JoystickClose_Detour (struct SDL_Joystick* joystick)
@@ -433,42 +487,6 @@ SDL_JoystickClose_Detour (struct SDL_Joystick* joystick)
 
   SDL_JoystickClose_Original (joystick);
 }
-
-struct SDL_GameController;
-
-
-typedef                void (__cdecl *SDL_GameControllerClose_pfn)(SDL_GameController* controller);
-typedef             int16_t (__cdecl *SDL_GameControllerGetAxis_pfn)(SDL_GameController* controller, DWORD dwAxis);
-typedef             uint8_t (__cdecl *SDL_GameControllerGetButton_pfn)(SDL_GameController* controller, DWORD dwButton);
-typedef       SDL_Joystick* (__cdecl *SDL_GameControllerGetJoystick_pfn)(SDL_GameController* controller);
-typedef               char* (__cdecl *SDL_GameControllerMapping_pfn)(SDL_GameController* controller);
-typedef SDL_GameController* (__cdecl *SDL_GameControllerOpen_pfn)(int joystick_index);
-
-SDL_GameControllerClose_pfn       SDL_GameControllerClose_Original       = nullptr;
-SDL_GameControllerGetAxis_pfn     SDL_GameControllerGetAxis_Original     = nullptr;
-SDL_GameControllerGetButton_pfn   SDL_GameControllerGetButton_Original   = nullptr;
-SDL_GameControllerGetJoystick_pfn SDL_GameControllerGetJoystick_Original = nullptr;
-SDL_GameControllerMapping_pfn     SDL_GameControllerMapping_Original     = nullptr;
-SDL_GameControllerOpen_pfn        SDL_GameControllerOpen_Original        = nullptr;
-
-
-typedef        int16_t          (__cdecl *SDL_JoystickGetAxis_pfn)(struct SDL_Joystick* joystick, int axis);
-typedef        uint8_t          (__cdecl *SDL_JoystickGetButton_pfn)(struct SDL_Joystick* joystick, int button);
-typedef struct SDL_JoystickGUID (__cdecl *SDL_JoystickGetDeviceGUID_pfn)(struct SDL_Joystick* joystick);
-typedef        void             (__cdecl *SDL_JoystickGetGUIDString_pfn)(SDL_JoystickGUID guid, char* pszGUID, int cbGUID);
-typedef        uint8_t          (__cdecl *SDL_JoystickGetHat_pfn)(struct SDL_Joystick* joystick, int hat);
-typedef        int              (__cdecl *SDL_JoystickNumAxes_pfn)(struct SDL_Joystick* joystick);
-typedef        int              (__cdecl *SDL_JoystickNumButtons_pfn)(struct SDL_Joystick* joystick);
-typedef        int              (__cdecl *SDL_JoystickNumHats_pfn)(struct SDL_Joystick* joystick);
-
-SDL_JoystickGetAxis_pfn        SDL_JoystickGetAxis_Original       = nullptr;  
-SDL_JoystickGetButton_pfn      SDL_JoystickGetButton_Original     = nullptr;
-SDL_JoystickGetDeviceGUID_pfn  SDL_JoystickGetDeviceGUID_Original = nullptr;
-SDL_JoystickGetGUIDString_pfn  SDL_JoystickGetGUIDString_Original = nullptr;
-SDL_JoystickGetHat_pfn         SDL_JoystickGetHat_Original        = nullptr;
-SDL_JoystickNumAxes_pfn        SDL_JoystickNumAxes_Original       = nullptr;
-SDL_JoystickNumButtons_pfn     SDL_JoystickNumButtons_Original    = nullptr;
-SDL_JoystickNumHats_pfn        SDL_JoystickNumHats_Original       = nullptr;
 
 int16_t
 __cdecl
@@ -573,7 +591,7 @@ SDL_GameControllerOpen_Detour (int device_index)
   if ((tbf::InputFix::ai_fix.num_virtual > 0) && device_index >= tbf::InputFix::ai_fix.first_virtual && device_index < tbf::InputFix::ai_fix.first_virtual + tbf::InputFix::ai_fix.num_virtual)
     return SDL_GameControllerOpen_Original (0);
 
-  return SDL_GameControllerOpen_Original (0);
+  return SDL_GameControllerOpen_Original (device_index);
 }
 
 int16_t
@@ -650,11 +668,13 @@ TBF_InitSDLOverride (void)
             (LPVOID *)&SDL_ShowCursor_Original);
 
 
+#if 0
 
   TBF_CreateDLLHook2 ( L"SDL2.dll",
                        "SDL_IsGameController",
                        SDL_IsGameController_Detour,
             (LPVOID *)&SDL_IsGameController_Original);
+#endif
 
   TBF_CreateDLLHook2 ( L"SDL2.dll",
                        "SDL_NumJoysticks",
@@ -673,6 +693,11 @@ TBF_InitSDLOverride (void)
 
 
   TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickUpdate",
+                       SDL_JoystickUpdate_Detour,
+            (LPVOID *)&SDL_JoystickUpdate_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
                        "SDL_JoystickOpen",
                        SDL_JoystickOpen_Detour,
             (LPVOID *)&SDL_JoystickOpen_Original);
@@ -687,6 +712,11 @@ TBF_InitSDLOverride (void)
                        SDL_JoystickGetAttached_Detour,
             (LPVOID *)&SDL_JoystickGetAttached_Original);
 
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_GameControllerUpdate",
+                       SDL_GameControllerUpdate_Detour,
+            (LPVOID *)&SDL_GameControllerUpdate_Original);
 
   TBF_CreateDLLHook2 ( L"SDL2.dll",
                        "SDL_GameControllerOpen",
@@ -762,7 +792,7 @@ TBF_InitSDLOverride (void)
   TBF_ApplyQueuedHooks ();
 
   tbf::InputFix::ai_fix.first_virtual = SDL_NumJoysticks_Original ();
-  tbf::InputFix::ai_fix.num_virtual   = std::min (4 - tbf::InputFix::ai_fix.first_virtual, config.input.gamepad.virtual_controllers);
+  tbf::InputFix::ai_fix.num_virtual   = std::min (3 - tbf::InputFix::ai_fix.first_virtual, config.input.gamepad.virtual_controllers);
   tbf::InputFix::ai_fix.pVirtual      = (SDL_Joystick *)(LPVOID)0xDEADBEEFULL;
 }
 
