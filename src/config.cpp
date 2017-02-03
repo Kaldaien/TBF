@@ -103,6 +103,7 @@ struct {
 struct {
   struct {
     tbf::ParameterStringW* texture_set;
+    tbf::ParameterInt*     virtual_controllers;
   } gamepad;
 } input;
 
@@ -378,6 +379,16 @@ TBF_LoadConfig (std::wstring name)
       L"Gamepad.Type",
         L"TextureSet" );
 
+  input.gamepad.virtual_controllers =
+    static_cast <tbf::ParameterInt *>
+      (g_ParameterFactory.create_parameter <int> (
+        L"Virtual Gamepad Count")
+      );
+  input.gamepad.virtual_controllers->register_to_ini (
+    gamepad_ini,
+      L"Gamepad.Type",
+        L"VirtualControllers" );
+
 
   keyboard.swap_wasd =
     static_cast <tbf::ParameterBool *>
@@ -441,7 +452,9 @@ TBF_LoadConfig (std::wstring name)
     keyboard_ini->parse ();
   }
 
-  input.gamepad.texture_set->load  (config.input.gamepad.texture_set);
+  input.gamepad.texture_set->load         (config.input.gamepad.texture_set);
+  input.gamepad.virtual_controllers->load (config.input.gamepad.virtual_controllers);
+
   keyboard.swap_wasd->load         (config.keyboard.swap_wasd);
 
   render.rescale_shadows->load     (config.render.shadow_rescale);
@@ -500,7 +513,8 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   textures.quick_load->store        (config.textures.quick_load);
   textures.clamp_npot_coords->store (config.textures.clamp_npot_coords);
 
-  input.gamepad.texture_set->store (config.input.gamepad.texture_set);
+  input.gamepad.texture_set->store         (config.input.gamepad.texture_set);
+  input.gamepad.virtual_controllers->store (config.input.gamepad.virtual_controllers);
 
   keyboard.swap_wasd->store        (config.keyboard.swap_wasd);
 

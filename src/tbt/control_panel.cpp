@@ -695,9 +695,14 @@ TBFix_DrawConfigUI (void)
 
   if (ImGui::CollapsingHeader ("Input"))
   {
-    ImGui::TreePush ("");
-    ImGui::Checkbox ("Swap WASD and Arrow Keys", &config.keyboard.swap_wasd);
-    ImGui::TreePop  (  );
+    ImGui::TreePush  ("");
+    ImGui::Checkbox  ("Swap WASD and Arrow Keys", &config.keyboard.swap_wasd);
+
+    need_restart |= ImGui::SliderInt ("Number of Virtual Controllers (AI Fix)", &config.input.gamepad.virtual_controllers, 0, 4);
+      
+    if (ImGui::IsItemHovered ())
+      ImGui::SetTooltip ("Map Players 2-4 to individual TBFix Dummy Controllers under Controller Settings, then set Strategy = Auto for Players 2-4.");
+    ImGui::TreePop   (  );
   }
 
   if (ImGui::CollapsingHeader ("Audio Configuration", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))

@@ -84,7 +84,8 @@ struct tbf_config_t
 
   struct {
     struct {
-      std::wstring texture_set   = L"XboxOne";
+      std::wstring texture_set         = L"XboxOne";
+      int          virtual_controllers = 0;
     } gamepad;
 
     struct {

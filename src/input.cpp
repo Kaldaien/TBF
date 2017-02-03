@@ -269,10 +269,6 @@ BOOL
 __cdecl
 SDL_SetHint_Detour ( const char* name, const char* value )
 {
-  if (! _stricmp (name, "SDL_HINT_MOUSE_RELATIVE_MODE_WARP")) {
-    return TRUE;
-  }
-
   return SDL_SetHint_Original (name, value);
 }
 
@@ -386,6 +382,212 @@ SDL_GameControllerGetAxis_Detour ( LPVOID controller,
 }
 
 
+struct SDL_JoystickGUID {
+  uint8_t data [16];
+};
+
+struct {
+  int& num_virtual   = config.input.gamepad.virtual_controllers;
+  int  first_virtual = 0;
+
+  struct SDL_Joystick*    pVirtual             = (struct SDL_Joystick *)(LPVOID)0xDEADBEEFULL;
+         SDL_JoystickGUID virtual_guid { 0xff };
+} ai_fix;
+
+typedef BOOL (__cdecl *SDL_IsGameController_pfn)(int joystick_index);
+SDL_IsGameController_pfn SDL_IsGameController_Original = nullptr;
+
+BOOL
+__cdecl
+SDL_IsGameController_Detour (int joystick_index)
+{
+  if (joystick_index >= ai_fix.first_virtual && joystick_index < ai_fix.first_virtual + ai_fix.num_virtual)
+    return FALSE;
+
+  return SDL_IsGameController_Original (joystick_index);
+}
+
+typedef int (__cdecl *SDL_NumJoysticks_pfn)(void);
+
+SDL_NumJoysticks_pfn SDL_NumJoysticks_Original = nullptr;
+
+int
+__cdecl
+SDL_NumJoysticks_Detour (void)
+{
+  ai_fix.first_virtual = SDL_NumJoysticks_Original ();
+
+  return SDL_NumJoysticks_Original () + ai_fix.num_virtual;
+}
+
+
+typedef const char* (__cdecl *SDL_JoystickName_pfn)(struct SDL_Joystick* joystick);
+SDL_JoystickName_pfn SDL_JoystickName_Original = nullptr;
+
+const char*
+__cdecl
+SDL_JoystickName_Detour (struct SDL_Joystick* joystick)
+{
+  if (joystick == (struct SDL_Joystick *)ai_fix.pVirtual)
+    return "TBFix Dummy Controller";
+
+  return SDL_JoystickName_Original (joystick);
+}
+
+typedef const char* (__cdecl *SDL_JoystickNameForIndex_pfn)(int device_index);
+SDL_JoystickNameForIndex_pfn SDL_JoystickNameForIndex_Original = nullptr;
+
+const char*
+__cdecl
+SDL_JoystickNameForIndex_Detour (int device_index)
+{
+  if (device_index >= ai_fix.first_virtual && device_index < ai_fix.first_virtual + ai_fix.num_virtual)
+    return "TBFix Dummy Controller";
+
+  return SDL_JoystickNameForIndex_Original (device_index);
+}
+
+typedef BOOL (__cdecl *SDL_JoystickGetAttached_pfn)(struct SDL_Joystick* joystick);
+SDL_JoystickGetAttached_pfn SDL_JoystickGetAttached_Original = nullptr;
+
+BOOL
+__cdecl
+SDL_JoystickGetAttached_Detour (struct SDL_Joystick* joystick)
+{
+  if (joystick == (struct SDL_Joystick *)ai_fix.pVirtual)
+    return TRUE;
+
+  return SDL_JoystickGetAttached_Original (joystick);
+}
+
+typedef struct SDL_Joystick* (__cdecl *SDL_JoystickOpen_pfn)(int device_index);
+SDL_JoystickOpen_pfn SDL_JoystickOpen_Original = nullptr;
+
+struct SDL_Joystick*
+__cdecl
+SDL_JoystickOpen_Detour (int device_index)
+{
+  if (device_index >= ai_fix.first_virtual && device_index < ai_fix.first_virtual + ai_fix.num_virtual)
+    return (struct SDL_Joystick *)ai_fix.pVirtual;
+
+  return SDL_JoystickOpen_Original (device_index);
+}
+
+
+typedef void (__cdecl *SDL_JoystickClose_pfn)(struct SDL_Joystick* joystick);
+SDL_JoystickClose_pfn SDL_JoystickClose_Original = nullptr;
+
+void
+__cdecl
+SDL_JoystickClose_Detour (struct SDL_Joystick* joystick)
+{
+  if (joystick == (struct SDL_Joystick *)ai_fix.pVirtual)
+    return;
+
+  SDL_JoystickClose_Original (joystick);
+}
+
+
+typedef        int16_t          (__cdecl *SDL_JoystickGetAxis_pfn)(struct SDL_Joystick* joystick, int axis);
+typedef        uint8_t          (__cdecl *SDL_JoystickGetButton_pfn)(struct SDL_Joystick* joystick, int button);
+typedef struct SDL_JoystickGUID (__cdecl *SDL_JoystickGetDeviceGUID_pfn)(struct SDL_Joystick* joystick);
+typedef        void             (__cdecl *SDL_JoystickGetGUIDString_pfn)(SDL_JoystickGUID guid, char* pszGUID, int cbGUID);
+typedef        uint8_t          (__cdecl *SDL_JoystickGetHat_pfn)(struct SDL_Joystick* joystick, int hat);
+typedef        int              (__cdecl *SDL_JoystickNumAxes_pfn)(struct SDL_Joystick* joystick);
+typedef        int              (__cdecl *SDL_JoystickNumButtons_pfn)(struct SDL_Joystick* joystick);
+typedef        int              (__cdecl *SDL_JoystickNumHats_pfn)(struct SDL_Joystick* joystick);
+
+SDL_JoystickGetAxis_pfn        SDL_JoystickGetAxis_Original       = nullptr;  
+SDL_JoystickGetButton_pfn      SDL_JoystickGetButton_Original     = nullptr;
+SDL_JoystickGetDeviceGUID_pfn  SDL_JoystickGetDeviceGUID_Original = nullptr;
+SDL_JoystickGetGUIDString_pfn  SDL_JoystickGetGUIDString_Original = nullptr;
+SDL_JoystickGetHat_pfn         SDL_JoystickGetHat_Original        = nullptr;
+SDL_JoystickNumAxes_pfn        SDL_JoystickNumAxes_Original       = nullptr;
+SDL_JoystickNumButtons_pfn     SDL_JoystickNumButtons_Original    = nullptr;
+SDL_JoystickNumHats_pfn        SDL_JoystickNumHats_Original       = nullptr;
+
+int16_t
+__cdecl
+SDL_JoystickGetAxis_Detour (struct SDL_Joystick* joystick, int axis)
+{
+  if (joystick == ai_fix.pVirtual)
+    return 0;
+
+  return SDL_JoystickGetAxis_Original (joystick, axis);
+}
+
+uint8_t
+__cdecl
+SDL_JoystickGetButton_Detour (struct SDL_Joystick* joystick, int button)
+{
+  if (joystick == ai_fix.pVirtual)
+    return 0;
+
+  return SDL_JoystickGetButton_Original (joystick, button);
+}
+
+SDL_JoystickGUID
+__cdecl
+SDL_JoystickGetDeviceGUID_Detour (struct SDL_Joystick* joystick)
+{
+  if (joystick == ai_fix.pVirtual)
+    return ai_fix.virtual_guid;
+
+  return SDL_JoystickGetDeviceGUID_Original (joystick);
+}
+
+void
+__cdecl
+SDL_JoystickGetGUIDString_Detour (SDL_JoystickGUID guid, char* pszGUID, int cbGUID)
+{
+  if (! memcmp (&guid, &ai_fix.virtual_guid, 16)) {
+    snprintf (pszGUID, cbGUID, "TBFix Virtual");
+    return;
+  }
+
+  SDL_JoystickGetGUIDString_Original (guid, pszGUID, cbGUID);
+}
+
+uint8_t
+__cdecl
+SDL_JoystickGetHat_Detour (struct SDL_Joystick* joystick, int hat)
+{
+  if (joystick == ai_fix.pVirtual)
+    return 0;
+
+  return SDL_JoystickGetHat_Original (joystick, hat);
+}
+
+int
+__cdecl
+SDL_JoystickNumHats_Detour (struct SDL_Joystick* joystick)
+{
+  if (joystick == ai_fix.pVirtual)
+    return 1; // 1 D-Pad
+
+  return SDL_JoystickNumHats_Original (joystick);
+}
+
+int
+__cdecl
+SDL_JoystickNumButtons_Detour (struct SDL_Joystick* joystick)
+{
+  if (joystick == ai_fix.pVirtual)
+    return 12;
+
+  return SDL_JoystickNumButtons_Original (joystick);
+}
+
+int
+__cdecl
+SDL_JoystickNumAxes_Detour (struct SDL_Joystick* joystick)
+{
+  if (joystick == ai_fix.pVirtual)
+    return 6; // 2 sticks + 1 trigger
+
+  return SDL_JoystickNumAxes_Original (joystick);
+}
+
 void
 TBF_InitSDLOverride (void)
 {
@@ -429,7 +631,85 @@ TBF_InitSDLOverride (void)
                        SDL_GameControllerGetAxis_Detour,
             (LPVOID *)&SDL_GameControllerGetAxis_Original);
 
-  TBF_ApplyQueuedHooks ();
 
-  SDL_SetHint_Original ("SDL_HINT_MOUSE_RELATIVE_MODE_WARP", "0");
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_IsGameController",
+                       SDL_IsGameController_Detour,
+            (LPVOID *)&SDL_IsGameController_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_NumJoysticks",
+                       SDL_NumJoysticks_Detour,
+            (LPVOID *)&SDL_NumJoysticks_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickName",
+                       SDL_JoystickName_Detour,
+            (LPVOID *)&SDL_JoystickName_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickNameForIndex",
+                       SDL_JoystickNameForIndex_Detour,
+            (LPVOID *)&SDL_JoystickNameForIndex_Original);
+
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickOpen",
+                       SDL_JoystickOpen_Detour,
+            (LPVOID *)&SDL_JoystickOpen_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickClose",
+                       SDL_JoystickClose_Detour,
+            (LPVOID *)&SDL_JoystickClose_Original);
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickGetAttached",
+                       SDL_JoystickGetAttached_Detour,
+            (LPVOID *)&SDL_JoystickGetAttached_Original);
+
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickGetAxis",
+                       SDL_JoystickGetAxis_Detour,
+            (LPVOID *)&SDL_JoystickGetAxis_Original );
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickGetButton",
+                       SDL_JoystickGetButton_Detour,
+            (LPVOID *)&SDL_JoystickGetButton_Original );
+    
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickGetDeviceGUID",
+                       SDL_JoystickGetDeviceGUID_Detour,
+            (LPVOID *)&SDL_JoystickGetDeviceGUID_Original );
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickGetGUIDString",
+                       SDL_JoystickGetGUIDString_Detour,
+            (LPVOID *)&SDL_JoystickGetGUIDString_Original );
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickGetHat",
+                       SDL_JoystickGetHat_Detour,
+            (LPVOID *)&SDL_JoystickGetHat_Original );
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickNumAxes",
+                       SDL_JoystickNumAxes_Detour,
+            (LPVOID *)&SDL_JoystickNumAxes_Original );
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickNumButtons",
+                       SDL_JoystickNumButtons_Detour,
+            (LPVOID *)&SDL_JoystickNumButtons_Original );
+
+  TBF_CreateDLLHook2 ( L"SDL2.dll",
+                       "SDL_JoystickNumHats",
+                       SDL_JoystickNumHats_Detour,
+            (LPVOID *)&SDL_JoystickNumHats_Original );
+
+
+  TBF_ApplyQueuedHooks ();
 }
