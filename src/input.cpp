@@ -21,8 +21,10 @@
 **/
 
 #define _CRT_SECURE_NO_WARNINGS
+#define NOMINMAX
 
 #include <string>
+#include <algorithm>
 
 #include "hook.h"
 #include "input.h"
@@ -136,7 +138,7 @@ SK_TBF_PluginKeyPress ( BOOL Control,
         debug_tex_id =  0;
       } else {
         if (tex_dbg_idx >= textures_used_last_dump.size ())
-          tex_dbg_idx = max (0, (uint32_t)textures_used_last_dump.size () - 1);
+          tex_dbg_idx = std::max (0UL, (uint32_t)textures_used_last_dump.size () - 1UL);
 
         debug_tex_id = textures_used_last_dump [tex_dbg_idx];
       }
@@ -158,7 +160,7 @@ SK_TBF_PluginKeyPress ( BOOL Control,
         debug_tex_id =  0;
       } else {
         if (tex_dbg_idx >= textures_used_last_dump.size ())
-          tex_dbg_idx = max (0, (uint32_t)textures_used_last_dump.size () - 1);
+          tex_dbg_idx = std::max (0UL, (uint32_t)textures_used_last_dump.size () - 1UL);
 
         debug_tex_id = textures_used_last_dump [tex_dbg_idx];
       }
@@ -180,8 +182,9 @@ tbf::InputFix::Init (void)
                       SK_TBF_PluginKeyPress,
            (LPVOID *)&SK_PluginKeyPress_Original );
 
-
   TBF_ApplyQueuedHooks ();
+
+  ai_fix.num_virtual = config.input.gamepad.virtual_controllers;
 }
 
 void
@@ -381,19 +384,6 @@ SDL_GameControllerGetAxis_Detour ( LPVOID controller,
   return SDL_GameControllerGetAxis_Original (controller, axis);
 }
 
-
-struct SDL_JoystickGUID {
-  uint8_t data [16];
-};
-
-struct {
-  int& num_virtual   = config.input.gamepad.virtual_controllers;
-  int  first_virtual = 0;
-
-  struct SDL_Joystick*    pVirtual             = (struct SDL_Joystick *)(LPVOID)0xDEADBEEFULL;
-         SDL_JoystickGUID virtual_guid { 0xff };
-} ai_fix;
-
 typedef BOOL (__cdecl *SDL_IsGameController_pfn)(int joystick_index);
 SDL_IsGameController_pfn SDL_IsGameController_Original = nullptr;
 
@@ -401,7 +391,7 @@ BOOL
 __cdecl
 SDL_IsGameController_Detour (int joystick_index)
 {
-  if (joystick_index >= ai_fix.first_virtual && joystick_index < ai_fix.first_virtual + ai_fix.num_virtual)
+  if ((tbf::InputFix::ai_fix.num_virtual > 0) && joystick_index >= tbf::InputFix::ai_fix.first_virtual && joystick_index < (tbf::InputFix::ai_fix.first_virtual + tbf::InputFix::ai_fix.num_virtual))
     return FALSE;
 
   return SDL_IsGameController_Original (joystick_index);
@@ -415,9 +405,10 @@ int
 __cdecl
 SDL_NumJoysticks_Detour (void)
 {
-  ai_fix.first_virtual = SDL_NumJoysticks_Original ();
+  tbf::InputFix::ai_fix.first_virtual = SDL_NumJoysticks_Original ();
+  tbf::InputFix::ai_fix.num_virtual   = std::min (4 - tbf::InputFix::ai_fix.first_virtual, config.input.gamepad.virtual_controllers);
 
-  return SDL_NumJoysticks_Original () + ai_fix.num_virtual;
+  return std::min (4, SDL_NumJoysticks_Original () + tbf::InputFix::ai_fix.num_virtual);
 }
 
 
@@ -428,7 +419,7 @@ const char*
 __cdecl
 SDL_JoystickName_Detour (struct SDL_Joystick* joystick)
 {
-  if (joystick == (struct SDL_Joystick *)ai_fix.pVirtual)
+  if (joystick == (struct SDL_Joystick *)tbf::InputFix::ai_fix.pVirtual)
     return "TBFix Dummy Controller";
 
   return SDL_JoystickName_Original (joystick);
@@ -441,7 +432,7 @@ const char*
 __cdecl
 SDL_JoystickNameForIndex_Detour (int device_index)
 {
-  if (device_index >= ai_fix.first_virtual && device_index < ai_fix.first_virtual + ai_fix.num_virtual)
+  if ((tbf::InputFix::ai_fix.num_virtual > 0) && device_index >= tbf::InputFix::ai_fix.first_virtual && device_index < tbf::InputFix::ai_fix.first_virtual + tbf::InputFix::ai_fix.num_virtual)
     return "TBFix Dummy Controller";
 
   return SDL_JoystickNameForIndex_Original (device_index);
@@ -454,7 +445,7 @@ BOOL
 __cdecl
 SDL_JoystickGetAttached_Detour (struct SDL_Joystick* joystick)
 {
-  if (joystick == (struct SDL_Joystick *)ai_fix.pVirtual)
+  if (joystick == (struct SDL_Joystick *)tbf::InputFix::ai_fix.pVirtual)
     return TRUE;
 
   return SDL_JoystickGetAttached_Original (joystick);
@@ -467,8 +458,8 @@ struct SDL_Joystick*
 __cdecl
 SDL_JoystickOpen_Detour (int device_index)
 {
-  if (device_index >= ai_fix.first_virtual && device_index < ai_fix.first_virtual + ai_fix.num_virtual)
-    return (struct SDL_Joystick *)ai_fix.pVirtual;
+  if ((tbf::InputFix::ai_fix.num_virtual > 0) && device_index >= tbf::InputFix::ai_fix.first_virtual && device_index < tbf::InputFix::ai_fix.first_virtual + tbf::InputFix::ai_fix.num_virtual)
+    return (struct SDL_Joystick *)tbf::InputFix::ai_fix.pVirtual;
 
   return SDL_JoystickOpen_Original (device_index);
 }
@@ -481,7 +472,7 @@ void
 __cdecl
 SDL_JoystickClose_Detour (struct SDL_Joystick* joystick)
 {
-  if (joystick == (struct SDL_Joystick *)ai_fix.pVirtual)
+  if (joystick == (struct SDL_Joystick *)tbf::InputFix::ai_fix.pVirtual)
     return;
 
   SDL_JoystickClose_Original (joystick);
@@ -510,7 +501,7 @@ int16_t
 __cdecl
 SDL_JoystickGetAxis_Detour (struct SDL_Joystick* joystick, int axis)
 {
-  if (joystick == ai_fix.pVirtual)
+  if (joystick == tbf::InputFix::ai_fix.pVirtual)
     return 0;
 
   return SDL_JoystickGetAxis_Original (joystick, axis);
@@ -520,7 +511,7 @@ uint8_t
 __cdecl
 SDL_JoystickGetButton_Detour (struct SDL_Joystick* joystick, int button)
 {
-  if (joystick == ai_fix.pVirtual)
+  if (joystick == tbf::InputFix::ai_fix.pVirtual)
     return 0;
 
   return SDL_JoystickGetButton_Original (joystick, button);
@@ -530,8 +521,8 @@ SDL_JoystickGUID
 __cdecl
 SDL_JoystickGetDeviceGUID_Detour (struct SDL_Joystick* joystick)
 {
-  if (joystick == ai_fix.pVirtual)
-    return ai_fix.virtual_guid;
+  if (joystick == tbf::InputFix::ai_fix.pVirtual)
+    return tbf::InputFix::ai_fix.virtual_guid;
 
   return SDL_JoystickGetDeviceGUID_Original (joystick);
 }
@@ -540,8 +531,9 @@ void
 __cdecl
 SDL_JoystickGetGUIDString_Detour (SDL_JoystickGUID guid, char* pszGUID, int cbGUID)
 {
-  if (! memcmp (&guid, &ai_fix.virtual_guid, 16)) {
-    snprintf (pszGUID, cbGUID, "TBFix Virtual");
+  if (! memcmp (&guid, &tbf::InputFix::ai_fix.virtual_guid, 16)) {
+    if (cbGUID > 0)
+      snprintf (pszGUID, cbGUID, "TBFix Virtual");
     return;
   }
 
@@ -552,7 +544,7 @@ uint8_t
 __cdecl
 SDL_JoystickGetHat_Detour (struct SDL_Joystick* joystick, int hat)
 {
-  if (joystick == ai_fix.pVirtual)
+  if (joystick == tbf::InputFix::ai_fix.pVirtual)
     return 0;
 
   return SDL_JoystickGetHat_Original (joystick, hat);
@@ -562,7 +554,7 @@ int
 __cdecl
 SDL_JoystickNumHats_Detour (struct SDL_Joystick* joystick)
 {
-  if (joystick == ai_fix.pVirtual)
+  if (joystick == tbf::InputFix::ai_fix.pVirtual)
     return 1; // 1 D-Pad
 
   return SDL_JoystickNumHats_Original (joystick);
@@ -572,7 +564,7 @@ int
 __cdecl
 SDL_JoystickNumButtons_Detour (struct SDL_Joystick* joystick)
 {
-  if (joystick == ai_fix.pVirtual)
+  if (joystick == tbf::InputFix::ai_fix.pVirtual)
     return 12;
 
   return SDL_JoystickNumButtons_Original (joystick);
@@ -582,7 +574,7 @@ int
 __cdecl
 SDL_JoystickNumAxes_Detour (struct SDL_Joystick* joystick)
 {
-  if (joystick == ai_fix.pVirtual)
+  if (joystick == tbf::InputFix::ai_fix.pVirtual)
     return 6; // 2 sticks + 1 trigger
 
   return SDL_JoystickNumAxes_Original (joystick);
@@ -710,6 +702,11 @@ TBF_InitSDLOverride (void)
                        SDL_JoystickNumHats_Detour,
             (LPVOID *)&SDL_JoystickNumHats_Original );
 
-
   TBF_ApplyQueuedHooks ();
+
+  tbf::InputFix::ai_fix.first_virtual = SDL_NumJoysticks_Original ();
+  tbf::InputFix::ai_fix.num_virtual   = std::min (4 - tbf::InputFix::ai_fix.first_virtual, config.input.gamepad.virtual_controllers);
+  tbf::InputFix::ai_fix.pVirtual      = (SDL_Joystick *)(LPVOID)0xDEADBEEFULL;
 }
+
+tbf::InputFix::ai_fix_s tbf::InputFix::ai_fix;

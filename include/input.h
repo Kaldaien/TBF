@@ -23,13 +23,28 @@
 #ifndef __TBF__INPUT_H__
 #define __TBF__INPUT_H__
 
+struct SDL_Joystick;
+
+struct SDL_JoystickGUID {
+  uint8_t data [16];
+};
+
 namespace tbf
 {
   namespace InputFix
   {
     void Init     ();
     void Shutdown ();
+    
+    struct ai_fix_s {
+      int  num_virtual   = 0;
+      int  first_virtual = 1;
+    
+      SDL_Joystick*    pVirtual             = (SDL_Joystick *)(LPVOID)0xDEADBEEFULL;
+      SDL_JoystickGUID virtual_guid { 0xff };
+    } extern ai_fix;
   };
 };
+
 
 #endif /* __TBF__INPUT_H__ */

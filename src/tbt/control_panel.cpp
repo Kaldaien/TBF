@@ -18,6 +18,7 @@
 #include "framerate.h"
 #include "sound.h"
 #include "hook.h"
+#include "input.h"
 
 
 #include <string>
