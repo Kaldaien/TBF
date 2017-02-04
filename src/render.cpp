@@ -233,6 +233,9 @@ crc32(uint32_t crc, const void *buf, size_t size)
 std::unordered_map <LPVOID, uint32_t> vs_checksums;
 std::unordered_map <LPVOID, uint32_t> ps_checksums;
 
+tbf::RenderFix::frame_state_s tbf::RenderFix::last_frame;
+
+
 // Store the CURRENT shader's checksum instead of repeatedly
 //   looking it up in the above hashmaps.
 uint32_t vs_checksum = 0;
@@ -382,6 +385,8 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
   vs_checksum = vs_checksums [pShader];
   g_pVS       = pShader;
 
+  ////tbf::RenderFix::last_frame.vertex_shaders.insert (vs_checksum);
+
   return D3D9SetVertexShader_Original (This, pShader);
 }
 
@@ -443,6 +448,8 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
 
   ps_checksum = ps_checksums [pShader];
   g_pPS       = pShader;
+
+  ////tbf::RenderFix::last_frame.pixel_shaders.insert (ps_checksum);
 
   return D3D9SetPixelShader_Original (This, pShader);
 }

@@ -22,6 +22,7 @@
 
 #ifndef __TBF__RENDER_H__
 #define __TBF__RENDER_H__
+#define NOMINMAX
 
 #include "command.h"
 
@@ -29,6 +30,8 @@
 #include <d3d9types.h>
 
 #include <Windows.h>
+
+#include <unordered_set>
 
 namespace tbf
 {
@@ -82,6 +85,14 @@ namespace tbf
 
     extern HMODULE            d3dx9_43_dll;
     extern HMODULE            user32_dll;
+
+    struct frame_state_s
+    {
+      void clear (void) { pixel_shaders.clear (); vertex_shaders.clear (); }
+    
+      std::unordered_set <uint32_t> pixel_shaders;
+      std::unordered_set <uint32_t> vertex_shaders;
+    } extern last_frame;
   }
 }
 

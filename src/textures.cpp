@@ -2247,7 +2247,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
       if (power_of_two_in && power_of_two_out)
       {
-        if (info.MipLevels > 1 || config.textures.uncompressed)
+        if (info.MipLevels > 1/* || config.textures.uncompressed*/)
         {
           resample = true;
         }

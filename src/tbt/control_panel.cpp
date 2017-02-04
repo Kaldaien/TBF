@@ -706,6 +706,7 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePop   (  );
   }
 
+#if 0
   if (ImGui::CollapsingHeader ("Audio (DO NOT USE ON RETAIL VERSION OF GAME)", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   { 
     ImGui::TreePush ("");
@@ -770,6 +771,7 @@ TBFix_DrawConfigUI (void)
 
      ImGui::TreePop ();
    }
+#endif
 
    ImGui::PopItemWidth ();
 

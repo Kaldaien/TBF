@@ -76,7 +76,8 @@ CalcCursorPos (LPPOINT pPoint)
   return *pPoint;
 }
 
-#define LOG_CALL() dll_log->Log ("[SDLTrace] Function: %s, Line: %lu", __FUNCTION__, __LINE__);
+//#define LOG_CALL() dll_log->Log ("[SDLTrace] Function: %s, Line: %lu", __FUNCTION__, __LINE__);
+#define LOG_CALL() ;
 
 
 typedef void (CALLBACK *SK_PluginKeyPress_pfn)( BOOL Control,
@@ -460,7 +461,7 @@ SDL_IsGameController_Detour (int joystick_index)
 {
   LOG_CALL ();
 
-  dll_log->Log (L"device_index = %lu", joystick_index);
+  //dll_log->Log (L"device_index = %lu", joystick_index);
 
   SDL_JoystickUpdate_Original       ();
   SDL_GameControllerUpdate_Original ();
@@ -507,7 +508,7 @@ SDL_JoystickName_Detour (struct SDL_Joystick* joystick)
 
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return "TBFix Dummy Controller";
 
   return SDL_JoystickName_Original (joystick);
@@ -519,7 +520,7 @@ SDL_JoystickNameForIndex_Detour (int device_index)
 {
   LOG_CALL ();
 
-  dll_log->Log (L"device_index = %lu", device_index);
+  //dll_log->Log (L"device_index = %lu", device_index);
 
   SDL_JoystickUpdate_Original       ();
   SDL_GameControllerUpdate_Original ();
@@ -542,7 +543,7 @@ SDL_JoystickGetAttached_Detour (struct SDL_Joystick* joystick)
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return SDL_TRUE;
 
   return SDL_JoystickGetAttached_Original (joystick);
@@ -582,7 +583,7 @@ SDL_JoystickGetAxis_Detour (struct SDL_Joystick* joystick, int axis)
 {
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return 0;
 
   return SDL_JoystickGetAxis_Original (joystick, axis);
@@ -594,7 +595,7 @@ SDL_JoystickGetButton_Detour (struct SDL_Joystick* joystick, int button)
 {
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return 0;
 
   return SDL_JoystickGetButton_Original (joystick, button);
@@ -626,7 +627,7 @@ SDL_JoystickGetGUID_Detour (struct SDL_Joystick* joystick)
 
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return tbf::InputFix::ai_fix.joysticks [idx].guid;
 
   return SDL_JoystickGetGUID_Original (joystick);
@@ -651,7 +652,7 @@ SDL_JoystickGetHat_Detour (struct SDL_Joystick* joystick, int hat)
 {
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return 0;
 
   return SDL_JoystickGetHat_Original (joystick, hat);
@@ -663,7 +664,7 @@ SDL_JoystickNumHats_Detour (struct SDL_Joystick* joystick)
 {
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return 1; // 1 D-Pad
 
   return SDL_JoystickNumHats_Original (joystick);
@@ -675,7 +676,7 @@ SDL_JoystickNumButtons_Detour (struct SDL_Joystick* joystick)
 {
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return 12;
 
   return SDL_JoystickNumButtons_Original (joystick);
@@ -687,7 +688,7 @@ SDL_JoystickNumAxes_Detour (struct SDL_Joystick* joystick)
 {
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return 6; // 2 sticks + 1 trigger
 
   return SDL_JoystickNumAxes_Original (joystick);
@@ -705,7 +706,7 @@ SDL_GameControllerClose_Detour (SDL_GameController* gamecontroller)
   if ( (uintptr_t)gamecontroller >= (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle &&
        (uintptr_t)gamecontroller <= (uintptr_t)tbf::InputFix::ai_fix.joysticks [3].handle )
   {
-    dll_log->Log (L" %p <==", gamecontroller);
+    //dll_log->Log (L" %p <==", gamecontroller);
     return;
   }
 
@@ -716,11 +717,11 @@ SDL_GameController*
 __cdecl
 SDL_GameControllerOpen_Detour (int device_index)
 {
-  dll_log->Log (L"Open Controller: %lu", device_index);
+  //dll_log->Log (L"Open Controller: %lu", device_index);
 
   if (device_index >= SDL_NumJoysticks_Original ())
   {
-    dll_log->Log (L" == > %p", tbf::InputFix::ai_fix.joysticks [std::max (3, device_index - SDL_NumJoysticks_Original ())].handle);
+    //dll_log->Log (L" == > %p", tbf::InputFix::ai_fix.joysticks [std::max (3, device_index - SDL_NumJoysticks_Original ())].handle);
     return (SDL_GameController *)tbf::InputFix::ai_fix.joysticks [std::max (3, device_index - SDL_NumJoysticks_Original ())].handle;
   }
 
@@ -733,7 +734,7 @@ SDL_GameControllerGetAxis_Detour (SDL_GameController* controller, SDL_GameContro
 {
   ptrdiff_t idx = (uintptr_t)controller - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return 0;
 
   return SDL_GameControllerGetAxis_Original (controller, axis);
@@ -745,7 +746,7 @@ SDL_GameControllerGetButton_Detour (SDL_GameController* controller, SDL_GameCont
 {
   ptrdiff_t idx = (uintptr_t)controller - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return 0;
 
   return SDL_GameControllerGetButton_Original (controller, button);
@@ -764,7 +765,7 @@ SDL_GameControllerMapping_Detour (SDL_GameController* controller)
 
   ptrdiff_t idx = (uintptr_t)controller - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return last_mapping;
 
   strncpy (last_mapping, SDL_GameControllerMapping_Original (controller), 1024);
@@ -783,7 +784,7 @@ SDL_GameControllerGetJoystick_Detour (SDL_GameController* controller)
 
   ptrdiff_t idx = (uintptr_t)controller - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return (SDL_Joystick *)controller;
 
   return SDL_GameControllerGetJoystick_Original (controller);
@@ -815,7 +816,7 @@ SDL_HapticOpenFromJoystick_Detour (SDL_Joystick* joystick)
 
   ptrdiff_t idx = (uintptr_t)joystick - (uintptr_t)tbf::InputFix::ai_fix.joysticks [0].handle;
 
-  if (idx >= 0 && idx < 8)
+  if (idx >= 0 && idx < 4)
     return nullptr;
 
   return SDL_HapticOpenFromJoystick_Original (joystick);
@@ -857,6 +858,7 @@ TBF_InitSDLOverride (void)
             (LPVOID *)&SDL_ShowCursor_Original);
 
 
+  if (config.input.gamepad.virtual_controllers) {
   TBF_CreateDLLHook2 ( L"SDL2.dll",
                        "SDL_NumJoysticks",
                        SDL_NumJoysticks_Detour,
@@ -984,6 +986,7 @@ TBF_InitSDLOverride (void)
                        "SDL_HapticOpenFromJoystick",
                        SDL_HapticOpenFromJoystick_Detour,
             (LPVOID *)&SDL_HapticOpenFromJoystick_Original );
+  }
 
   TBF_ApplyQueuedHooks ();
 
