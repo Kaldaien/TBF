@@ -166,6 +166,11 @@ SKPlugIn_Init (HMODULE hModSpecialK)
                                        SK_FetchVersionInfo );
 
   if (TBF_Init_MinHook () == MH_OK) {
+    extern void
+    TBF_InitSDLOverride (void);
+
+    TBF_InitSDLOverride ();
+
     extern void TBFix_ImGui_Init (void);
                 TBFix_ImGui_Init ();
 
@@ -178,11 +183,6 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     tbf::RenderFix::Init    ();
     //tbf::KeyboardFix::Init  ();
     //tbf::InputFix::Init ();
-
-    extern void
-    TBF_InitSDLOverride (void);
-
-    TBF_InitSDLOverride ();
 
 
     CreateThread ( nullptr, 0,

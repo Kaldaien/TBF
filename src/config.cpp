@@ -73,6 +73,7 @@ struct {
 
   tbf::ParameterBool*    dump_shaders;
   tbf::ParameterBool*    fix_map_res;
+  tbf::ParameterBool*    pause_on_ui;
 } render;
 
 struct {
@@ -338,6 +339,17 @@ TBF_LoadConfig (std::wstring name)
       L"Resolution.Experimental",
         L"FixMap" );
 
+  render.pause_on_ui =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool>(
+      L"Config Menu Pauses Game")
+    );
+
+  render.pause_on_ui->register_to_ini (
+    render_ini,
+      L"ImGui.Settings",
+        L"PauseOnActivate" );
+
   framerate.replace_limiter =
     static_cast <tbf::ParameterBool *>
       (g_ParameterFactory.create_parameter <bool> (
@@ -462,6 +474,7 @@ TBF_LoadConfig (std::wstring name)
 
   render.dump_shaders->load        (config.render.dump_shaders);
   render.fix_map_res->load         (config.render.fix_map_res);
+  render.pause_on_ui->load         (config.input.ui.pause);
 
   framerate.replace_limiter->load  (config.framerate.replace_limiter);
   framerate.tolerance->load        (config.framerate.tolerance);
@@ -501,6 +514,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.rescale_shadows->store     (config.render.shadow_rescale);
   render.rescale_env_shadows->store (config.render.env_shadow_rescale);
   render.fix_map_res->store         (config.render.fix_map_res);
+  render.pause_on_ui->store         (config.input.ui.pause);
 
   textures.remaster->store          (config.textures.remaster);
   textures.uncompressed->store      (config.textures.uncompressed);

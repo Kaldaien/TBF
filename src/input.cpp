@@ -213,17 +213,76 @@ typedef
     const uint8_t*  (__cdecl *SDL_GetKeyboardState_pfn) ( int* numkeys ); SDL_GetKeyboardState_pfn SDL_GetKeyboardState_Original           = nullptr;
 
 
-bool cursor_visible = false;
+enum {
+  SDL_QUERY   = -1,
+  SDL_DISABLE =  0,
+  SDL_ENABLE  =  1
+};
+
+
+struct {
+  int   state     = SDL_ENABLE;
+  bool  capture   = false;
+  DWORD last_warp = 0;
+
+  struct
+  {
+    int x,
+        y;
+
+    int original_x,
+        original_y;
+  } pos = { 0 };
+
+} cursor;
+
+
+bool
+TBFix_IsSDLCursorVisible (void)
+{
+  return (SDL_ShowCursor_Original (SDL_QUERY) == SDL_ENABLE);
+}
+
+void
+TBFix_ShowCursor (void)
+{
+  SDL_ShowCursor_Original (SDL_ENABLE);
+}
+
+void
+TBFix_HideCursor (void)
+{
+  SDL_ShowCursor_Original (SDL_DISABLE);
+}
+
+void
+TBFix_ReleaseCursor (void)
+{
+  SDL_WarpMouseInWindow_Original (nullptr, cursor.pos.x, cursor.pos.y);
+  SDL_ShowCursor_Original        (         cursor.state);
+  cursor.capture   = false;
+}
+
+void
+TBFix_CaptureCursor (void)
+{
+  SDL_GetMouseState_Original     (&cursor.pos.original_x, &cursor.pos.original_y);
+  SDL_GetMouseState_Original     (&cursor.pos.x,          &cursor.pos.y);
+  cursor.capture   = true;
+}
+
 
 int
 __cdecl
 SDL_ShowCursor_Detour (int toggle)
 {
-  if (toggle == 1)
-    cursor_visible = true;
+  if (toggle != SDL_QUERY)
+    cursor.state = toggle;
 
-  if (toggle == 0)
-    cursor_visible = false;
+  if (cursor.capture)
+  {
+    return cursor.state;
+  }
 
   return SDL_ShowCursor_Original (toggle);
 }
@@ -249,17 +308,38 @@ SDL_GetMouseState_Detour ( int* x, int* y )
 {
   uint32_t ret = SDL_GetMouseState_Original ( x, y );
 
-#if 0
-  if (! cursor_visible) {
-    if (x != nullptr)
-      *x = 0;
-
-    if (y != nullptr)
-      *y = 0;
+  if (cursor.capture)
+  {
+    if (cursor.last_warp > (timeGetTime () - 133UL))
+    {
+      if (x != nullptr) *x = cursor.pos.x;
+      if (y != nullptr) *y = cursor.pos.y;
+    }
   }
-#endif
 
   return ret;
+}
+
+uint32_t
+__cdecl
+SDL_GetRelativeMouseState_Detour ( int* x, int* y )
+{
+  return SDL_GetRelativeMouseState_Original ( x, y );
+}
+
+void
+__cdecl
+SDL_WarpMouseInWindow_Detour ( LPVOID mouse, int x, int y )
+{
+  cursor.pos.x = x;
+  cursor.pos.y = y;
+
+  if (! cursor.capture)
+  {
+    SDL_WarpMouseInWindow_Original (mouse, x, y);
+  }
+
+  cursor.last_warp = timeGetTime ();
 }
 
 const
@@ -827,38 +907,60 @@ SDL_HapticOpenFromJoystick_Detour (SDL_Joystick* joystick)
 void
 TBF_InitSDLOverride (void)
 {
-  TBF_CreateDLLHook2 ( L"SDL2.dll",
-                       "SDL_GetHint",
-                       SDL_GetHint_Detour,
-            (LPVOID *)&SDL_GetHint_Original);
+  static bool init0 = false;
 
-  TBF_CreateDLLHook2 ( L"SDL2.dll",
-                       "SDL_SetHint",
-                       SDL_SetHint_Detour,
-            (LPVOID *)&SDL_SetHint_Original);
+  if (! init0) {
+    TBF_CreateDLLHook2 ( L"SDL2.dll",
+                         "SDL_GetHint",
+                         SDL_GetHint_Detour,
+              (LPVOID *)&SDL_GetHint_Original);
 
-  TBF_CreateDLLHook2 ( L"SDL2.dll",
-                       "SDL_GetMouseState",
-                       SDL_GetMouseState_Detour,
-            (LPVOID *)&SDL_GetMouseState_Original);
+    TBF_CreateDLLHook2 ( L"SDL2.dll",
+                         "SDL_SetHint",
+                         SDL_SetHint_Detour,
+              (LPVOID *)&SDL_SetHint_Original);
 
-  TBF_CreateDLLHook2 ( L"SDL2.dll",
-                       "SDL_GetKeyboardState",
-                       SDL_GetKeyboardState_Detour,
-            (LPVOID *)&SDL_GetKeyboardState_Original);
+    TBF_CreateDLLHook2 ( L"SDL2.dll",
+                         "SDL_GetMouseState",
+                         SDL_GetMouseState_Detour,
+              (LPVOID *)&SDL_GetMouseState_Original);
 
-  TBF_CreateDLLHook2 ( L"SDL2.dll",
-                       "SDL_GetKeyFromScancode",
-                       SDL_GetKeyFromScancode_Detour,
-            (LPVOID *)&SDL_GetKeyFromScancode_Original);
+    TBF_CreateDLLHook2 ( L"SDL2.dll",
+                         "SDL_GetRelativeMouseState",
+                         SDL_GetRelativeMouseState_Detour,
+              (LPVOID *)&SDL_GetRelativeMouseState_Original);
 
-  TBF_CreateDLLHook2 ( L"SDL2.dll",
-                       "SDL_ShowCursor",
-                       SDL_ShowCursor_Detour,
-            (LPVOID *)&SDL_ShowCursor_Original);
+    TBF_CreateDLLHook2 ( L"SDL2.dll",
+                         "SDL_WarpMouseInWindow",
+                         SDL_WarpMouseInWindow_Detour,
+              (LPVOID *)&SDL_WarpMouseInWindow_Original);
+
+    TBF_CreateDLLHook2 ( L"SDL2.dll",
+                         "SDL_GetKeyboardState",
+                         SDL_GetKeyboardState_Detour,
+              (LPVOID *)&SDL_GetKeyboardState_Original);
+
+    TBF_CreateDLLHook2 ( L"SDL2.dll",
+                         "SDL_GetKeyFromScancode",
+                         SDL_GetKeyFromScancode_Detour,
+              (LPVOID *)&SDL_GetKeyFromScancode_Original);
+
+    TBF_CreateDLLHook2 ( L"SDL2.dll",
+                         "SDL_ShowCursor",
+                         SDL_ShowCursor_Detour,
+              (LPVOID *)&SDL_ShowCursor_Original);
+    init0 = true;
+  }
 
 
   if (config.input.gamepad.virtual_controllers) {
+  static bool init1 = false;
+
+  if (init1)
+    return;
+
+  init1 = true;
+
   TBF_CreateDLLHook2 ( L"SDL2.dll",
                        "SDL_NumJoysticks",
                        SDL_NumJoysticks_Detour,

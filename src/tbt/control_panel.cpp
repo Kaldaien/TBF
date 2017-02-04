@@ -68,9 +68,17 @@ int  cursor_refs         = 0;
 typedef DWORD (*SK_ImGui_Toggle_pfn)(void);
 SK_ImGui_Toggle_pfn SK_ImGui_Toggle_Original = nullptr;
 
+extern void TBFix_ShowCursor    (void);
+extern void TBFix_ReleaseCursor (void);
+extern void TBFix_CaptureCursor (void);
+
 void
 TBFix_ToggleConfigUI (void)
 {
+  DWORD dwPos = GetMessagePos ();
+
+  SendMessage (tbf::RenderFix::hWndDevice, WM_MOUSEMOVE, 0x00, dwPos);
+
   SK_ImGui_Toggle_Original ();
 
   reset_frame_history = true;
@@ -82,6 +90,17 @@ TBFix_ToggleConfigUI (void)
 
   if (config.input.ui.pause)
     TBFix_PauseGame (config.input.ui.visible);
+
+
+  if (config.input.ui.visible)
+  {
+    TBFix_CaptureCursor ();
+    TBFix_ShowCursor    ();
+  } else {
+    TBFix_ReleaseCursor ();
+  }
+
+  SendMessage (tbf::RenderFix::hWndDevice, WM_MOUSEMOVE, 0x00, dwPos);
 
   TBF_SaveConfig ();
 }
@@ -699,7 +718,12 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePush  ("");
     ImGui::Checkbox  ("Swap WASD and Arrow Keys", &config.keyboard.swap_wasd);
 
-    ImGui::SliderInt ("Number of Virtual Controllers (AI Fix)", &config.input.gamepad.virtual_controllers, 0, 3);
+    if (ImGui::SliderInt ("Number of Virtual Controllers (AI Fix)", &config.input.gamepad.virtual_controllers, 0, 3)) {
+      extern void
+      TBF_InitSDLOverride (void);
+
+      TBF_InitSDLOverride ();    
+    }
       
     if (ImGui::IsItemHovered ())
       ImGui::SetTooltip ("Map Players 2-4 to individual TBFix Dummy Controllers under Controller Settings, then set Control Mode = Auto for Players 2-4.");
