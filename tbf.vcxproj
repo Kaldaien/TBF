@@ -164,6 +164,8 @@
     </ClCompile>
     <ClCompile Include="src\framerate.cpp" />
     <ClCompile Include="src\hook.cpp" />
+    <ClCompile Include="src\ImGui\control_panel.cpp" />
+    <ClCompile Include="src\ImGui\mod_tools.cpp" />
     <ClCompile Include="src\input.cpp" />
     <ClCompile Include="src\ini.cpp" />
     <ClCompile Include="src\lzma\7zAlloc.c" />
@@ -207,7 +209,6 @@
     <ClCompile Include="src\lzma\XzDec.c" />
     <ClCompile Include="src\lzma\XzEnc.c" />
     <ClCompile Include="src\lzma\XzIn.c" />
-    <ClCompile Include="src\tbt\control_panel.cpp" />
     <ClCompile Include="src\textures.cpp" />
     <Text Include="include\keyboard.h" />
     <ClCompile Include="src\log.cpp" />

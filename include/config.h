@@ -70,6 +70,7 @@ struct tbf_config_t
 
   struct {
     bool     dump                =  false;
+    bool     on_demand_dump      =  false;
     bool     remaster            =  true;
     bool     cache               =  true;
     bool     uncompressed        =  false;

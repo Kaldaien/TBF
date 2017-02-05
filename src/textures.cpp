@@ -2214,9 +2214,10 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   bool resample = false;
 
   // Necessary to make D3DX texture write functions work
-  if ( Pool == D3DPOOL_DEFAULT && config.textures.dump &&
-        (! dumped_textures.count     (checksum))       &&
-        (! injectable_textures.count (checksum)) )
+  if ( Pool == D3DPOOL_DEFAULT && (config.textures.on_demand_dump ||
+       ( config.textures.dump                         &&
+        (! dumped_textures.count     (checksum))      &&
+        (! injectable_textures.count (checksum)) ) ) )
     Usage = D3DUSAGE_DYNAMIC;
 
 
@@ -2593,11 +2594,74 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   }
 
   if ( config.textures.dump && (! inject_thread) && (! injectable_textures.count (checksum)) &&
-                          (! dumped_textures.count (checksum)) ) {
+                          (! dumped_textures.count (checksum)) )
+  {
     D3DXIMAGE_INFO info = { 0 };
     D3DXGetImageInfoFromFileInMemory (pSrcData, SrcDataSize, &info);
 
     D3DFORMAT fmt_real = info.Format;
+
+    TBF_DumpTexture (fmt_real, checksum, *ppTexture);
+  }
+
+  return hr;
+}
+
+bool
+TBF_DeleteDumpedTexture (D3DFORMAT fmt, uint32_t checksum)
+{
+  wchar_t wszPath [MAX_PATH];
+  _swprintf ( wszPath, L"%s\\dump",
+                TBFIX_TEXTURE_DIR );
+
+  if (GetFileAttributesW (wszPath) != FILE_ATTRIBUTE_DIRECTORY)
+    CreateDirectoryW (wszPath, nullptr);
+
+  _swprintf ( wszPath, L"%s\\dump\\textures",
+                TBFIX_TEXTURE_DIR );
+
+  if (GetFileAttributesW (wszPath) != FILE_ATTRIBUTE_DIRECTORY)
+    CreateDirectoryW (wszPath, nullptr);
+
+  _swprintf ( wszPath, L"%s\\%s",
+                wszPath,
+                 SK_D3D9_FormatToStr (fmt, false).c_str () );
+
+  if (GetFileAttributesW (wszPath) != FILE_ATTRIBUTE_DIRECTORY)
+    CreateDirectoryW (wszPath, nullptr);
+
+  wchar_t wszFileName [MAX_PATH] = { L'\0' };
+  _swprintf ( wszFileName, L"%s\\dump\\textures\\%s\\%08x%s",
+                TBFIX_TEXTURE_DIR,
+                  SK_D3D9_FormatToStr (fmt, false).c_str (),
+                    checksum,
+                      TBFIX_TEXTURE_EXT );
+
+  if (GetFileAttributesW (wszFileName) != INVALID_FILE_ATTRIBUTES)
+  {
+    if (DeleteFileW (wszFileName))
+    {
+      dumped_textures.erase (checksum);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool
+TBF_IsTextureDumped (uint32_t checksum)
+{
+  return dumped_textures.count (checksum);
+}
+
+HRESULT
+TBF_DumpTexture (D3DFORMAT fmt, uint32_t checksum, IDirect3DTexture9* pTex)
+{
+  if ( (! injectable_textures.count (checksum)) &&
+       (! dumped_textures.count     (checksum)) )
+  {
+    D3DFORMAT fmt_real = fmt;
 
     bool compressed = (fmt_real >= D3DFMT_DXT1 && fmt_real <= D3DFMT_DXT5);
 
@@ -2628,10 +2692,15 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
                       checksum,
                         TBFIX_TEXTURE_EXT );
 
-    D3DXSaveTextureToFile (wszFileName, D3DXIFF_DDS, (*ppTexture), NULL);
+    HRESULT hr = D3DXSaveTextureToFile (wszFileName, D3DXIFF_DDS, pTex, NULL);
+
+    if (SUCCEEDED (hr))
+      dumped_textures.insert (checksum);
+
+    return hr;
   }
 
-  return hr;
+  return E_FAIL;
 }
 
 std::vector <ISKTextureD3D9 *> remove_textures;

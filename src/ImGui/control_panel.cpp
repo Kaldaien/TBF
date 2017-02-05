@@ -29,9 +29,10 @@ bool
 SK_ImGui_ControlPanel (void);
 
 
-bool show_config        = true;
-bool show_special_k_cfg = false;
-bool show_test_window   = false;
+bool show_config          = true;
+bool show_special_k_cfg   = false;
+bool show_test_window     = false;
+bool show_texture_mod_dlg = false;
 
 ImVec4 clear_col = ImColor (114, 144, 154);
 
@@ -77,7 +78,11 @@ TBFix_ToggleConfigUI (void)
 {
   DWORD dwPos = GetMessagePos ();
 
-  SendMessage (tbf::RenderFix::hWndDevice, WM_MOUSEMOVE, 0x00, dwPos);
+  ImGuiIO& io =
+    ImGui::GetIO ();
+
+  if (! io.WantCaptureMouse)
+    SendMessage (tbf::RenderFix::hWndDevice, WM_MOUSEMOVE, 0x00, dwPos);
 
   SK_ImGui_Toggle_Original ();
 
@@ -100,11 +105,15 @@ TBFix_ToggleConfigUI (void)
     TBFix_ReleaseCursor ();
   }
 
-  SendMessage (tbf::RenderFix::hWndDevice, WM_MOUSEMOVE, 0x00, dwPos);
+  if (! io.WantCaptureMouse)
+    SendMessage (tbf::RenderFix::hWndDevice, WM_MOUSEMOVE, 0x00, dwPos);
 
   TBF_SaveConfig ();
 }
 
+extern
+bool
+TBFix_TextureModDlg (void);
 
 void
 TBFix_GamepadConfigDlg (void)
@@ -185,7 +194,7 @@ void
 ImGui_ImplDX9_NewFrame (void);
 
 
-void
+bool
 TBFix_DrawConfigUI (void)
 {
   static bool need_restart = false;
@@ -519,144 +528,10 @@ TBFix_DrawConfigUI (void)
       ImGui::TreePop     ( );
     }
 
-    if (ImGui::CollapsingHeader ("Modding"))
-    {
-      ImGui::TreePush ("");
-      if (ImGui::Checkbox ("Dump Textures  (TBFix_Res\\dump\\textures\\<format>\\*.dds)",    &config.textures.dump))     tbf::RenderFix::need_reset.graphics = true;
-
-      if (ImGui::IsItemHovered ())
-      {
-        ImGui::BeginTooltip ();
-        ImGui::Text         ("Enabling this will cause the game to run slower and waste disk space, only enable if you know what you are doing.");
-        ImGui::EndTooltip   ();
-      }
-
-      ImGui::BeginChild ("ModDescription", ImVec2 (750, 325), true);
-        ImGui::TextColored    (ImVec4 (0.9f, 0.7f, 0.5f, 1.0f), "Texture Modding Overview"); ImGui::SameLine ();
-        ImGui::Text           ("    (Documentation Pending)");
-
-        ImGui::Separator      ();
-
-        ImGui::TextWrapped    ("\nReplacement textures go in (TBFix_Res\\inject\\textures\\{blocking|streaming}\\<checksum>.dds)\n\n");
-
-        ImGui::TreePush ("");
-          ImGui::BulletText ("Blocking textures have a high performance penalty, but zero chance of visible pop-in.");
-          ImGui::BulletText ("Streaming textures will replace the game's original texture whenever Disk/CPU loads finish.");
-          ImGui::TreePush   ("");
-            ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.6f, 0.9f, 0.2f, 1.0f));
-            ImGui::BulletText     ("Use streaming whenever possible or performance will bite you in the ass.");
-            ImGui::PopStyleColor  ();
-          ImGui::TreePop    (  );
-        ImGui::TreePop  ();
-
-        ImGui::TextWrapped    ("\n\nLoading modified textures from separate files is inefficient; entire groups of textures may also be packaged into \".7z\" files (See TBFix_Res\\inject\\00_License.7z as an example, and use low/no compression ratio or you will kill the game's performance).\n");
-
-        ImGui::Separator      ();
-
-        ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.9f, 0.6f, 0.3f, 1.0f));
-        ImGui::TextWrapped    ( "\n\nA more detailed synopsis will follow in future versions, for now please refer to the GitHub release notes for Tales of Symphonia "
-                                "\"Fix\" v 0.9.0 for a thorough description on authoring texture mods.\n\n" );
-        ImGui::PopStyleColor  ();
-
-        ImGui::Separator      ();
-
-        ImGui::Bullet         (); ImGui::SameLine ();
-        ImGui::TextWrapped    ( "\nIf texture mods are enabled, you can click on the Injected and Base buttons on the texture cache "
-                                  "summary pannel to compare modified and unmodified." );
-      ImGui::EndChild         ();
-
-      ImGui::SameLine ();
-
-      ImGui::BeginChild       ("DebugTexture", ImVec2 (300, 325));
-
-      static std::vector <std::string> list_contents;
-      static bool                      list_dirty     = false;
-      static int                       sel            =     0;
-
-      extern std::vector <uint32_t> textures_used_last_dump;
-      extern              uint32_t  tex_dbg_idx;
-      extern              uint32_t  debug_tex_id;
-
-      if (list_dirty)
-      {
-             list_contents.clear ();
-                  sel = tex_dbg_idx;
-
-        for ( auto it : textures_used_last_dump )
-        {
-          char szDesc [16] = { };
-
-          sprintf (szDesc, "%08x", it);
-
-          list_contents.push_back (szDesc);
-        }
-      }
-
-      if (ImGui::Button ("Refresh Textures"))
-      {
-        SK_ICommandProcessor& command =
-          *SK_GetCommandProcessor ();
-
-        command.ProcessCommandLine ("Textures.Trace true");
-
-        tbf::RenderFix::tex_mgr.updateOSD ();
-
-        list_dirty = true;
-      }
-
-      if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("Refreshes the set of texture checksums used in the last frame drawn.");
-
-      ImGui::SameLine ();
-
-      if (ImGui::Button ("Clear Debug"))
-      {
-        sel                         = -1;
-        debug_tex_id                =  0;
-        textures_used_last_dump.clear ();
-      }
-
-      if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("Exits texture debug mode.");
-
-      //if (ImGui::Button ("Dump Selected"))
-      //{
-      //}
-
-      if ( ImGui::ListBox (
-            "", &sel,
-              [](void *data, int idx, const char **out_data) -> 
-                bool {
-                  *out_data = list_contents [idx].c_str ();
-
-                  return true;
-                },
-              nullptr,
-            textures_used_last_dump.size (),
-          textures_used_last_dump.size () )
-        )
-      {
-        if ((int32_t)tex_dbg_idx < 0 || (! textures_used_last_dump.size ())) {
-          tex_dbg_idx  = -1;
-          debug_tex_id =  0;
-        } else {
-            tex_dbg_idx = sel;
-
-          debug_tex_id = textures_used_last_dump [sel];
-        }
-      }
-
-      if (ImGui::IsItemHovered ())
-      {
-        ImGui::BeginTooltip ();
-        ImGui::TextColored (ImVec4 (0.7f, 0.9f, 0.3f, 1.0f), "The \"debug\" texture will appear black to make identifying textures to modify easier.");
-        ImGui::Separator  ();
-        ImGui::BulletText ("Press Ctrl + Shift + [ to select the previous texture from this list");
-        ImGui::BulletText ("Press Ctrl + Shift + ] to select the next texture from this list");
-        ImGui::EndTooltip ();
-      }
-
-      ImGui::EndChild ();
-      ImGui::TreePop  ();
+    if (ImGui::Button ("Texture Modding Tools")) {
+      show_texture_mod_dlg = (! show_texture_mod_dlg);
     }
+
     ImGui::TreePop ();
   }
 
@@ -857,6 +732,11 @@ TBFix_DrawConfigUI (void)
 
   if (show_special_k_cfg)  show_special_k_cfg = SK_ImGui_ControlPanel ();
 
+  if (show_texture_mod_dlg)
+  {
+    show_texture_mod_dlg = TBFix_TextureModDlg ();
+  }
+
   if ( SUCCEEDED (
          tbf::RenderFix::pDevice->BeginScene ()
        )
@@ -870,6 +750,8 @@ TBFix_DrawConfigUI (void)
   {
     TBFix_ToggleConfigUI ();
   }
+
+  return show_config;
 }
 
 

@@ -82,6 +82,7 @@ struct {
   tbf::ParameterFloat*   lod_bias;
   tbf::ParameterBool*    cache;
   tbf::ParameterBool*    dump;
+  tbf::ParameterBool*    dump_on_demand;
   tbf::ParameterInt*     cache_size;
   tbf::ParameterInt*     worker_threads;
   tbf::ParameterBool*    show_loading_text;
@@ -216,6 +217,16 @@ TBF_LoadConfig (std::wstring name)
     render_ini,
       L"Texture.System",
         L"Dump" );
+
+  textures.dump_on_demand =
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Dump Textures on Demand")
+      );
+  textures.dump_on_demand->register_to_ini (
+    render_ini,
+      L"Texture.System",
+        L"DumpOnDemand" );
 
   textures.remaster =
     static_cast <tbf::ParameterBool *>
@@ -485,6 +496,7 @@ TBF_LoadConfig (std::wstring name)
   textures.lod_bias->load          (config.textures.lod_bias);
   textures.cache->load             (config.textures.cache);
   textures.dump->load              (config.textures.dump);
+  textures.dump_on_demand->load    (config.textures.on_demand_dump);
   textures.cache_size->load        (config.textures.max_cache_in_mib);
   textures.worker_threads->load    (config.textures.worker_threads);
   textures.show_loading_text->load (config.textures.show_loading_text);
@@ -521,6 +533,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   textures.lod_bias->store          (config.textures.lod_bias);
   textures.cache->store             (config.textures.cache);
   textures.dump->store              (config.textures.dump);
+  textures.dump_on_demand->store    (config.textures.on_demand_dump);
   textures.cache_size->store        (config.textures.max_cache_in_mib);
   textures.worker_threads->store    (config.textures.worker_threads);
   textures.show_loading_text->store (config.textures.show_loading_text);

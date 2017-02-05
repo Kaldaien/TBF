@@ -502,5 +502,14 @@ typedef HRESULT (STDMETHODCALLTYPE *SetDepthStencilSurface_pfn)(
   _In_ IDirect3DSurface9     *pNewZStencil
 );
 
+HRESULT
+TBF_DumpTexture (D3DFORMAT fmt, uint32_t checksum, IDirect3DTexture9* pTex);
+
+bool
+TBF_IsTextureDumped (uint32_t checksum);
+
+bool
+TBF_DeleteDumpedTexture (D3DFORMAT fmt, uint32_t checksum);
+
 
 #endif /* __TBFIX__TEXTURES_H__ */

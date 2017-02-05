@@ -43,9 +43,6 @@
     <ClCompile Include="src\framerate.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\tbt\control_panel.cpp">
-      <Filter>Source Files\ImGui</Filter>
-    </ClCompile>
     <ClCompile Include="src\lzma\7zAlloc.c">
       <Filter>Source Files\lzma</Filter>
     </ClCompile>
@@ -168,6 +165,12 @@
     </ClCompile>
     <ClCompile Include="src\lzma\XzIn.c">
       <Filter>Source Files\lzma</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ImGui\mod_tools.cpp">
+      <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ImGui\control_panel.cpp">
+      <Filter>Source Files\ImGui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
