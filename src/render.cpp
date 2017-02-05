@@ -665,7 +665,7 @@ STDMETHODCALLTYPE
 D3D9EndFrame_Pre (void)
 {
   if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
-    return SK_BeginBufferSwap ();
+    return SK_BeginBufferSwap();
 
   void TBFix_LogUsedTextures (void);
   TBFix_LogUsedTextures ();

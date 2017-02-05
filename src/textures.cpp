@@ -2147,9 +2147,9 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
   EnterCriticalSection (&cs_tex_inject);
 
-  if (inject_tids.count (GetCurrentThreadId ())) {
+  if (inject_tids.count (GetCurrentThreadId ()))
+  {
     inject_thread = true;
-    //resample      = false;
   }
 
   LeaveCriticalSection (&cs_tex_inject);
@@ -2559,8 +2559,10 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
   QueryPerformanceCounter (&end);
 
-  if (SUCCEEDED (hr)) {
-    if (config.textures.cache && checksum != 0x00) {
+  if (SUCCEEDED (hr))
+  {
+    if (config.textures.cache && checksum != 0x00)
+    {
       tbf::RenderFix::Texture* pTex =
         new tbf::RenderFix::Texture ();
 
