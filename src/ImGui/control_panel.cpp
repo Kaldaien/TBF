@@ -687,15 +687,16 @@ TBFix_DrawConfigUI (void)
             history [i].vu_peaks.inst_min = std::min (history [i].vu_peaks.inst_min, channel_peaks_ [i]);
             history [i].vu_peaks.inst_max = std::max (history [i].vu_peaks.inst_max, channel_peaks_ [i]);
 
-            if (history [i].vu_peaks.dwMinSample < timeGetTime () - VUMETER_TIME * 2) {
-              history [i].vu_peaks.disp_min    = history [i].vu_peaks.inst_min;
+            history [i].vu_peaks.disp_min    = history [i].vu_peaks.inst_min;
+
+            if (history [i].vu_peaks.dwMinSample < timeGetTime () - VUMETER_TIME * 3) {
               history [i].vu_peaks.inst_min    = channel_peaks_ [i];
               history [i].vu_peaks.dwMinSample = timeGetTime ();
             }
 
             history [i].vu_peaks.disp_max    = history [i].vu_peaks.inst_max;
 
-            if (history [i].vu_peaks.dwMaxSample < timeGetTime () - VUMETER_TIME * 4) {
+            if (history [i].vu_peaks.dwMaxSample < timeGetTime () - VUMETER_TIME * 3) {
               history [i].vu_peaks.inst_max    = channel_peaks_ [i];
               history [i].vu_peaks.dwMaxSample = timeGetTime ();
             }
@@ -728,7 +729,8 @@ TBFix_DrawConfigUI (void)
             ImGui::PopStyleColor  ();
             ImGui::EndGroup ();
 
-            if (i % 2) {
+            if (! (i % 2))
+            {
               ImGui::SameLine (); ImGui::NextColumn ();
             } else {
               ImGui::Columns   ( 1 );
