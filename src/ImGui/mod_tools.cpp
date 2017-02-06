@@ -73,7 +73,8 @@ TBFix_TextureModDlg (void)
     extern              uint32_t  tex_dbg_idx;
     extern              uint32_t  debug_tex_id;
 
-    ImGui::TreePush ("");
+    ImGui::BeginChild ("ToolHeadings", ImVec2 (750, 32), false, ImGuiWindowFlags_AlwaysUseWindowPadding);
+
     if (ImGui::Button ("Refresh Textures"))
     {
       SK_ICommandProcessor& command =
@@ -116,9 +117,7 @@ TBFix_TextureModDlg (void)
     }
 
     ImGui::Separator ();
-
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 2.0f);
-    ImGui::BeginChild       ("DebugTextures", ImVec2 (100, std::max (last_ht + 128, 18L * (LONG)textures_used_last_dump.size ())));
+    ImGui::EndChild  ();
 
     if (list_dirty)
     {
@@ -135,58 +134,86 @@ TBFix_TextureModDlg (void)
       }
     }
 
-    if ( ImGui::ListBox (
-          "", &sel,
-            [](void *data, int idx, const char **out_data) -> 
-              bool {
-                *out_data = list_contents [idx].c_str ();
+    ImGui::BeginGroup ();
 
-                return true;
-              },
-            nullptr,
-          textures_used_last_dump.size (),
-        textures_used_last_dump.size () )
-      )
+    ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
+
+    ImGui::BeginChild ( "Item List",
+                        ImVec2 ( 90, std::max (512L, last_ht) + 128 ),
+                          true, ImGuiWindowFlags_AlwaysAutoResize );
+
+   if (textures_used_last_dump.size ())
+   {
+     static      int last_sel = 0;
+     static bool sel_changed  = false;
+
+     if (sel != last_sel)
+       sel_changed = true;
+
+     last_sel = sel;
+
+     for ( int line = 0; line < textures_used_last_dump.size (); line++)
+     {
+       if (line == sel)
+       {
+         bool selected = true;
+         ImGui::Selectable (list_contents [line].c_str (), &selected);
+
+         if (sel_changed)
+         {
+           ImGui::SetScrollHere (0.5f); // 0.0f:top, 0.5f:center, 1.0f:bottom
+           sel_changed = false;
+         }
+       }
+
+       else
+       {
+         bool selected = false;
+
+         if (ImGui::Selectable (list_contents[line].c_str (), &selected))
+         {
+           sel_changed = true;
+           tex_dbg_idx                 =  line;
+           sel                         =  line;
+           debug_tex_id                =  textures_used_last_dump [line];
+         }
+       }
+     }
+   }
+
+   ImGui::EndChild ();
+
+   if (ImGui::IsItemHovered ())
+   {
+     ImGui::BeginTooltip ();
+     ImGui::TextColored (ImVec4 (0.9f, 0.6f, 0.2f, 1.0f), "The \"debug\" texture will appear black to make identifying textures to modify easier.");
+     ImGui::Separator  ();
+     ImGui::BulletText ("Press Ctrl + Shift + [ to select the previous texture from this list");
+     ImGui::BulletText ("Press Ctrl + Shift + ] to select the next texture from this list");
+     ImGui::EndTooltip ();
+   }
+
+   ImGui::SameLine ();
+   ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 20.0f);
+
+   last_ht    = std::max (last_ht,    16L);
+   last_width = std::max (last_width, 16L);
+
+   ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
+
+   ImGui::BeginChild ( "Item Selection",
+                       ImVec2 (std::max (256L, last_width + 24), std::max (512L, last_ht) + 128), true, ImGuiWindowFlags_AlwaysAutoResize );
+
+    if (debug_tex_id != 0x00)
     {
-      if ((int32_t)tex_dbg_idx < 0 || (! textures_used_last_dump.size ())) {
-        tex_dbg_idx  = -1;
-        debug_tex_id =  0;
-      } else {
-          tex_dbg_idx = sel;
-
-        debug_tex_id = textures_used_last_dump [sel];
-      }
-    }
-
-    if (ImGui::IsItemHovered ())
-    {
-      ImGui::BeginTooltip ();
-      ImGui::TextColored (ImVec4 (0.7f, 0.9f, 0.3f, 1.0f), "The \"debug\" texture will appear black to make identifying textures to modify easier.");
-      ImGui::Separator  ();
-      ImGui::BulletText ("Press Ctrl + Shift + [ to select the previous texture from this list");
-      ImGui::BulletText ("Press Ctrl + Shift + ] to select the next texture from this list");
-      ImGui::EndTooltip ();
-    }
-
-    ImGui::EndChild ();
-
-    ImGui::SameLine ();
-
-    ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 0.0f);
-
-    last_ht    = std::max (last_ht,    16L);
-    last_width = std::max (last_width, 16L);
-
-    ImGui::BeginChild ("SelectedTexture", ImVec2 (std::max (256L, last_width + 24), last_ht + 128), ImGuiWindowFlags_AlwaysAutoResize);
-
-    if (debug_tex_id != 0x00) {
       tbf::RenderFix::Texture* pTex =
         tbf::RenderFix::tex_mgr.getTexture (debug_tex_id);
 
-      if (pTex != nullptr) {
+      if (pTex != nullptr)
+      {
          D3DSURFACE_DESC desc;
 
-         if (SUCCEEDED (pTex->d3d9_tex->GetLevelDesc (0, &desc)))
+         if (SUCCEEDED (pTex->d3d9_tex->pTex->GetLevelDesc (0, &desc)))
          {
            last_width  = desc.Width;
            last_ht     = desc.Height;
@@ -201,7 +228,7 @@ TBFix_TextureModDlg (void)
            ImGui::Text ( "Format:       %ws",
                            SK_D3D9_FormatToStr (desc.Format).c_str () );
            ImGui::Text ( "Data Size:    %.2f MiB",
-                           (double)pTex->size / (1024.0f * 1024.0f) );
+                           (double)pTex->d3d9_tex->tex_size / (1024.0f * 1024.0f) );
            ImGui::Text ( "Load Time:    %.6f Seconds",
                            pTex->load_time / 1000.0f );
 
@@ -223,23 +250,77 @@ TBFix_TextureModDlg (void)
              }
            }
 
-           ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.8f, 0.95f, 0.1f, 1.0f));
+           ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.95f, 0.95f, 0.05f, 1.0f));
            ImGui::BeginChildFrame (0, ImVec2 ((float)desc.Width + 8, (float)desc.Height + 8), ImGuiWindowFlags_ShowBorders);
            ImGui::Image           ( pTex->d3d9_tex->pTex,
                                       ImVec2 ((float)desc.Width, (float)desc.Height),
                                         ImVec2  (0,0),             ImVec2  (1,1),
                                         ImColor (255,255,255,255), ImColor (255,255,255,128)
                                   );
-           ImGui::PopStyleColor   (1);
            ImGui::EndChildFrame   ();
+           ImGui::PopStyleColor   (1);
          }
       }
     }
-    ImGui::EndChild   ();
+    ImGui::EndChild      ();
+    ImGui::PopStyleColor (2);
 
-    ImGui::PopStyleVar(2);
+    if (debug_tex_id != 0x00)
+    {
+      tbf::RenderFix::Texture* pTex =
+        tbf::RenderFix::tex_mgr.getTexture (debug_tex_id);
 
-    ImGui::TreePop  ();
+      if (pTex != nullptr && pTex->d3d9_tex->pTexOverride != nullptr)
+      {
+        ImGui::SameLine ();
+
+        ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
+
+        ImGui::BeginChild ( "Item Selection2",
+                            ImVec2 (std::max (256L, last_width + 24), std::max (512L, last_ht) + 128), true, ImGuiWindowFlags_AlwaysAutoResize );
+
+         D3DSURFACE_DESC desc;
+
+         if (SUCCEEDED (pTex->d3d9_tex->pTexOverride->GetLevelDesc (0, &desc)))
+         {
+           last_width  = desc.Width;
+           last_ht     = desc.Height;
+
+           extern std::wstring
+           SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
+
+
+           ImGui::Text ( "Dimensions:   %lux%lu",
+                           desc.Width, desc.Height/*,
+                             pTex->d3d9_tex->GetLevelCount ()*/ );
+           ImGui::Text ( "Format:       %ws",
+                           SK_D3D9_FormatToStr (desc.Format).c_str () );
+           ImGui::Text ( "Data Size:    %.2f MiB",
+                           (double)pTex->d3d9_tex->override_size / (1024.0f * 1024.0f) );
+           ImGui::TextColored (ImVec4 (1.0f, 1.0f, 1.0f, 1.0f), "{Injected} or {Resampled} Texture" );
+
+           ImGui::Separator     ();
+
+           if ( ImGui::Button ("TODO: Reload Button") )
+           {
+             //TBF_DumpTexture (desc.Format, debug_tex_id, pTex->d3d9_tex->pTex);
+           }
+
+           ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.95f, 0.95f, 0.05f, 1.0f));
+           ImGui::BeginChildFrame (0, ImVec2 ((float)desc.Width + 8, (float)desc.Height + 8), ImGuiWindowFlags_ShowBorders);
+           ImGui::Image           ( pTex->d3d9_tex->pTexOverride,
+                                      ImVec2 ((float)desc.Width, (float)desc.Height),
+                                        ImVec2  (0,0),             ImVec2  (1,1),
+                                        ImColor (255,255,255,255), ImColor (255,255,255,128)
+                                  );
+           ImGui::EndChildFrame   ();
+           ImGui::PopStyleColor   (1);
+         }
+        ImGui::EndChild      ();
+      }
+    }
+    ImGui::PopStyleVar   (1);
+    ImGui::EndGroup      ();
   }
 
   if (ImGui::CollapsingHeader ("Misc. Settings"))
