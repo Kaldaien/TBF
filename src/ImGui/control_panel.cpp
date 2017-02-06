@@ -3,6 +3,8 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#define NOMINMAX
+
 #include <imgui/imgui.h>
 #include <d3d9.h>
 #define DIRECTINPUT_VERSION 0x0800
@@ -23,6 +25,51 @@
 
 #include <string>
 #include <vector>
+
+
+#include <algorithm>
+#include <Mmdeviceapi.h>
+#include <audiopolicy.h>
+#include <endpointvolume.h>
+#include <atlbase.h>
+
+IAudioMeterInformation*
+TBFix_GetAudioMeterInfo (void)
+{
+  CComPtr <IMMDeviceEnumerator> pDevEnum = nullptr;
+
+  if (FAILED ((pDevEnum.CoCreateInstance (__uuidof (MMDeviceEnumerator)))))
+    return nullptr;
+
+  // Most game audio a user will not want to hear while a game is in the
+  //   background will pass through eConsole.
+  //
+  //   eCommunication will be headset stuff and that's something a user is not
+  //     going to appreciate having muted :) Consider overloading this function
+  //       to allow independent control.
+  //
+  CComPtr <IMMDevice> pDevice;
+  if ( FAILED (
+         pDevEnum->GetDefaultAudioEndpoint ( eRender,
+                                               eConsole,
+                                                 &pDevice )
+              )
+     ) return nullptr;
+
+  IAudioMeterInformation* pMeterInfo = nullptr;
+
+  HRESULT hr = pDevice->Activate ( __uuidof (IAudioMeterInformation),
+                                     CLSCTX_ALL,
+                                       nullptr,
+                                         IID_PPV_ARGS_Helper (&pMeterInfo) );
+
+  if (SUCCEEDED (hr))
+    return pMeterInfo;
+
+  return nullptr;
+}
+
+
 
 __declspec (dllimport)
 bool
@@ -605,6 +652,99 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePop   (  );
   }
 
+  if (ImGui::CollapsingHeader ("Audio Volume"))
+  {
+    IAudioMeterInformation* pMeterInfo =
+      TBFix_GetAudioMeterInfo ();
+
+    if (pMeterInfo != nullptr)
+    {
+      UINT channels = 0;
+
+      if (SUCCEEDED (pMeterInfo->GetMeteringChannelCount (&channels)))
+      {
+        static float channel_peaks_    [32];
+
+        struct
+        {
+          struct {
+            float inst_min = FLT_MAX;  DWORD dwMinSample = 0;  float disp_min = FLT_MAX;
+            float inst_max = FLT_MIN;  DWORD dwMaxSample = 0;  float disp_max = FLT_MIN;
+          } vu_peaks;
+
+          float peaks [120];
+          int   current_idx;
+        } static history [32];
+
+        #define VUMETER_TIME 300
+
+        ImGui::Columns (2);
+
+        for (int i = 0 ; i < channels; i++)
+        {
+          if (SUCCEEDED (pMeterInfo->GetChannelsPeakValues (channels, channel_peaks_)))
+          {
+            history [i].vu_peaks.inst_min = std::min (history [i].vu_peaks.inst_min, channel_peaks_ [i]);
+            history [i].vu_peaks.inst_max = std::max (history [i].vu_peaks.inst_max, channel_peaks_ [i]);
+
+            if (history [i].vu_peaks.dwMinSample < timeGetTime () - VUMETER_TIME * 2) {
+              history [i].vu_peaks.disp_min    = history [i].vu_peaks.inst_min;
+              history [i].vu_peaks.inst_min    = channel_peaks_ [i];
+              history [i].vu_peaks.dwMinSample = timeGetTime ();
+            }
+
+            history [i].vu_peaks.disp_max    = history [i].vu_peaks.inst_max;
+
+            if (history [i].vu_peaks.dwMaxSample < timeGetTime () - VUMETER_TIME * 4) {
+              history [i].vu_peaks.inst_max    = channel_peaks_ [i];
+              history [i].vu_peaks.dwMaxSample = timeGetTime ();
+            }
+
+            history [i].peaks [history [i].current_idx] = channel_peaks_ [i];
+            history [i].current_idx = (history [i].current_idx + 1) % IM_ARRAYSIZE (history [i].peaks);
+
+            ImGui::BeginGroup ();
+
+            ImGui::PlotLines ( "",
+                                history [i].peaks,
+                                  IM_ARRAYSIZE (history [i].peaks),
+                                    history [i].current_idx,
+                                      "",
+                                           history [i].vu_peaks.disp_min,
+                                           1.0f,
+                                            ImVec2 (ImGui::GetContentRegionAvailWidth (), 80) );
+
+            //char szName [64];
+            //sprintf (szName, "Channel: %lu", i);
+
+            ImGui::PushStyleColor (ImGuiCol_PlotHistogram,     ImVec4 (0.9f, 0.1f, 0.1f, 0.15f));
+            ImGui::ProgressBar    (history [i].vu_peaks.disp_max, ImVec2 (-1.0f, 0.0f));
+            ImGui::PopStyleColor  ();
+
+            ImGui::ProgressBar    (channel_peaks_ [i],          ImVec2 (-1.0f, 0.0f));
+
+            ImGui::PushStyleColor (ImGuiCol_PlotHistogram,     ImVec4 (0.1f, 0.1f, 0.9f, 0.15f));
+            ImGui::ProgressBar    (history [i].vu_peaks.disp_min, ImVec2 (-1.0f, 0.0f));
+            ImGui::PopStyleColor  ();
+            ImGui::EndGroup ();
+
+            if (i % 2) {
+              ImGui::SameLine (); ImGui::NextColumn ();
+            } else {
+              ImGui::Columns   ( 1 );
+              ImGui::Separator (   );
+              ImGui::Columns   ( 2 );
+            }
+          }
+        }
+
+        ImGui::Columns (1);
+      }
+
+      pMeterInfo->Release ();
+    }
+  }
+
 #if 0
   if (ImGui::CollapsingHeader ("Audio (DO NOT USE ON RETAIL VERSION OF GAME)", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   { 
@@ -780,3 +920,7 @@ TBFix_ImGui_Init (void)
                      TBFix_ImGui_DrawFrame,
              (LPVOID *)&SK_ImGui_DrawFrame_Original );
 }
+
+
+#define ID_TIMER  1
+#define TIMER_PERIOD  125
