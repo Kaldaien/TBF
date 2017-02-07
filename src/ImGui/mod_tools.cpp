@@ -98,13 +98,11 @@ TBF_DrawFileList (void)
     list_dirty = false;
   }
 
-  ImGui::BeginGroup ();
+  ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
+  ImGui::PushStyleColor (ImGuiCol_Border,                   ImVec4 (0.4f, 0.6f, 0.9f, 1.0f));
 
 #define FILE_LIST_WIDTH  250UL
 #define FILE_LIST_HEIGHT 100UL
-
-  ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
-  ImGui::PushStyleColor (ImGuiCol_Border,                   ImVec4 (0.4f, 0.6f, 0.9f, 1.0f));
 
   ImGui::BeginChild ( "Source List",
                         ImVec2 ( FILE_LIST_WIDTH, FILE_LIST_HEIGHT ),
@@ -180,8 +178,6 @@ TBF_DrawFileList (void)
 
     ImGui::PopStyleColor ();
     ImGui::PopStyleVar   ();
-  
-    ImGui::EndGroup      ();
 
     ImGui::SameLine      ();
 
@@ -189,9 +185,8 @@ TBF_DrawFileList (void)
 
     ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
     ImGui::BeginChild ( "Texture Selection",
-                           ImVec2 (0, list_size.y - 24),
-                             true,
-                               ImGuiWindowFlags_AlwaysAutoResize );
+                           ImVec2 (-2.0f, list_size.y - 24),
+                             true );
 
     for ( auto it : sources [sel].checksums )
     {

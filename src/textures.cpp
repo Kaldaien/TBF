@@ -1792,7 +1792,7 @@ TBFix_UpdateQueueOSD (void)
   {
     DWORD dwTime = timeGetTime ();
 
-    //if (TryEnterCriticalSection (&osd_cs))
+    if (TryEnterCriticalSection (&osd_cs))
     {
       extern std::string mod_text;
 
@@ -1861,7 +1861,7 @@ TBFix_UpdateQueueOSD (void)
       if (mod_text != "")
         last_queue_update = dwTime;
       
-      //LeaveCriticalSection (&osd_cs);
+      LeaveCriticalSection (&osd_cs);
     }
   }
 }
@@ -2486,8 +2486,6 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
             (*ppTexture)->AddRef ();
           }
         }
-
-        ////tsf::RenderFix::tex_mgr.removeTexture (pTexOrig);
       }
 
       else {
@@ -2495,7 +2493,6 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
                                      load_op ) );
 
         stream_pool.postJob (load_op);
-        //resample_pool->postJob (load_op);
       }
 
       LeaveCriticalSection        (&cs_tex_stream);
@@ -3565,6 +3562,23 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
           if (SUCCEEDED (hr))
             pThread->pool_->postFinished (pStream);
 
+          else {
+            tex_log->Log ( L"[ Tex. Mgr ] Texture Resample Failure (hr=%x) for texture %x, blacklisting from future resamples...",
+                             hr, pStream->checksum );
+            resample_blacklist.insert (pStream->checksum);
+
+            ISKTextureD3D9* pSKTex =
+              (ISKTextureD3D9 *)pStream->pDest;
+
+            pSKTex->pTexOverride  = nullptr;
+            pSKTex->override_size = 0;
+
+            // Remove the temporary reference we added earlier
+            pStream->pDest->Release ();
+
+            tbf::RenderFix::tex_mgr.removeTexture (pSKTex);
+          }
+
           pThread->finishJob ();
         }
 
@@ -3586,6 +3600,25 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
 
           if (SUCCEEDED (hr))
             pThread->pool_->postFinished (pStream);
+
+          else
+          {
+            tex_log->Log ( L"[ Tex. Mgr ] Texture Injection Failure (hr=%x) for texture %x, removing from injectable list...",
+                             hr, pStream->checksum );
+            if (injectable_textures.count (pStream->checksum))
+              injectable_textures.erase (pStream->checksum);
+
+            ISKTextureD3D9* pSKTex =
+              (ISKTextureD3D9 *)pStream->pDest;
+
+            pSKTex->pTexOverride  = nullptr;
+            pSKTex->override_size = 0;
+
+            // Remove the temporary reference we added earlier
+            pStream->pDest->Release ();
+
+            tbf::RenderFix::tex_mgr.removeTexture (pSKTex);
+          }
 
           pThread->finishJob ();
         }
