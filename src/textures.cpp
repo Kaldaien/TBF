@@ -103,19 +103,6 @@ bool __need_purge     = false;
 bool __log_used       = false;
 bool __show_cache     = false;
 
-enum tbf_load_method_t {
-  Streaming,
-  Blocking,
-  DontCare
-};
-
-struct tbf_tex_record_s {
-  unsigned int               archive = std::numeric_limits <unsigned int>::max ();
-           int               fileno  = 0UL;
-  enum     tbf_load_method_t method  = DontCare;
-           size_t            size    = 0UL;
-};
-
 bool pending_loads            (void);
 void TBFix_LoadQueuedTextures (void);
 
@@ -130,6 +117,34 @@ void TBFix_LoadQueuedTextures (void);
 std::unordered_map <uint32_t, tbf_tex_record_s> injectable_textures;
 std::vector        <std::wstring>               archives;
 std::unordered_set <uint32_t>                   dumped_textures;
+
+std::vector <std::wstring>
+TBF_GetTextureArchives (void)
+{
+  return archives;
+}
+
+std::vector < std::pair < uint32_t, tbf_tex_record_s > >
+TBF_GetInjectableTextures (void)
+{
+  std::vector < std::pair < uint32_t, tbf_tex_record_s > > textures;
+
+  for ( auto it : injectable_textures ) 
+  {
+    textures.push_back (std::make_pair (it.first, it.second));
+  }
+
+  return textures;
+}
+
+tbf_tex_record_s*
+TBF_GetInjectableTexture (uint32_t checksum)
+{
+  if (injectable_textures.count (checksum))
+    return &injectable_textures [checksum];
+
+  return nullptr;
+}
 
 // The set of textures used during the last frame
 std::vector        <uint32_t>                   textures_last_frame;
@@ -658,7 +673,7 @@ D3D9SetTexture_Detour (
     else
       pTexture = pSKTex->pTex;
 
-    if (pSKTex->tex_crc32 == (uint32_t)debug_tex_id)
+    if (pSKTex->tex_crc32 == (uint32_t)debug_tex_id && config.textures.highlight_debug_tex)
       pTexture = nullptr;
 
     if (pTexture != nullptr)
@@ -1561,6 +1576,8 @@ InjectTexture (tbf_tex_load_s* load)
     return E_NOT_VALID_STATE;
   }
 
+  load->pDest->AddRef ();
+
   const tbf_tex_record_s* inj_tex =
     &(*inject).second;
 
@@ -2279,7 +2296,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
       record.method = Streaming;
 
     // If -1, load from disk...
-    if (record.archive == -1)
+    if (record.archive == std::numeric_limits <unsigned int>::max ())
     {
       if (record.method == Streaming)
         _swprintf ( wszInjectFileName, L"%s\\inject\\textures\\streaming\\%08x%s",
@@ -2411,7 +2428,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
         tbf_tex_record_s rec;
         rec.size    =  ULARGE_INTEGER { file_attrib_data.nFileSizeLow,
                                           file_attrib_data.nFileSizeHigh }.QuadPart;
-        rec.archive = -1;
+        rec.archive = std::numeric_limits <unsigned int>::max ();
         rec.method  =  Blocking;
 
         if (! injectable_textures.count (checksum))
@@ -2712,8 +2729,10 @@ tbf::RenderFix::TextureManager::getTexture (uint32_t checksum)
 
     auto rem = remove_textures.begin ();
 
-    while (rem != remove_textures.end ()) {
-      if ((*rem)->pTexOverride != nullptr) {
+    while (rem != remove_textures.end ())
+    {
+      if ((*rem)->pTexOverride != nullptr)
+      {
         InterlockedDecrement (&injected_count);
         InterlockedAdd64     (&injected_size, -(*rem)->override_size);
       }
@@ -2865,267 +2884,9 @@ tbf::RenderFix::TextureManager::Init (void)
 
   CrcGenerateTable ();
 
-  CFileInStream arc_stream;
-  CLookToRead   look_stream;
-
-  FileInStream_CreateVTable (&arc_stream);
-  LookToRead_CreateVTable   (&look_stream, False);
-
-  look_stream.realStream = &arc_stream.s;
-  LookToRead_Init         (&look_stream);
-
   d3dx9_43_dll = LoadLibrary (L"D3DX9_43.DLL");
 
-  //
-  // Walk injectable textures so we don't have to query the filesystem on every
-  //   texture load to check if a injectable one exists.
-  //
-  if ( GetFileAttributesW (TBFIX_TEXTURE_DIR L"\\inject") !=
-         INVALID_FILE_ATTRIBUTES ) {
-    WIN32_FIND_DATA fd;
-    HANDLE          hFind  = INVALID_HANDLE_VALUE;
-    int             files  = 0;
-    LARGE_INTEGER   liSize = { 0 };
-
-    tex_log->LogEx ( true, L"[Inject Tex] Enumerating injectable textures..." );
-
-    hFind = FindFirstFileW (TBFIX_TEXTURE_DIR L"\\inject\\textures\\blocking\\*", &fd);
-
-    if (hFind != INVALID_HANDLE_VALUE) {
-      do {
-        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
-          if (wcsstr (_wcslwr (fd.cFileName), TBFIX_TEXTURE_EXT)) {
-            uint32_t checksum;
-            swscanf (fd.cFileName, L"%x" TBFIX_TEXTURE_EXT, &checksum);
-
-            // Already got this texture...
-            if (injectable_textures.count (checksum))
-                continue;
-
-            ++files;
-
-            LARGE_INTEGER fsize;
-
-            fsize.HighPart = fd.nFileSizeHigh;
-            fsize.LowPart  = fd.nFileSizeLow;
-
-            liSize.QuadPart += fsize.QuadPart;
-
-            tbf_tex_record_s rec;
-            rec.size    = (uint32_t)fsize.QuadPart;
-            rec.archive = -1;
-            rec.method  = Blocking;
-
-            injectable_textures.insert (std::make_pair (checksum, rec));
-          }
-        }
-      } while (FindNextFileW (hFind, &fd) != 0);
-
-      FindClose (hFind);
-    }
-
-    hFind = FindFirstFileW (TBFIX_TEXTURE_DIR L"\\inject\\textures\\streaming\\*", &fd);
-
-    if (hFind != INVALID_HANDLE_VALUE) {
-      do {
-        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
-          if (wcsstr (_wcslwr (fd.cFileName), TBFIX_TEXTURE_EXT)) {
-            uint32_t checksum;
-            swscanf (fd.cFileName, L"%x" TBFIX_TEXTURE_EXT, &checksum);
-
-            // Already got this texture...
-            if (injectable_textures.count (checksum))
-                continue;
-
-            ++files;
-
-            LARGE_INTEGER fsize;
-
-            fsize.HighPart = fd.nFileSizeHigh;
-            fsize.LowPart  = fd.nFileSizeLow;
-
-            liSize.QuadPart += fsize.QuadPart;
-
-            tbf_tex_record_s rec;
-            rec.size    = (uint32_t)fsize.QuadPart;
-            rec.archive = -1;
-            rec.method  = Streaming;
-
-            injectable_textures.insert (std::make_pair (checksum, rec));
-          }
-        }
-      } while (FindNextFileW (hFind, &fd) != 0);
-
-      FindClose (hFind);
-    }
-
-    hFind = FindFirstFileW (TBFIX_TEXTURE_DIR L"\\inject\\textures\\*", &fd);
-
-    if (hFind != INVALID_HANDLE_VALUE) {
-      do {
-        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
-          if (wcsstr (_wcslwr (fd.cFileName), TBFIX_TEXTURE_EXT)) {
-            uint32_t checksum;
-            swscanf (fd.cFileName, L"%x" TBFIX_TEXTURE_EXT, &checksum);
-
-            // Already got this texture...
-            if (injectable_textures.count (checksum))
-                continue;
-
-            ++files;
-
-            LARGE_INTEGER fsize;
-
-            fsize.HighPart = fd.nFileSizeHigh;
-            fsize.LowPart  = fd.nFileSizeLow;
-
-            liSize.QuadPart += fsize.QuadPart;
-
-            tbf_tex_record_s rec;
-            rec.size    = (uint32_t)fsize.QuadPart;
-            rec.archive = -1;
-            rec.method  = DontCare;
-
-            if (! injectable_textures.count (checksum))
-              injectable_textures.insert (std::make_pair (checksum, rec));
-          }
-        }
-      } while (FindNextFileW (hFind, &fd) != 0);
-
-      FindClose (hFind);
-    }
-
-    hFind = FindFirstFileW (TBFIX_TEXTURE_DIR L"\\inject\\*.*", &fd);
-
-    if (hFind != INVALID_HANDLE_VALUE)
-    {
-      int archive = 0;
-
-      do
-      {
-        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES)
-        {
-          wchar_t* wszArchiveNameLwr =
-            _wcslwr (_wcsdup (fd.cFileName));
-
-          if ( wcsstr (wszArchiveNameLwr, L".7z") )
-          {
-            int tex_count = 0;
-
-            CSzArEx       arc;
-            ISzAlloc      thread_alloc;
-            ISzAlloc      thread_tmp_alloc;
-
-            thread_alloc.Alloc     = SzAlloc;
-            thread_alloc.Free      = SzFree;
-
-            thread_tmp_alloc.Alloc = SzAllocTemp;
-            thread_tmp_alloc.Free  = SzFreeTemp;
-
-            wchar_t wszQualifiedArchiveName [MAX_PATH];
-            _swprintf ( wszQualifiedArchiveName,
-                          L"%s\\inject\\%s",
-                            TBFIX_TEXTURE_DIR,
-                              fd.cFileName );
-
-            if (InFile_OpenW (&arc_stream.file, wszQualifiedArchiveName))
-            {
-              tex_log->Log ( L"[Inject Tex]  ** Cannot open archive file: %s",
-                               wszQualifiedArchiveName );
-              continue;
-            }
-
-            SzArEx_Init (&arc);
-
-            if ( SzArEx_Open ( &arc,
-                                 &look_stream.s,
-                                   &thread_alloc,
-                                     &thread_tmp_alloc ) == SZ_OK )
-            {
-              uint32_t i;
-
-              wchar_t wszEntry [MAX_PATH];
-
-              for (i = 0; i < arc.NumFiles; i++)
-              {
-                if (SzArEx_IsDir (&arc, i))
-                  continue;
-
-                SzArEx_GetFileNameUtf16 (&arc, i, (UInt16 *)wszEntry);
-
-                // Truncate to 32-bits --> there's no way in hell a texture will ever be >= 2 GiB
-                size_t fileSize = SzArEx_GetFileSize (&arc, i);
-
-                wchar_t* wszFullName =
-                  _wcslwr (_wcsdup (wszEntry));
-
-                if ( wcsstr ( wszFullName, TBFIX_TEXTURE_EXT) )
-                {
-                  tbf_load_method_t method = DontCare;
-
-                  uint32_t checksum;
-                  wchar_t* wszUnqualifiedEntry =
-                    wszFullName + wcslen (wszFullName);
-
-                  // Strip the path
-                  while (  wszUnqualifiedEntry >= wszFullName &&
-                          *wszUnqualifiedEntry != L'/')
-                    wszUnqualifiedEntry--;
-
-                  if (*wszUnqualifiedEntry == L'/')
-                    ++wszUnqualifiedEntry;
-
-                  swscanf (wszUnqualifiedEntry, L"%x" TBFIX_TEXTURE_EXT, &checksum);
-
-                  // Already got this texture...
-                  if ( injectable_textures.count (checksum) ||
-                       inject_blacklist.count    (checksum) ) {
-                    free (wszFullName);
-                    continue;
-                  }
-
-                  if (wcsstr (wszFullName, L"streaming"))
-                    method = Streaming;
-                  else if (wcsstr (wszFullName, L"blocking"))
-                    method = Blocking;
-
-                  tbf_tex_record_s rec;
-                  rec.size    = (uint32_t)fileSize;
-                  rec.archive = archive;
-                  rec.fileno  = i;
-                  rec.method  = method;
-
-                  injectable_textures.insert (std::make_pair (checksum, rec));
-
-                  ++tex_count;
-                  ++files;
-
-                  liSize.QuadPart += rec.size;
-                }
-
-                free (wszFullName);
-              }
-
-              if (tex_count > 0) {
-                ++archive;
-                archives.push_back (wszQualifiedArchiveName);
-              }
-            }
-
-            SzArEx_Free (&arc, &thread_alloc);
-            File_Close  (&arc_stream.file);
-          }
-
-          free (wszArchiveNameLwr);
-        }
-      } while (FindNextFileW (hFind, &fd) != 0);
-
-      FindClose (hFind);
-    }
-
-    tex_log->LogEx ( false, L" %lu files (%3.1f MiB)\n",
-                       files, (double)liSize.QuadPart / (1024.0 * 1024.0) );
-  }
+  TBF_RefreshDataSources ();
 
   if ( GetFileAttributesW (TBFIX_TEXTURE_DIR L"\\dump\\textures") !=
          INVALID_FILE_ATTRIBUTES ) {
@@ -3934,3 +3695,391 @@ SK_TextureWorkerThread::finishJob (void)
   job_ = nullptr;
 }
 HMODULE tbf::RenderFix::d3dx9_43_dll = 0;
+
+
+
+
+void
+TBF_RefreshDataSources (void)
+{
+  CFileInStream arc_stream;
+  CLookToRead   look_stream;
+
+  FileInStream_CreateVTable (&arc_stream);
+  LookToRead_CreateVTable   (&look_stream, False);
+
+  look_stream.realStream = &arc_stream.s;
+  LookToRead_Init         (&look_stream);
+
+  injectable_textures.clear ();
+  archives.clear            ();
+
+  //
+  // Walk injectable textures so we don't have to query the filesystem on every
+  //   texture load to check if a injectable one exists.
+  //
+  if ( GetFileAttributesW (TBFIX_TEXTURE_DIR L"\\inject") !=
+         INVALID_FILE_ATTRIBUTES ) {
+    WIN32_FIND_DATA fd;
+    HANDLE          hFind  = INVALID_HANDLE_VALUE;
+    int             files  = 0;
+    LARGE_INTEGER   liSize = { 0 };
+
+    tex_log->LogEx ( true, L"[Inject Tex] Enumerating injectable textures..." );
+
+    hFind = FindFirstFileW (TBFIX_TEXTURE_DIR L"\\inject\\textures\\blocking\\*", &fd);
+
+    if (hFind != INVALID_HANDLE_VALUE) {
+      do {
+        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
+          if (wcsstr (_wcslwr (fd.cFileName), TBFIX_TEXTURE_EXT)) {
+            uint32_t checksum;
+            swscanf (fd.cFileName, L"%x" TBFIX_TEXTURE_EXT, &checksum);
+
+            // Already got this texture...
+            if (injectable_textures.count (checksum))
+                continue;
+
+            ++files;
+
+            LARGE_INTEGER fsize;
+
+            fsize.HighPart = fd.nFileSizeHigh;
+            fsize.LowPart  = fd.nFileSizeLow;
+
+            liSize.QuadPart += fsize.QuadPart;
+
+            tbf_tex_record_s rec;
+            rec.size    = (uint32_t)fsize.QuadPart;
+            rec.archive = std::numeric_limits <unsigned int>::max ();
+            rec.method  = Blocking;
+
+            injectable_textures.insert (std::make_pair (checksum, rec));
+          }
+        }
+      } while (FindNextFileW (hFind, &fd) != 0);
+
+      FindClose (hFind);
+    }
+
+    hFind = FindFirstFileW (TBFIX_TEXTURE_DIR L"\\inject\\textures\\streaming\\*", &fd);
+
+    if (hFind != INVALID_HANDLE_VALUE) {
+      do {
+        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
+          if (wcsstr (_wcslwr (fd.cFileName), TBFIX_TEXTURE_EXT)) {
+            uint32_t checksum;
+            swscanf (fd.cFileName, L"%x" TBFIX_TEXTURE_EXT, &checksum);
+
+            // Already got this texture...
+            if (injectable_textures.count (checksum))
+                continue;
+
+            ++files;
+
+            LARGE_INTEGER fsize;
+
+            fsize.HighPart = fd.nFileSizeHigh;
+            fsize.LowPart  = fd.nFileSizeLow;
+
+            liSize.QuadPart += fsize.QuadPart;
+
+            tbf_tex_record_s rec;
+            rec.size    = (uint32_t)fsize.QuadPart;
+            rec.archive = std::numeric_limits <unsigned int>::max ();
+            rec.method  = Streaming;
+
+            injectable_textures.insert (std::make_pair (checksum, rec));
+          }
+        }
+      } while (FindNextFileW (hFind, &fd) != 0);
+
+      FindClose (hFind);
+    }
+
+    hFind = FindFirstFileW (TBFIX_TEXTURE_DIR L"\\inject\\textures\\*", &fd);
+
+    if (hFind != INVALID_HANDLE_VALUE) {
+      do {
+        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES) {
+          if (wcsstr (_wcslwr (fd.cFileName), TBFIX_TEXTURE_EXT)) {
+            uint32_t checksum;
+            swscanf (fd.cFileName, L"%x" TBFIX_TEXTURE_EXT, &checksum);
+
+            // Already got this texture...
+            if (injectable_textures.count (checksum))
+                continue;
+
+            ++files;
+
+            LARGE_INTEGER fsize;
+
+            fsize.HighPart = fd.nFileSizeHigh;
+            fsize.LowPart  = fd.nFileSizeLow;
+
+            liSize.QuadPart += fsize.QuadPart;
+
+            tbf_tex_record_s rec;
+            rec.size    = (uint32_t)fsize.QuadPart;
+            rec.archive = std::numeric_limits <unsigned int>::max ();
+            rec.method  = DontCare;
+
+            if (! injectable_textures.count (checksum))
+              injectable_textures.insert (std::make_pair (checksum, rec));
+          }
+        }
+      } while (FindNextFileW (hFind, &fd) != 0);
+
+      FindClose (hFind);
+    }
+
+    hFind = FindFirstFileW (TBFIX_TEXTURE_DIR L"\\inject\\*.*", &fd);
+
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
+      int archive = 0;
+
+      do
+      {
+        if (fd.dwFileAttributes != INVALID_FILE_ATTRIBUTES)
+        {
+          wchar_t* wszArchiveNameLwr =
+            _wcslwr (_wcsdup (fd.cFileName));
+
+          if ( wcsstr (wszArchiveNameLwr, L".7z") )
+          {
+            int tex_count = 0;
+
+            CSzArEx       arc;
+            ISzAlloc      thread_alloc;
+            ISzAlloc      thread_tmp_alloc;
+
+            thread_alloc.Alloc     = SzAlloc;
+            thread_alloc.Free      = SzFree;
+
+            thread_tmp_alloc.Alloc = SzAllocTemp;
+            thread_tmp_alloc.Free  = SzFreeTemp;
+
+            wchar_t wszQualifiedArchiveName [MAX_PATH];
+            _swprintf ( wszQualifiedArchiveName,
+                          L"%s\\inject\\%s",
+                            TBFIX_TEXTURE_DIR,
+                              fd.cFileName );
+
+            if (InFile_OpenW (&arc_stream.file, wszQualifiedArchiveName))
+            {
+              tex_log->Log ( L"[Inject Tex]  ** Cannot open archive file: %s",
+                               wszQualifiedArchiveName );
+              continue;
+            }
+
+            SzArEx_Init (&arc);
+
+            if ( SzArEx_Open ( &arc,
+                                 &look_stream.s,
+                                   &thread_alloc,
+                                     &thread_tmp_alloc ) == SZ_OK )
+            {
+              uint32_t i;
+
+              wchar_t wszEntry [MAX_PATH];
+
+              for (i = 0; i < arc.NumFiles; i++)
+              {
+                if (SzArEx_IsDir (&arc, i))
+                  continue;
+
+                SzArEx_GetFileNameUtf16 (&arc, i, (UInt16 *)wszEntry);
+
+                // Truncate to 32-bits --> there's no way in hell a texture will ever be >= 2 GiB
+                size_t fileSize = SzArEx_GetFileSize (&arc, i);
+
+                wchar_t* wszFullName =
+                  _wcslwr (_wcsdup (wszEntry));
+
+                if ( wcsstr ( wszFullName, TBFIX_TEXTURE_EXT) )
+                {
+                  tbf_load_method_t method = DontCare;
+
+                  uint32_t checksum;
+                  wchar_t* wszUnqualifiedEntry =
+                    wszFullName + wcslen (wszFullName);
+
+                  // Strip the path
+                  while (  wszUnqualifiedEntry >= wszFullName &&
+                          *wszUnqualifiedEntry != L'/')
+                    wszUnqualifiedEntry--;
+
+                  if (*wszUnqualifiedEntry == L'/')
+                    ++wszUnqualifiedEntry;
+
+                  swscanf (wszUnqualifiedEntry, L"%x" TBFIX_TEXTURE_EXT, &checksum);
+
+                  // Already got this texture...
+                  if ( injectable_textures.count (checksum) ||
+                       inject_blacklist.count    (checksum) ) {
+                    free (wszFullName);
+                    continue;
+                  }
+
+                  if (wcsstr (wszFullName, L"streaming"))
+                    method = Streaming;
+                  else if (wcsstr (wszFullName, L"blocking"))
+                    method = Blocking;
+
+                  tbf_tex_record_s rec;
+                  rec.size    = (uint32_t)fileSize;
+                  rec.archive = archive;
+                  rec.fileno  = i;
+                  rec.method  = method;
+
+                  injectable_textures.insert (std::make_pair (checksum, rec));
+
+                  ++tex_count;
+                  ++files;
+
+                  liSize.QuadPart += rec.size;
+                }
+
+                free (wszFullName);
+              }
+
+              if (tex_count > 0) {
+                ++archive;
+                archives.push_back (wszQualifiedArchiveName);
+              }
+            }
+
+            SzArEx_Free (&arc, &thread_alloc);
+            File_Close  (&arc_stream.file);
+          }
+
+          free (wszArchiveNameLwr);
+        }
+      } while (FindNextFileW (hFind, &fd) != 0);
+
+      FindClose (hFind);
+    }
+
+    tex_log->LogEx ( false, L" %lu files (%3.1f MiB)\n",
+                       files, (double)liSize.QuadPart / (1024.0 * 1024.0) );
+  }
+
+  File_Close  (&arc_stream.file);
+}
+
+
+bool
+tbf::RenderFix::TextureManager::reloadTexture (uint32_t checksum)
+{
+  if ( injectable_textures.find (checksum) ==
+         injectable_textures.end () )
+    return false;
+
+  EnterCriticalSection        (&cs_tex_stream);
+
+  ISKTextureD3D9* pTex = 
+    getTexture (checksum)->d3d9_tex;
+
+
+  if (pTex->pTexOverride != nullptr)
+  {
+    tex_log->LogEx ( true, L"[Inject Tex] Reloading texture for checksum (%08x)... ",
+                         checksum );
+
+    InterlockedDecrement (&injected_count);
+    InterlockedAdd64     (&injected_size, -pTex->override_size);
+
+    pTex->pTexOverride->Release ();
+    pTex->pTexOverride = nullptr;
+  }
+
+  else {
+    LeaveCriticalSection (&cs_tex_stream);
+    return false;
+  }
+
+  tbf_tex_record_s record = injectable_textures [checksum];
+
+  if (record.method == DontCare)
+    record.method = Streaming;
+
+  tbf_tex_load_s* load_op      = nullptr;
+
+  wchar_t wszInjectFileName [MAX_PATH] = { L'\0' };
+
+  bool remap_stream = is_streaming (checksum);
+
+  // If -1, load from disk...
+  if (record.archive == std::numeric_limits <unsigned int>::max ())
+  {
+    if (record.method == Streaming)
+      _swprintf ( wszInjectFileName, L"%s\\inject\\textures\\streaming\\%08x%s",
+                    TBFIX_TEXTURE_DIR,
+                      checksum,
+                        TBFIX_TEXTURE_EXT );
+    else if (record.method == Blocking)
+      _swprintf ( wszInjectFileName, L"%s\\inject\\textures\\blocking\\%08x%s",
+                    TBFIX_TEXTURE_DIR,
+                      checksum,
+                        TBFIX_TEXTURE_EXT );
+  }
+
+  load_op           = new tbf_tex_load_s;
+  load_op->pDevice  = tbf::RenderFix::pDevice;
+  load_op->checksum = checksum;
+
+  load_op->type = tbf_tex_load_s::Stream;
+
+  wcscpy (load_op->wszFilename, wszInjectFileName);
+
+  if (load_op->type == tbf_tex_load_s::Stream)
+  {
+    if ((! remap_stream))
+      tex_log->LogEx ( false, L"streaming\n" );
+    else
+      tex_log->LogEx ( false, L"in-flight already\n" );
+  }
+
+  load_op->SrcDataSize =
+    injectable_textures.count (checksum) == 0 ?
+      0 : (UINT)injectable_textures [checksum].size;
+
+  load_op->pDest = pTex;
+
+  pTex->must_block = false;
+
+  if (is_streaming (load_op->checksum))
+  {
+    ISKTextureD3D9* pTexOrig =
+      (ISKTextureD3D9 *)textures_in_flight [load_op->checksum]->pDest;
+
+    // Remap the output of the in-flight texture
+    textures_in_flight [load_op->checksum]->pDest =
+      pTex;
+
+    if (getTexture (load_op->checksum) != nullptr)
+    {
+      for ( int i = 0;
+                i < getTexture (load_op->checksum)->refs;
+              ++i ) {
+        pTex->AddRef ();
+      }
+    }
+  }
+
+  else
+  {
+    textures_in_flight.insert ( std::make_pair ( load_op->checksum,
+                                 load_op ) );
+
+    stream_pool.postJob (load_op);
+  }
+
+  LeaveCriticalSection        (&cs_tex_stream);
+
+  if (pending_loads ())
+    TBFix_LoadQueuedTextures ();
+
+  return true;
+}

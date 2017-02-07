@@ -22,6 +22,8 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#define NOMINMAX
+
 #include "framerate.h"
 #include "config.h"
 #include "log.h"
@@ -391,7 +393,7 @@ tbf::FrameRateFix::RenderTick (void)
                          60.0f / (float)*pTickScale );
 
     tick_scale =             *pTickScale;
-    target_fps = 60 / max (0, tick_scale);
+    target_fps = 60 / std::max (0, tick_scale);
 
     SK_GetCommandProcessor ()->ProcessCommandFormatted (
       "TargetFPS %f",

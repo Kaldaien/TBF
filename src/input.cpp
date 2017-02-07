@@ -96,8 +96,13 @@ SK_TBF_PluginKeyPress ( BOOL Control,
   SK_ICommandProcessor& command =
     *SK_GetCommandProcessor ();
 
-  if (Control && Shift) {
-    if (vkCode == 'U') {
+  if (Control && Shift)
+  {
+    if (vkCode == VK_DELETE) {
+      config.render.osd_disclaimer = (! config.render.osd_disclaimer);
+    }
+
+    else if (vkCode == 'U') {
       command.ProcessCommandLine ("Textures.Remap toggle");
 
       tbf::RenderFix::tex_mgr.updateOSD ();

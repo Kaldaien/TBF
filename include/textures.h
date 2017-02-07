@@ -22,6 +22,8 @@
 #ifndef __TBFIX__TEXTURES_H__
 #define __TBFIX__TEXTURES_H__
 
+#define NOMINMAX
+
 #include "log.h"
 extern iSK_Logger* tex_log;
 
@@ -30,6 +32,9 @@ extern iSK_Logger* tex_log;
 
 #include <set>
 #include <map>
+#include <limits>
+#include <cstdint>
+#include <algorithm>
 
 interface ISKTextureD3D9;
 
@@ -144,6 +149,8 @@ namespace RenderFix {
 
     tbf::RenderFix::Texture* getTexture (uint32_t crc32);
     void                     addTexture (uint32_t crc32, tbf::RenderFix::Texture* pTex, size_t size);
+
+    bool                     reloadTexture (uint32_t crc32);
 
     // Record a cached reference
     void                     refTexture  (tbf::RenderFix::Texture* pTex);
@@ -511,5 +518,29 @@ TBF_IsTextureDumped (uint32_t checksum);
 bool
 TBF_DeleteDumpedTexture (D3DFORMAT fmt, uint32_t checksum);
 
+enum tbf_load_method_t {
+  Streaming,
+  Blocking,
+  DontCare
+};
+
+struct tbf_tex_record_s {
+  unsigned int               archive = std::numeric_limits <unsigned int>::max ();
+           int               fileno  = 0UL;
+  enum     tbf_load_method_t method  = DontCare;
+           size_t            size    = 0UL;
+};
+
+std::vector <std::wstring>
+TBF_GetTextureArchives (void);
+
+std::vector < std::pair < uint32_t, tbf_tex_record_s > >
+TBF_GetInjectableTextures (void);
+
+tbf_tex_record_s*
+TBF_GetInjectableTexture (uint32_t checksum);
+
+void
+TBF_RefreshDataSources (void);
 
 #endif /* __TBFIX__TEXTURES_H__ */

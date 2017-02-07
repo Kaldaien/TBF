@@ -598,15 +598,17 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
     (SKX_DrawExternalOSD_pfn)GetProcAddress (hMod, "SKX_DrawExternalOSD");
 
   static DWORD dwFirstTime     = timeGetTime ();
-  static bool  show_disclaimer = true;
+  static bool  show_disclaimer = config.render.osd_disclaimer;
 
   if (show_disclaimer)
   {
-    if (timeGetTime() > dwFirstTime + 10000UL)
+    if (timeGetTime () > dwFirstTime + 10000UL)
       show_disclaimer = false;
 
-    SKX_DrawExternalOSD ("ToBFix", "Press Ctrl + Shift + O         to toggle In-Game OSD\n"
-                                   "Press Ctrl + Shift + Backspace to access In-Game Config Menu");
+    SKX_DrawExternalOSD ("ToBFix", "\n"
+                                   "  Press Ctrl + Shift + O         to toggle In-Game OSD\n"
+                                   "  Press Ctrl + Shift + Backspace to access In-Game Config Menu\n\n"
+                                   "  Press Ctrl + Shift + Delete if you know how to read and do not want to read this message again.");
   }
 
   else

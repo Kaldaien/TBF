@@ -74,6 +74,7 @@ struct {
   tbf::ParameterBool*    dump_shaders;
   tbf::ParameterBool*    fix_map_res;
   tbf::ParameterBool*    pause_on_ui;
+  tbf::ParameterBool*    show_osd_disclaimer;
 } render;
 
 struct {
@@ -361,6 +362,17 @@ TBF_LoadConfig (std::wstring name)
       L"ImGui.Settings",
         L"PauseOnActivate" );
 
+  render.show_osd_disclaimer =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool>(
+      L"Show the OSD Disclaimer At Startup")
+    );
+
+  render.show_osd_disclaimer->register_to_ini (
+    render_ini,
+      L"ImGui.Settings",
+        L"ShowOSDDisclaimer" );
+
   framerate.replace_limiter =
     static_cast <tbf::ParameterBool *>
       (g_ParameterFactory.create_parameter <bool> (
@@ -486,6 +498,7 @@ TBF_LoadConfig (std::wstring name)
   render.dump_shaders->load        (config.render.dump_shaders);
   render.fix_map_res->load         (config.render.fix_map_res);
   render.pause_on_ui->load         (config.input.ui.pause);
+  render.show_osd_disclaimer->load (config.render.osd_disclaimer);
 
   framerate.replace_limiter->load  (config.framerate.replace_limiter);
   framerate.tolerance->load        (config.framerate.tolerance);
@@ -527,6 +540,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.rescale_env_shadows->store (config.render.env_shadow_rescale);
   render.fix_map_res->store         (config.render.fix_map_res);
   render.pause_on_ui->store         (config.input.ui.pause);
+  render.show_osd_disclaimer->store (config.render.osd_disclaimer);
 
   textures.remaster->store          (config.textures.remaster);
   textures.uncompressed->store      (config.textures.uncompressed);
