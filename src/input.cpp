@@ -182,6 +182,8 @@ SK_TBF_PluginKeyPress ( BOOL Control,
   SK_PluginKeyPress_Original (Control, Shift, Alt, vkCode);
 }
 
+#include "keyboard.h"
+
 void
 tbf::InputFix::Init (void)
 {
@@ -190,7 +192,9 @@ tbf::InputFix::Init (void)
                       SK_TBF_PluginKeyPress,
            (LPVOID *)&SK_PluginKeyPress_Original );
 
-  TBF_ApplyQueuedHooks ();
+  tbf::KeyboardFix::Init ();
+
+  //TBF_ApplyQueuedHooks (); // That happens when we init the kyboard fix
 }
 
 void
@@ -213,10 +217,6 @@ typedef uint32_t    (__cdecl *SDL_GetRelativeMouseState_pfn) ( int* x,
 typedef void        (__cdecl *SDL_WarpMouseInWindow_pfn) ( LPVOID window,
                                                            int    x,
                                                            int    y );    SDL_WarpMouseInWindow_pfn SDL_WarpMouseInWindow_Original         = nullptr;
-
-typedef
-    const uint8_t*  (__cdecl *SDL_GetKeyboardState_pfn) ( int* numkeys ); SDL_GetKeyboardState_pfn SDL_GetKeyboardState_Original           = nullptr;
-
 
 enum {
   SDL_QUERY   = -1,
@@ -346,85 +346,6 @@ SDL_WarpMouseInWindow_Detour ( LPVOID mouse, int x, int y )
 
   cursor.last_warp = timeGetTime ();
 }
-
-const
-uint8_t*
-__cdecl
-SDL_GetKeyboardState_Detour ( int* numkeys )
-{
-  const uint8_t* ret = SDL_GetKeyboardState_Original (numkeys);
-
-  //26	0x01A	SDL_SCANCODE_W
-  //4	0x004	SDL_SCANCODE_A
-  //22	0x016	SDL_SCANCODE_S
-  //7	0x007	SDL_SCANCODE_D
-
-
-  //79	0x04F	SDL_SCANCODE_RIGHT
-  //80	0x050	SDL_SCANCODE_LEFT
-  //81	0x051	SDL_SCANCODE_DOWN
-  //82	0x052	SDL_SCANCODE_UP
-
-  if (config.keyboard.swap_wasd) {
-    int count = *numkeys;
-
-    static uint8_t keys [1024];
-
-    memcpy (keys, ret, *numkeys);
-
-    uint8_t up    = keys [82];
-    uint8_t down  = keys [81];
-    uint8_t left  = keys [80];
-    uint8_t right = keys [79];
-
-
-     keys [82] = keys [26];
-     keys [80] = keys [4];
-     keys [81] = keys [22];
-     keys [79] = keys [7];
-
-     keys [26] = up;
-     keys [22] = down;
-     keys [7]  = right;
-     keys [4]  = left;
-
-     return keys;
-  }
-
-  return ret;
-}
-
-typedef int (__cdecl *SDL_GetKeyFromScancode_pfn)(int scancode);
-SDL_GetKeyFromScancode_pfn SDL_GetKeyFromScancode_Original = nullptr;
-
-int
-__cdecl
-SDL_GetKeyFromScancode_Detour (int scancode)
-{
-  if (config.keyboard.swap_wasd)
-  {
-      if (scancode == 82)
-      return SDL_GetKeyFromScancode_Original (26);
-    else if (scancode == 81)
-      return SDL_GetKeyFromScancode_Original (22);
-    else if (scancode == 80)
-      return SDL_GetKeyFromScancode_Original (4);
-    else if (scancode == 79)
-      return SDL_GetKeyFromScancode_Original (7);
-    
-    else if (scancode == 26)
-      return SDL_GetKeyFromScancode_Original (82);
-    else if (scancode == 22)
-      return SDL_GetKeyFromScancode_Original (81);
-    else if (scancode == 4)
-      return SDL_GetKeyFromScancode_Original (80);
-    else if (scancode == 7)
-      return SDL_GetKeyFromScancode_Original (79);
-  }
-
-  return SDL_GetKeyFromScancode_Original (scancode);
-}
-
 
 typedef enum
 {
@@ -939,16 +860,6 @@ TBF_InitSDLOverride (void)
                          "SDL_WarpMouseInWindow",
                          SDL_WarpMouseInWindow_Detour,
               (LPVOID *)&SDL_WarpMouseInWindow_Original);
-
-    TBF_CreateDLLHook2 ( L"SDL2.dll",
-                         "SDL_GetKeyboardState",
-                         SDL_GetKeyboardState_Detour,
-              (LPVOID *)&SDL_GetKeyboardState_Original);
-
-    TBF_CreateDLLHook2 ( L"SDL2.dll",
-                         "SDL_GetKeyFromScancode",
-                         SDL_GetKeyFromScancode_Detour,
-              (LPVOID *)&SDL_GetKeyFromScancode_Original);
 
     TBF_CreateDLLHook2 ( L"SDL2.dll",
                          "SDL_ShowCursor",

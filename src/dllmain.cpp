@@ -177,12 +177,11 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     bool success = 
       SUCCEEDED (CoInitializeEx (nullptr, COINIT_MULTITHREADED));
 
-    tbf::SoundFix::Init     ();
-    //tbf::FileIO::Init       ();
-    //tbf::SteamFix::Init     ();
-    tbf::RenderFix::Init    ();
-    //tbf::KeyboardFix::Init  ();
-    //tbf::InputFix::Init ();
+    tbf::SoundFix::Init   ();
+    //tbf::FileIO::Init   ();
+    //tbf::SteamFix::Init ();
+    tbf::RenderFix::Init  ();
+    tbf::InputFix::Init   ();
 
 
     CreateThread ( nullptr, 0,

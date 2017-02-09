@@ -21,6 +21,7 @@
 #include "sound.h"
 #include "hook.h"
 #include "input.h"
+#include "keyboard.h"
 
 
 #include <string>
@@ -463,7 +464,7 @@ TBFix_DrawConfigUI (void)
 
       ImGui::PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 15.0f);
       ImGui::TreePush  ("");
-      ImGui::BeginChild  ("Texture Details", ImVec2 (0, 140), true);
+      ImGui::BeginChild  ("Texture Details", ImVec2 (0, 130), true);
 
       ImGui::Columns   ( 3 );
         ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 1.0f, 1.0f, 1.0f));
@@ -631,17 +632,27 @@ TBFix_DrawConfigUI (void)
   if (ImGui::CollapsingHeader ("Input"))
   {
     ImGui::TreePush  ("");
-    ImGui::Checkbox  ("Swap WASD and Arrow Keys", &config.keyboard.swap_wasd);
 
-    if (ImGui::SliderInt ("Number of Virtual Controllers (AI Fix)", &config.input.gamepad.virtual_controllers, 0, 3)) {
-      extern void
-      TBF_InitSDLOverride (void);
+    if (ImGui::CollapsingHeader ("Keyboard"))
+      tbf::KeyboardFix::DrawControlPanel ();
 
-      TBF_InitSDLOverride ();    
-    }
+    if (ImGui::CollapsingHeader ("Gamepad / AI"))
+    {
+      ImGui::PushItemWidth (300);
+
+      if (ImGui::SliderInt ("Number of Virtual Controllers (AI Fix)", &config.input.gamepad.virtual_controllers, 0, 3)) {
+        extern void
+        TBF_InitSDLOverride (void);
       
-    if (ImGui::IsItemHovered ())
-      ImGui::SetTooltip ("Map Players 2-4 to individual TBFix Dummy Controllers under Controller Settings, then set Control Mode = Auto for Players 2-4.");
+        TBF_InitSDLOverride ();    
+      }
+        
+      if (ImGui::IsItemHovered ())
+        ImGui::SetTooltip ("Map Players 2-4 to individual TBFix Dummy Controllers under Controller Settings, then set Control Mode = Auto for Players 2-4.");
+      
+      ImGui::PopItemWidth ();
+    }
+
     ImGui::TreePop   (  );
   }
 

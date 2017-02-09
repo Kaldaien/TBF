@@ -168,6 +168,7 @@
     <ClCompile Include="src\ImGui\mod_tools.cpp" />
     <ClCompile Include="src\input.cpp" />
     <ClCompile Include="src\ini.cpp" />
+    <ClCompile Include="src\keyboard.cpp" />
     <ClCompile Include="src\lzma\7zAlloc.c" />
     <ClCompile Include="src\lzma\7zArcIn.c" />
     <ClCompile Include="src\lzma\7zBuf.c" />

@@ -435,6 +435,16 @@ TBF_LoadConfig (std::wstring name)
       L"Keyboard.Remap",
         L"SwapArrowsWithWASD" );
 
+  keyboard.swap_keys =
+    static_cast <tbf::ParameterStringW *>
+    (g_ParameterFactory.create_parameter <std::wstring>(
+         L"List of Keys to Swap")
+    );
+  keyboard.swap_keys->register_to_ini (
+    keyboard_ini,
+      L"Keyboard.Remap",
+        L"SwapKeys" );
+
 
   sys.version =
     static_cast <tbf::ParameterStringW *>
@@ -491,6 +501,7 @@ TBF_LoadConfig (std::wstring name)
   input.gamepad.virtual_controllers->load (config.input.gamepad.virtual_controllers);
 
   keyboard.swap_wasd->load         (config.keyboard.swap_wasd);
+  keyboard.swap_keys->load         (config.keyboard.swap_keys);
 
   render.rescale_shadows->load     (config.render.shadow_rescale);
   render.rescale_env_shadows->load (config.render.env_shadow_rescale);
@@ -558,6 +569,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   input.gamepad.virtual_controllers->store (config.input.gamepad.virtual_controllers);
 
   keyboard.swap_wasd->store        (config.keyboard.swap_wasd);
+  keyboard.swap_keys->store        (config.keyboard.swap_keys);
 
   sys.version->store             (TBF_VER_STR);
   //sys.intro_video->store         (config.system.intro_video);

@@ -26,13 +26,22 @@
 #include <set>
 #include <vector>
 
-namespace tbf {
-  namespace KeyboardFix {
+typedef uint16_t SDL_Scancode;
+
+namespace tbf
+{
+  namespace KeyboardFix
+  {
     void Init     (void);
     void Shutdown (void);
 
-    extern std::set    <uint16_t>                        remapped_scancodes;
-    extern std::vector <std::pair <uint16_t, uint16_t> > swapped_keys;
+    void UpdateConfig (void);
+
+    void DrawControlPanel (void);
+    bool RemapDialog      (void);
+
+    extern std::set    <SDL_Scancode>                            remapped_scancodes;
+    extern std::vector <std::pair <SDL_Scancode, SDL_Scancode> > swapped_keys;
   }
 }
 

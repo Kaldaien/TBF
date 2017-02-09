@@ -15,6 +15,8 @@
 void
 TBF_DrawFileList (void)
 {
+  ImGui::PushItemWidth (500.0f);
+
   struct enumerated_source_s
   {
     std::string            name       = "invalid";
@@ -185,7 +187,7 @@ TBF_DrawFileList (void)
 
     ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
     ImGui::BeginChild ( "Texture Selection",
-                           ImVec2 (-2.0f, list_size.y - 24),
+                           ImVec2 (300.0f, list_size.y - 24),
                              true );
 
     for ( auto it : sources [sel].checksums )
@@ -225,6 +227,8 @@ TBF_DrawFileList (void)
 
     ImGui::EndGroup ();
   }
+
+  ImGui::PopItemWidth ();
 }
 
 bool
