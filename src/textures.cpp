@@ -660,12 +660,9 @@ D3D9SetTexture_Detour (
     //                                          this feature is being applied.
     //
     while ( __remap_textures && pSKTex->must_block &&
-                                pSKTex->pTexOverride == nullptr ) {
-      if (pending_loads ())
-        TBFix_LoadQueuedTextures ();
-      else {
-        YieldProcessor ();
-      }
+                                pSKTex->pTexOverride == nullptr )
+    {
+      TBFix_LoadQueuedTextures ();
     }
 
     if (__remap_textures && pSKTex->pTexOverride != nullptr)
@@ -2486,6 +2483,8 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
             (*ppTexture)->AddRef ();
           }
         }
+
+        ////tsf::RenderFix::tex_mgr.removeTexture (pTexOrig);
       }
 
       else {
@@ -2493,6 +2492,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
                                      load_op ) );
 
         stream_pool.postJob (load_op);
+        //resample_pool->postJob (load_op);
       }
 
       LeaveCriticalSection        (&cs_tex_stream);
@@ -3514,9 +3514,9 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
   // Ghetto sync. barrier, since Windows 7 does not support them...
   while ( InterlockedCompareExchange (
             &num_threads_init,
-              config.textures.worker_threads * 3,
-                config.textures.worker_threads * 3
-          ) < (ULONG)config.textures.worker_threads * 3 )
+              config.textures.worker_threads,
+                config.textures.worker_threads
+          ) < (ULONG)config.textures.worker_threads )
   {
     SwitchToThread ();
   }
@@ -3567,16 +3567,13 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
                              hr, pStream->checksum );
             resample_blacklist.insert (pStream->checksum);
 
-            ISKTextureD3D9* pSKTex =
-              (ISKTextureD3D9 *)pStream->pDest;
-
-            pSKTex->pTexOverride  = nullptr;
-            pSKTex->override_size = 0;
-
-            // Remove the temporary reference we added earlier
             pStream->pDest->Release ();
+            pStream->pSrc = pStream->pDest;
 
-            tbf::RenderFix::tex_mgr.removeTexture (pSKTex);
+            ((ISKTextureD3D9 *)pStream->pSrc)->must_block = false;
+            ((ISKTextureD3D9 *)pStream->pSrc)->refs--;
+
+            finished_streaming (pStream->checksum);
           }
 
           pThread->finishJob ();
@@ -3603,21 +3600,19 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
 
           else
           {
+            HRESULT hr = S_OK;
             tex_log->Log ( L"[ Tex. Mgr ] Texture Injection Failure (hr=%x) for texture %x, removing from injectable list...",
-                             hr, pStream->checksum );
+              hr, pStream->checksum);
             if (injectable_textures.count (pStream->checksum))
               injectable_textures.erase (pStream->checksum);
 
-            ISKTextureD3D9* pSKTex =
-              (ISKTextureD3D9 *)pStream->pDest;
-
-            pSKTex->pTexOverride  = nullptr;
-            pSKTex->override_size = 0;
-
-            // Remove the temporary reference we added earlier
             pStream->pDest->Release ();
+            pStream->pSrc = pStream->pDest;
 
-            tbf::RenderFix::tex_mgr.removeTexture (pSKTex);
+            ((ISKTextureD3D9 *)pStream->pSrc)->must_block = false;
+            ((ISKTextureD3D9 *)pStream->pSrc)->refs--;
+
+            finished_streaming (pStream->checksum);
           }
 
           pThread->finishJob ();

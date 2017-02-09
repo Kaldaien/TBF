@@ -97,7 +97,7 @@ SK_TBF_PluginKeyPress ( BOOL Control,
     *SK_GetCommandProcessor ();
 
   if (Control && Shift)
-  {
+{
     if (vkCode == VK_DELETE) {
       config.render.osd_disclaimer = (! config.render.osd_disclaimer);
     }

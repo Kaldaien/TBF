@@ -41,13 +41,6 @@ TBFix_GetAudioMeterInfo (void)
   if (FAILED ((pDevEnum.CoCreateInstance (__uuidof (MMDeviceEnumerator)))))
     return nullptr;
 
-  // Most game audio a user will not want to hear while a game is in the
-  //   background will pass through eConsole.
-  //
-  //   eCommunication will be headset stuff and that's something a user is not
-  //     going to appreciate having muted :) Consider overloading this function
-  //       to allow independent control.
-  //
   CComPtr <IMMDevice> pDevice;
   if ( FAILED (
          pDevEnum->GetDefaultAudioEndpoint ( eRender,
@@ -652,222 +645,257 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePop   (  );
   }
 
-  if (ImGui::CollapsingHeader ("Audio Volume"))
-  {
-    IAudioMeterInformation* pMeterInfo =
-      TBFix_GetAudioMeterInfo ();
-
-    if (pMeterInfo != nullptr)
-    {
-      UINT channels = 0;
-
-      if (SUCCEEDED (pMeterInfo->GetMeteringChannelCount (&channels)))
-      {
-        static float channel_peaks_    [32];
-
-        struct
-        {
-          struct {
-            float inst_min = FLT_MAX;  DWORD dwMinSample = 0;  float disp_min = FLT_MAX;
-            float inst_max = FLT_MIN;  DWORD dwMaxSample = 0;  float disp_max = FLT_MIN;
-          } vu_peaks;
-
-          float peaks [120];
-          int   current_idx;
-        } static history [32];
-
-        #define VUMETER_TIME 300
-
-        ImGui::Columns (2);
-
-        for (int i = 0 ; i < channels; i++)
-        {
-          if (SUCCEEDED (pMeterInfo->GetChannelsPeakValues (channels, channel_peaks_)))
-          {
-            history [i].vu_peaks.inst_min = std::min (history [i].vu_peaks.inst_min, channel_peaks_ [i]);
-            history [i].vu_peaks.inst_max = std::max (history [i].vu_peaks.inst_max, channel_peaks_ [i]);
-
-            history [i].vu_peaks.disp_min    = history [i].vu_peaks.inst_min;
-
-            if (history [i].vu_peaks.dwMinSample < timeGetTime () - VUMETER_TIME * 3) {
-              history [i].vu_peaks.inst_min    = channel_peaks_ [i];
-              history [i].vu_peaks.dwMinSample = timeGetTime ();
-            }
-
-            history [i].vu_peaks.disp_max    = history [i].vu_peaks.inst_max;
-
-            if (history [i].vu_peaks.dwMaxSample < timeGetTime () - VUMETER_TIME * 3) {
-              history [i].vu_peaks.inst_max    = channel_peaks_ [i];
-              history [i].vu_peaks.dwMaxSample = timeGetTime ();
-            }
-
-            history [i].peaks [history [i].current_idx] = channel_peaks_ [i];
-            history [i].current_idx = (history [i].current_idx + 1) % IM_ARRAYSIZE (history [i].peaks);
-
-            ImGui::BeginGroup ();
-
-            ImGui::PlotLines ( "",
-                                history [i].peaks,
-                                  IM_ARRAYSIZE (history [i].peaks),
-                                    history [i].current_idx,
-                                      "",
-                                           history [i].vu_peaks.disp_min,
-                                           1.0f,
-                                            ImVec2 (ImGui::GetContentRegionAvailWidth (), 80) );
-
-            //char szName [64];
-            //sprintf (szName, "Channel: %lu", i);
-
-            ImGui::PushStyleColor (ImGuiCol_PlotHistogram,     ImVec4 (0.9f, 0.1f, 0.1f, 0.15f));
-            ImGui::ProgressBar    (history [i].vu_peaks.disp_max, ImVec2 (-1.0f, 0.0f));
-            ImGui::PopStyleColor  ();
-
-            ImGui::ProgressBar    (channel_peaks_ [i],          ImVec2 (-1.0f, 0.0f));
-
-            ImGui::PushStyleColor (ImGuiCol_PlotHistogram,     ImVec4 (0.1f, 0.1f, 0.9f, 0.15f));
-            ImGui::ProgressBar    (history [i].vu_peaks.disp_min, ImVec2 (-1.0f, 0.0f));
-            ImGui::PopStyleColor  ();
-            ImGui::EndGroup ();
-
-            if (! (i % 2))
-            {
-              ImGui::SameLine (); ImGui::NextColumn ();
-            } else {
-              ImGui::Columns   ( 1 );
-              ImGui::Separator (   );
-              ImGui::Columns   ( 2 );
-            }
-          }
-        }
-
-        ImGui::Columns (1);
-      }
-
-      pMeterInfo->Release ();
-    }
-  }
-
-#if 0
-  if (ImGui::CollapsingHeader ("Audio (DO NOT USE ON RETAIL VERSION OF GAME)", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
+  if (ImGui::CollapsingHeader ("Audio"))
   { 
     ImGui::TreePush ("");
 
-    if (tbf::SoundFix::wasapi_init)
+    if (ImGui::CollapsingHeader ("Volume Levels"))
     {
-      ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 16.0f);
-      ImGui::BeginChild  ("Audio Details", ImVec2 (0, 80), true);
+      IAudioMeterInformation* pMeterInfo =
+        TBFix_GetAudioMeterInfo ();
 
-        ImGui::Columns   (3);
-        ImGui::Text      ("");                                                                     ImGui::NextColumn ();
-        ImGui::Text      ("Sample Rate");                                                          ImGui::NextColumn ();
-        ImGui::Text      ("Channel Setup");
-        ImGui::Columns   (1);
-        ImGui::Separator ();
-        ImGui::Columns   (3);
-        ImGui::Text      ( "Game (SoundCore)");                                                    ImGui::NextColumn ();
-        ImGui::Text      ( "%.2f kHz @ %lu-bit", (float)tbf::SoundFix::snd_core_fmt.nSamplesPerSec / 1000.0f,
-                                                   tbf::SoundFix::snd_core_fmt.wBitsPerSample );   ImGui::NextColumn ();
-        ImGui::Text      ( "%lu",                  tbf::SoundFix::snd_core_fmt.nChannels );
-        ImGui::Columns   (1);
-        ImGui::Separator ();
-        ImGui::Columns   (3);
-        ImGui::Text      ( "Device");                                                              ImGui::NextColumn ();
-        ImGui::Text      ( "%.2f kHz @ %lu-bit", (float)tbf::SoundFix::snd_device_fmt.nSamplesPerSec / 1000.0f,
-                                                   tbf::SoundFix::snd_device_fmt.wBitsPerSample ); ImGui::NextColumn ();
-        ImGui::Text      ( "%lu",                  tbf::SoundFix::snd_device_fmt.nChannels );
-        ImGui::Columns   (1);
+      if (pMeterInfo != nullptr)
+      {
+        UINT channels = 0;
 
-      ImGui::EndChild    ();
-      ImGui::PopStyleVar ();
+        if (SUCCEEDED (pMeterInfo->GetMeteringChannelCount (&channels)))
+        {
+          static float channel_peaks_    [32];
+
+          if (channels < 4)
+          {
+            ImGui::TextColored ( ImVec4 (0.9f, 0.7f, 0.2f, 1.0f),
+                                   "WARNING: Do not select Surround in-game, you will be missing center channel audio on your hardware!" );
+            ImGui::Separator   ();
+          }
+
+          struct
+          {
+            struct {
+              float inst_min = FLT_MAX;  DWORD dwMinSample = 0;  float disp_min = FLT_MAX;
+              float inst_max = FLT_MIN;  DWORD dwMaxSample = 0;  float disp_max = FLT_MIN;
+            } vu_peaks;
+
+            float peaks [120];
+            int   current_idx;
+          } static history [32];
+
+          #define VUMETER_TIME 300
+
+          ImGui::Columns (2);
+
+          for (int i = 0 ; i < std::min (config.audio.channels, channels); i++)
+          {
+            if (SUCCEEDED (pMeterInfo->GetChannelsPeakValues (channels, channel_peaks_)))
+            {
+              history [i].vu_peaks.inst_min = std::min (history [i].vu_peaks.inst_min, channel_peaks_ [i]);
+              history [i].vu_peaks.inst_max = std::max (history [i].vu_peaks.inst_max, channel_peaks_ [i]);
+
+              history [i].vu_peaks.disp_min    = history [i].vu_peaks.inst_min;
+
+              if (history [i].vu_peaks.dwMinSample < timeGetTime () - VUMETER_TIME * 3) {
+                history [i].vu_peaks.inst_min    = channel_peaks_ [i];
+                history [i].vu_peaks.dwMinSample = timeGetTime ();
+              }
+
+              history [i].vu_peaks.disp_max    = history [i].vu_peaks.inst_max;
+
+              if (history [i].vu_peaks.dwMaxSample < timeGetTime () - VUMETER_TIME * 3) {
+                history [i].vu_peaks.inst_max    = channel_peaks_ [i];
+                history [i].vu_peaks.dwMaxSample = timeGetTime ();
+              }
+
+              history [i].peaks [history [i].current_idx] = channel_peaks_ [i];
+              history [i].current_idx = (history [i].current_idx + 1) % IM_ARRAYSIZE (history [i].peaks);
+
+              ImGui::BeginGroup ();
+
+              ImGui::PlotLines ( "",
+                                  history [i].peaks,
+                                    IM_ARRAYSIZE (history [i].peaks),
+                                      history [i].current_idx,
+                                        "",
+                                             history [i].vu_peaks.disp_min,
+                                             1.0f,
+                                              ImVec2 (ImGui::GetContentRegionAvailWidth (), 80) );
+
+              //char szName [64];
+              //sprintf (szName, "Channel: %lu", i);
+
+              ImGui::PushStyleColor (ImGuiCol_PlotHistogram,     ImVec4 (0.9f, 0.1f, 0.1f, 0.15f));
+              ImGui::ProgressBar    (history [i].vu_peaks.disp_max, ImVec2 (-1.0f, 0.0f));
+              ImGui::PopStyleColor  ();
+
+              ImGui::ProgressBar    (channel_peaks_ [i],          ImVec2 (-1.0f, 0.0f));
+
+              ImGui::PushStyleColor (ImGuiCol_PlotHistogram,     ImVec4 (0.1f, 0.1f, 0.9f, 0.15f));
+              ImGui::ProgressBar    (history [i].vu_peaks.disp_min, ImVec2 (-1.0f, 0.0f));
+              ImGui::PopStyleColor  ();
+              ImGui::EndGroup ();
+
+              if (! (i % 2))
+              {
+                ImGui::SameLine (); ImGui::NextColumn ();
+              } else {
+                ImGui::Columns   ( 1 );
+                ImGui::Separator (   );
+                ImGui::Columns   ( 2 );
+              }
+            }
+          }
+
+          ImGui::Columns (1);
+        }
+
+        pMeterInfo->Release ();
+      }
     }
 
-    need_restart |= ImGui::Checkbox ("Enable Audio Fix", &config.audio.enable_fix);
-
-    if (config.audio.enable_fix)
+    if (ImGui::CollapsingHeader ("Mix Format"))
     {
-      ImGui::TreePush ("");
-        need_restart |= ImGui::RadioButton ("Stereo",       (int *)&config.audio.channels, 2); ImGui::SameLine ();
-        need_restart |= ImGui::RadioButton ("Quadraphonic", (int *)&config.audio.channels, 4); ImGui::SameLine ();
-        need_restart |= ImGui::RadioButton ("5.1 Surround", (int *)&config.audio.channels, 6); ImGui::SameLine ();
-        need_restart |= ImGui::RadioButton ("7.1 Surround", (int *)&config.audio.channels, 8);
-      ImGui::TreePop  (  );
-      
-      ImGui::TreePush ("");
-      int sel;
-      
-      if   (config.audio.sample_hz == 48000)  sel = 1;
-      else                                    sel = 0;
-      
-      need_restart |= ImGui::Combo ("Sample Rate", &sel, " 44.1 kHz\0 48.0 kHz\0\0", 2);
-      
-      if (sel == 0)  config.audio.sample_hz = 44100;
-      else           config.audio.sample_hz = 48000;
-      
-      need_restart |= ImGui::Checkbox ("Use Compatibility Mode", &config.audio.compatibility);
-      
-      if (ImGui::IsItemHovered ())
-        ImGui::SetTooltip ("May reduce audio quality, but can help with some weird USB headsets and Windows 7 / Older.");
-      ImGui::TreePop ();
-     }
+      if (tbf::SoundFix::wasapi_init)
+      {
+        ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 16.0f);
+        ImGui::BeginChild  ("Audio Details", ImVec2 (0, 80), true);
 
-     ImGui::TreePop ();
-   }
-#endif
+          ImGui::Columns   (3);
+          ImGui::Text      ("");                                                                     ImGui::NextColumn ();
+          ImGui::Text      ("Sample Rate");                                                          ImGui::NextColumn ();
+          ImGui::Text      ("Channel Setup");
+          ImGui::Columns   (1);
+          ImGui::Separator ();
+          ImGui::Columns   (3);
+          ImGui::Text      ( "Game (SoundCore)");                                                    ImGui::NextColumn ();
+          ImGui::Text      ( "%.2f kHz @ %lu-bit", (float)tbf::SoundFix::snd_core_fmt.nSamplesPerSec / 1000.0f,
+                                                     tbf::SoundFix::snd_core_fmt.wBitsPerSample );   ImGui::NextColumn ();
+          ImGui::Text      ( "%lu",                  tbf::SoundFix::snd_core_fmt.nChannels );
+          ImGui::Columns   (1);
+          ImGui::Separator ();
+          ImGui::Columns   (3);
+          ImGui::Text      ( "Device");                                                              ImGui::NextColumn ();
+          ImGui::Text      ( "%.2f kHz @ %lu-bit", (float)tbf::SoundFix::snd_device_fmt.nSamplesPerSec / 1000.0f,
+                                                     tbf::SoundFix::snd_device_fmt.wBitsPerSample ); ImGui::NextColumn ();
+          ImGui::Text      ( "%lu",                  tbf::SoundFix::snd_device_fmt.nChannels );
+          ImGui::Columns   (1);
 
-   ImGui::PopItemWidth ();
-
-   ImGui::Separator (   );
-   ImGui::Columns   ( 2 );
-
-   if (ImGui::Button ("   Gamepad Config   "))
-     ImGui::OpenPopup ("Gamepad Config");
-
-   TBFix_GamepadConfigDlg ();
-
-   ImGui::SameLine      ();
-
-   if (ImGui::Button ("   Special K Config   "))
-     show_special_k_cfg = (! show_special_k_cfg);
-
-   ImGui::SameLine (0.0f, 60.0f);
-
-   if (ImGui::Selectable ("...", show_test_window))
-     show_test_window = (! show_test_window);
-
-   ImGui::NextColumn ();
-
-   if ( ImGui::Checkbox ("Pause Game While This Menu Is Open", &config.input.ui.pause) )
-     TBFix_PauseGame (config.input.ui.pause);
-
-   bool extra_details = false;
-
-   if (need_restart || tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures)
-     extra_details = true;
-
-    if (extra_details) {
-      ImGui::Columns    ( 1 );
-      ImGui::Separator  (   );
-
-      if (need_restart) {
-        ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 0.4f, 0.15f, 1.0f));
-        ImGui::BulletText     ("Game Restart Required");
-        ImGui::PopStyleColor  ();
+        ImGui::EndChild    ();
+        ImGui::PopStyleVar ();
       }
-      
-      if (tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures) {
-        ImGui::PushStyleColor  (ImGuiCol_Text, ImVec4 (1.0f, 0.8f, 0.2f, 1.0f));
-        ImGui::Bullet          ( ); ImGui::SameLine ();
-        ImGui::TextWrapped     ( "You have made changes that will not apply until you change Screen Modes in Graphics Settings, "
-                                "or by performing Alt + Tab with the game set to Fullscreen mode.\n" );
-        ImGui::PopStyleColor   ( );
-        ImGui::PopTextWrapPos  ( );
-      }
-   }
 
+      ImGui::Separator ();
+
+      need_restart |= ImGui::Checkbox ("Enable Override", &config.audio.enable_fix);
+
+      if (config.audio.enable_fix)
+      {
+        IAudioMeterInformation* pMeterInfo =
+          TBFix_GetAudioMeterInfo ();
+
+        UINT channels = 2;
+
+        if (pMeterInfo != nullptr)
+        {
+          if (FAILED (pMeterInfo->GetMeteringChannelCount (&channels)))
+            channels = 2;
+
+          pMeterInfo->Release ();
+        }
+
+        ImGui::TreePush ("");
+          need_restart |= ImGui::RadioButton ("Stereo",       (int *)&config.audio.channels, 2);
+
+          if (channels >= 4)
+          {
+            ImGui::SameLine();  need_restart |= ImGui::RadioButton ("Quadraphonic",   (int *)&config.audio.channels, 4);
+
+            if (channels >= 6) {
+              ImGui::SameLine (); need_restart |= ImGui::RadioButton ("5.1 Surround", (int *)&config.audio.channels, 6);
+            }
+          }
+        ImGui::TreePop  (  );
+        
+        ImGui::TreePush ("");
+        int sel;
+        
+             if (config.audio.sample_hz == 48000) sel = 2;
+        else if (config.audio.sample_hz == 44100) sel = 1;
+        else                                      sel = 0;
+        
+        need_restart |= ImGui::Combo ("Sample Rate", &sel, " Unlimited (expect distortion)\0 44.1 kHz\0 48.0 kHz\0\0", 3);
+        
+             if (sel == 0) config.audio.sample_hz = -1;
+        else if (sel == 1) config.audio.sample_hz = 44100;
+        else               config.audio.sample_hz = 48000;
+           
+        
+        need_restart |= ImGui::Checkbox ("Use Compatibility Mode", &config.audio.compatibility);
+        
+        if (ImGui::IsItemHovered ())
+          ImGui::SetTooltip ("May reduce audio quality, but can help with some weird USB headsets and Windows 7 / Older.");
+        ImGui::TreePop ();
+      }
+    }
+    ImGui::TreePop ();
+  }
+
+  ImGui::PopItemWidth ();
+
+  ImGui::Separator (   );
+  ImGui::Columns   ( 2 );
+
+  if (ImGui::Button ("   Gamepad Config   "))
+    ImGui::OpenPopup ("Gamepad Config");
+
+  TBFix_GamepadConfigDlg ();
+
+  ImGui::SameLine      ();
+
+  if (ImGui::Button ("   Special K Config   "))
+    show_special_k_cfg = (! show_special_k_cfg);
+
+  ImGui::SameLine (0.0f, 60.0f);
+
+  if (ImGui::Selectable ("...", show_test_window))
+    show_test_window = (! show_test_window);
+
+  ImGui::NextColumn ();
+
+  if ( ImGui::Checkbox ("Pause Game While This Menu Is Open", &config.input.ui.pause) )
+    TBFix_PauseGame (config.input.ui.pause);
+
+  bool extra_details = false;
+
+  if (need_restart || tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures)
+    extra_details = true;
+
+  if (extra_details)
+  {
+    ImGui::Columns    ( 1 );
+    ImGui::Separator  (   );
+
+    if (need_restart)
+    {
+      ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 0.4f, 0.15f, 1.0f));
+      ImGui::BulletText     ("Game Restart Required");
+      ImGui::PopStyleColor  ();
+    }
+    
+    if (tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures)
+    {
+      ImGui::PushStyleColor  (ImGuiCol_Text, ImVec4 (1.0f, 0.8f, 0.2f, 1.0f));
+      ImGui::Bullet          ( ); ImGui::SameLine ();
+      ImGui::TextWrapped     ( "You have made changes that will not apply until you change Screen Modes in Graphics Settings, "
+                              "or by performing Alt + Tab with the game set to Fullscreen mode.\n" );
+      ImGui::PopStyleColor   ( );
+      ImGui::PopTextWrapPos  ( );
+    }
+  }
+  
   ImGui::End ();
 
 
-  if (show_test_window) {
+  if (show_test_window)
+  {
     ImGui::SetNextWindowPos (ImVec2 (650, 20), ImGuiSetCond_FirstUseEver);
     ImGui::ShowTestWindow   (&show_test_window);
   }
