@@ -561,6 +561,99 @@ TBFix_TextureModDlg (void)
     ImGui::PopStyleVar   (2);
   }
 
+#if 0
+  if (ImGui::CollapsingHeader ("Live Render Target View", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
+  {
+    static LONG last_ht    = 256L;
+    static LONG last_width = 256L;
+
+    static std::vector <std::string> list_contents;
+    static bool                      list_dirty     = false;
+    static int                       sel            =     0;
+
+    extern std::vector <uint32_t> textures_used_last_dump;
+    extern              uint32_t  tex_dbg_idx;
+    extern              uint32_t  debug_tex_id;
+
+    ImGui::BeginChild ("ToolHeadings2", ImVec2 (750, 32), false, ImGuiWindowFlags_AlwaysUseWindowPadding);
+
+    if (ImGui::Button ("Refresh Targets"))
+    {
+      SK_ICommandProcessor& command =
+        *SK_GetCommandProcessor ();
+
+      list_dirty = true;
+    }
+
+    if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("Refreshes the set of texture checksums used in the last frame drawn.");
+
+    ImGui::Separator ();
+    ImGui::EndChild  ();
+
+    if (list_dirty)
+    {
+           list_contents.clear ();
+                sel = tex_dbg_idx;
+
+      for ( auto it : render_textures )
+      {
+        char szDesc [16] = { };
+
+        sprintf (szDesc, "%px", it);
+
+        list_contents.push_back (szDesc);
+      }
+    }
+
+    ImGui::BeginGroup ();
+
+    ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
+    ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
+
+    ImGui::BeginChild ( "Item List",
+                        ImVec2 ( 90, std::max (512L, last_ht) + 128 ),
+                          true, ImGuiWindowFlags_AlwaysAutoResize );
+
+   if (render_textures.size ())
+   {
+     static      int last_sel = 0;
+     static bool sel_changed  = false;
+
+     if (sel != last_sel)
+       sel_changed = true;
+
+     last_sel = sel;
+
+     for ( int line = 0; line < render_textures.size (); line++)
+     {
+       if (line == sel)
+       {
+         bool selected = true;
+         ImGui::Selectable (list_contents [line].c_str (), &selected);
+
+         if (sel_changed)
+         {
+           ImGui::SetScrollHere (0.5f); // 0.0f:top, 0.5f:center, 1.0f:bottom
+           sel_changed = false;
+         }
+       }
+
+       else
+       {
+         bool selected = false;
+
+         if (ImGui::Selectable (list_contents [line].c_str (), &selected))
+         {
+           sel_changed = true;
+           tex_dbg_idx =  line;
+           sel         =  line;
+         }
+       }
+     }
+    }
+  }
+#endif
+
   if (ImGui::CollapsingHeader ("Misc. Settings"))
   {
     ImGui::TreePush ("");

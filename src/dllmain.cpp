@@ -181,7 +181,6 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     //tbf::FileIO::Init   ();
     //tbf::SteamFix::Init ();
     tbf::RenderFix::Init  ();
-    tbf::InputFix::Init   ();
 
 
     CreateThread ( nullptr, 0,

@@ -38,6 +38,8 @@ extern iSK_Logger* tex_log;
 
 interface ISKTextureD3D9;
 
+const int log_level = 0;
+
 typedef enum D3DXIMAGE_FILEFORMAT {
   D3DXIFF_BMP = 0,
   D3DXIFF_JPG = 1,

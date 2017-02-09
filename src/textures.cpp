@@ -740,6 +740,8 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
                     SK_D3D9_PoolToStr   (Pool) );
 #endif
 
+  bool game_created = false;
+
   //
   // Model Shadows
   //
@@ -755,6 +757,8 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
 
     Width  <<= shift;
     Height <<= shift;
+
+    game_created = true;
   }
 
   else if (Width == Height && (Height == 512 || Height == 1024 || Height == 2048 || Height == 4096) &&
@@ -764,6 +768,8 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
 
       Width  <<= shift;
       Height <<= shift;
+
+      game_created = true;
     }
 
   //
@@ -1930,8 +1936,6 @@ TBFix_LoadQueuedTextures (void)
 
       finished_streaming (load->checksum);
 
-      tbf::RenderFix::tex_mgr.updateOSD ();
-
       ++loads;
 
       // Remove the temporary reference
@@ -1997,8 +2001,6 @@ TBFix_LoadQueuedTextures (void)
 
       finished_streaming (load->checksum);
 
-      tbf::RenderFix::tex_mgr.updateOSD ();
-
       ++loads;
 
       // Remove the temporary reference
@@ -2035,7 +2037,7 @@ TBFix_LoadQueuedTextures (void)
     }
   }
 
-  tbf::RenderFix::tex_mgr.osdStats ();
+  tbf::RenderFix::tex_mgr.updateOSD ();
 }
 
 #include <set>
@@ -2769,6 +2771,8 @@ tbf::RenderFix::TextureManager::removeTexture (ISKTextureD3D9* pTexD3D9)
 
   remove_textures.push_back (pTexD3D9);
 
+  updateOSD ();
+
   LeaveCriticalSection (&cs_cache);
 }
 
@@ -2783,9 +2787,10 @@ tbf::RenderFix::TextureManager::addTexture (uint32_t checksum, tbf::RenderFix::T
   {
     textures [checksum] = pTex;
   }
-  LeaveCriticalSection (&cs_cache);
 
   updateOSD ();
+
+  LeaveCriticalSection (&cs_cache);
 }
 
 void
