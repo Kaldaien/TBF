@@ -246,6 +246,9 @@ TBFix_DrawConfigUI (void)
   ImGuiIO& io =
     ImGui::GetIO ();
 
+      io.FontGlobalScale = config.input.ui.scale;
+  const   LONG font_size = ImGui::GetFont ()->FontSize * io.FontGlobalScale;
+
   ImGui::SetNextWindowPosCenter       (ImGuiSetCond_Always);
   ImGui::SetNextWindowSizeConstraints (ImVec2 (665, 50), ImVec2 ( ImGui::GetIO ().DisplaySize.x * 0.95f,
                                                                     ImGui::GetIO ().DisplaySize.y * 0.95f ) );
@@ -262,6 +265,15 @@ TBFix_DrawConfigUI (void)
                      ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders );
 
   ImGui::PushItemWidth (ImGui::GetWindowWidth () * 0.666f);
+
+  if (ImGui::CollapsingHeader ("UI Scale"))
+  {
+    ImGui::TreePush    ("");
+
+    ImGui::SliderFloat ("Scale (only 1.0 is officially supported)", &config.input.ui.scale, 1.0f, 3.0f);
+
+    ImGui::TreePop     ();
+  }
 
   if (ImGui::CollapsingHeader ("Framerate", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   {
@@ -331,12 +343,12 @@ TBFix_DrawConfigUI (void)
                                szAvg,
                                  0.0f,
                                    2.0f * tbf::FrameRateFix::GetTargetFrametime (),
-                                     ImVec2 (0, 80) );
+                                     ImVec2 (0, font_size * 7) );
 
     ImGui::SameLine ();
 
     if (! config.framerate.replace_limiter) {
-      ImGui::BeginChild     ( "LimitDisclaimer", ImVec2 ( 330.0f, 80.0f ) );
+      ImGui::BeginChild     ( "LimitDisclaimer", ImVec2 ( font_size * 25, font_size * 7 ) );
       ImGui::TextColored ( ImVec4 (1.0f, 1.0f, 0.0f, 1.0f),
                              "Working limiters do not resemble seismographs!" );
 
@@ -350,7 +362,7 @@ TBFix_DrawConfigUI (void)
     }
 
     else {
-      ImGui::BeginChild     ( "LimitDisclaimer", ImVec2 ( 310.0f, 80.0f ) );
+      ImGui::BeginChild     ( "LimitDisclaimer", ImVec2 ( font_size * 25, font_size * 7 ) );
       ImGui::TextColored    ( ImVec4 ( 0.2f, 1.0f, 0.2f, 1.0f),
                                 "This is how a framerate limiter should work." );
 
@@ -480,7 +492,7 @@ TBFix_DrawConfigUI (void)
 
       ImGui::PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 15.0f);
       ImGui::TreePush  ("");
-      ImGui::BeginChild  ("Texture Details", ImVec2 (0, 130), true);
+      ImGui::BeginChild  ("Texture Details", ImVec2 (0, font_size * 10), true);
 
       ImGui::Columns   ( 3 );
         ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 1.0f, 1.0f, 1.0f));
@@ -587,6 +599,49 @@ TBFix_DrawConfigUI (void)
 
     if (ImGui::Button ("Texture Modding Tools")) {
       show_texture_mod_dlg = (! show_texture_mod_dlg);
+    }
+
+    ImGui::TreePop ();
+  }
+
+  if (ImGui::CollapsingHeader ("Post-Processing"))
+  {
+    ImGui::TreePush ("");
+
+    int sel = config.render.postproc_ratio == 0.0f ?
+                0 : 1;
+    if (sel == 1) {
+      if (config.render.postproc_ratio < 1.0)
+        sel = 1;
+      else if (config.render.postproc_ratio < 2.0)
+        sel = 2;
+      else
+        sel = 3;
+    }
+
+    if ( ImGui::Combo ( "Post-Processing Resolution", &sel,
+                        " Game Default -- Will cause shimmering\0"
+                        "  50% Screen Resolution\0"
+                        " 100% Screen Resolution\0"
+                        " 200% Screen Resolution\0\0", 4 ) )
+    {
+      switch (sel) {
+        case 0:
+          config.render.postproc_ratio = 0.0f;
+          break;
+        default:
+        case 1:
+          config.render.postproc_ratio = 0.5f;
+          break;
+        case 2:
+          config.render.postproc_ratio = 1.0f;
+          break;
+        case 3:
+          config.render.postproc_ratio = 2.0f;
+          break;
+      }
+
+      tbf::RenderFix::need_reset.textures = true;
     }
 
     ImGui::TreePop ();
@@ -783,7 +838,7 @@ TBFix_DrawConfigUI (void)
       if (tbf::SoundFix::wasapi_init)
       {
         ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 16.0f);
-        ImGui::BeginChild  ("Audio Details", ImVec2 (0, 80), true);
+        ImGui::BeginChild  ("Audio Details", ImVec2 (0, font_size * 6), true);
 
           ImGui::Columns   (3);
           ImGui::Text      ("");                                                                     ImGui::NextColumn ();

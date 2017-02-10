@@ -815,10 +815,14 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     }
 
   //
-  // Post-Processing (512x256) - FIXME damnit!
+  // Post-Processing (2048x1024) - FIXME damnit!
   //
-  else if ( Width  == 512 &&
-            Height == 256 && Usage == D3DUSAGE_RENDERTARGET ) {
+  else if ( ( ( Width  == 2048 &&
+                Height == 1024 ) ||
+              ( Width  == 1024 &&
+                Height == 512 )  ||
+              ( Width  == 512  &&
+                Height == 256 ) ) && Usage == D3DUSAGE_RENDERTARGET ) {
     if (config.render.postproc_ratio > 0.0f) {
       Width  = (UINT)(tbf::RenderFix::width  * config.render.postproc_ratio);
       Height = (UINT)(tbf::RenderFix::height * config.render.postproc_ratio);

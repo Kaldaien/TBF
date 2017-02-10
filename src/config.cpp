@@ -20,12 +20,16 @@
  *
 **/
 
+#define NOMINMAX
+
 #include "config.h"
 #include "parameter.h"
 #include "ini.h"
 #include "log.h"
 
 #include "DLL_VERSION.H"
+
+#include <algorithm>
 
 extern HMODULE hInjectorDLL;
 
@@ -75,6 +79,7 @@ struct {
   tbf::ParameterBool*    fix_map_res;
   tbf::ParameterBool*    pause_on_ui;
   tbf::ParameterBool*    show_osd_disclaimer;
+  tbf::ParameterFloat*   ui_scale;
 } render;
 
 struct {
@@ -351,9 +356,19 @@ TBF_LoadConfig (std::wstring name)
       L"Resolution.Experimental",
         L"FixMap" );
 
+  render.postproc_ratio =
+    static_cast <tbf::ParameterFloat *>
+      (g_ParameterFactory.create_parameter <float> (
+        L"Post-Process Ratio")
+      );
+  render.postproc_ratio->register_to_ini (
+    render_ini,
+      L"Resolution.Experimental",
+        L"PostProcessRatio" );
+
   render.pause_on_ui =
     static_cast <tbf::ParameterBool *>
-    (g_ParameterFactory.create_parameter <bool>(
+    (g_ParameterFactory.create_parameter <bool> (
       L"Config Menu Pauses Game")
     );
 
@@ -361,6 +376,17 @@ TBF_LoadConfig (std::wstring name)
     render_ini,
       L"ImGui.Settings",
         L"PauseOnActivate" );
+
+  render.ui_scale =
+    static_cast <tbf::ParameterFloat *>
+    (g_ParameterFactory.create_parameter <float> (
+      L"Config Menu Scale Factor")
+    );
+
+  render.ui_scale->register_to_ini (
+    render_ini,
+      L"ImGui.Settings",
+        L"FontScale" );
 
   render.show_osd_disclaimer =
     static_cast <tbf::ParameterBool *>
@@ -508,8 +534,12 @@ TBF_LoadConfig (std::wstring name)
 
   render.dump_shaders->load        (config.render.dump_shaders);
   render.fix_map_res->load         (config.render.fix_map_res);
+  render.postproc_ratio->load      (config.render.postproc_ratio);
   render.pause_on_ui->load         (config.input.ui.pause);
   render.show_osd_disclaimer->load (config.render.osd_disclaimer);
+  render.ui_scale->load            (config.input.ui.scale);
+
+  config.input.ui.scale = std::min (std::max (1.0f, config.input.ui.scale), 3.0f);
 
   framerate.replace_limiter->load  (config.framerate.replace_limiter);
   framerate.tolerance->load        (config.framerate.tolerance);
@@ -550,8 +580,10 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.rescale_shadows->store     (config.render.shadow_rescale);
   render.rescale_env_shadows->store (config.render.env_shadow_rescale);
   render.fix_map_res->store         (config.render.fix_map_res);
+  render.postproc_ratio->store      (config.render.postproc_ratio);
   render.pause_on_ui->store         (config.input.ui.pause);
   render.show_osd_disclaimer->store (config.render.osd_disclaimer);
+  render.ui_scale->store            (config.input.ui.scale);
 
   textures.remaster->store          (config.textures.remaster);
   textures.uncompressed->store      (config.textures.uncompressed);

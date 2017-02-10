@@ -932,10 +932,9 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   // Environmental Shadows
   //
   if (pViewport->Width == pViewport->Height && 
-      (pViewport->Width ==  512 ||
+    (pViewport->Width == 512 ||
        pViewport->Width == 1024 ||
-       pViewport->Width == 2048 ||
-       pViewport->Width == 4096)) {
+       pViewport->Width == 2048)) {
     //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu)", pViewport->Width, pViewport->Height);
     D3DVIEWPORT9 rescaled_shadow = *pViewport;
 
@@ -948,8 +947,12 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   //
   // Adjust Post-Processing
   //
-  else if (pViewport->Width  == 512 &&
-      pViewport->Height == 256 && config.render.postproc_ratio > 0.0f) {
+  else if ( ( ( pViewport->Width  == 2048 &&
+                pViewport->Height == 1024 ) ||
+              ( pViewport->Width  == 1024 &&
+                pViewport->Height == 512  ) ||
+              ( pViewport->Width  == 512  &&
+                pViewport->Height == 256  ) ) && config.render.postproc_ratio > 0.0f) {
     D3DVIEWPORT9 rescaled_post_proc = *pViewport;
 
     float scale_x, scale_y;

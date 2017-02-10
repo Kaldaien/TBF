@@ -31,10 +31,10 @@ extern std::wstring DEFAULT_BK2;
 struct tbf_config_t
 {
   struct {
-    uint32_t sample_hz       = -1;
+    uint32_t sample_hz       = 48000;
     uint32_t channels        =  6;
-    bool     compatibility   = false;
-    bool     enable_fix      = true;
+    bool     compatibility   = true;
+    bool     enable_fix      = false;
   } audio;
 
   struct {
@@ -60,7 +60,7 @@ struct tbf_config_t
     uintptr_t fovy_addr          = 0x00D56498ULL;//0x00D5239C;
     bool      blackbar_videos    = false;  // OBSOLETE
     bool      aspect_correction  = false;
-    float     postproc_ratio     =  0.0f;
+    float     postproc_ratio     =  0.5f;
     bool      clear_blackbars    = false;
     int32_t   shadow_rescale     = -2;
     int32_t   env_shadow_rescale =  1;
@@ -75,13 +75,13 @@ struct tbf_config_t
     bool     remaster            =  true;
     bool     cache               =  true;
     bool     uncompressed        =  false;
-    float    lod_bias            = -0.2666f;
+    float    lod_bias            = -0.1333f;
     int32_t  max_cache_in_mib    =  2048L;
     int32_t  worker_threads      =  3;
-    int32_t  max_decomp_jobs     =  6;
+    int32_t  max_decomp_jobs     =  3;
     bool     show_loading_text   =  false;
     bool     quick_load          =  false;
-    bool     clamp_npot_coords   =  false;
+    bool     clamp_npot_coords   =  true;
     bool     highlight_debug_tex =  true;
   } textures;
 
@@ -94,6 +94,7 @@ struct tbf_config_t
     struct {
       bool         visible       = false;
       bool         pause         = true;
+      float        scale         = 1.0f;
     } ui;
   } input;
 

@@ -17,6 +17,8 @@
 void
 TBF_DrawFileList (void)
 {
+  const LONG font_size = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
+
   ImGui::PushItemWidth (500.0f);
 
   struct enumerated_source_s
@@ -105,8 +107,8 @@ TBF_DrawFileList (void)
   ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
   ImGui::PushStyleColor (ImGuiCol_Border,                   ImVec4 (0.4f, 0.6f, 0.9f, 1.0f));
 
-#define FILE_LIST_WIDTH  250UL
-#define FILE_LIST_HEIGHT 100UL
+#define FILE_LIST_WIDTH  font_size * 20
+#define FILE_LIST_HEIGHT font_size * (sources.size () + 3)
 
   ImGui::BeginChild ( "Source List",
                         ImVec2 ( FILE_LIST_WIDTH, FILE_LIST_HEIGHT ),
@@ -189,7 +191,7 @@ TBF_DrawFileList (void)
 
     ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
     ImGui::BeginChild ( "Texture Selection",
-                           ImVec2 (300.0f, list_size.y - 24),
+                           ImVec2 (font_size * 30, list_size.y - font_size * 2),
                              true );
 
     for ( auto it : sources [sel].checksums )
@@ -236,6 +238,8 @@ TBF_DrawFileList (void)
 bool
 TBFix_TextureModDlg (void)
 {
+  const LONG font_size = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
+
   bool show_dlg = true;
 
   ImGui::Begin ( "Tales Engine Texture Mod Toolkit (v " TBF_VERSION_STR_A ")",
@@ -246,7 +250,7 @@ TBFix_TextureModDlg (void)
 
   if (ImGui::CollapsingHeader ("Preliminary Documentation"))
   {
-    ImGui::BeginChild ("ModDescription", ImVec2 (750, 325), true);
+    ImGui::BeginChild ("ModDescription", ImVec2 (font_size * 66, font_size * 25), true);
       ImGui::TextColored    (ImVec4 (0.9f, 0.7f, 0.5f, 1.0f), "Texture Modding Overview"); ImGui::SameLine ();
       ImGui::Text           ("    (Full Writeup Pending)");
 
@@ -299,7 +303,7 @@ TBFix_TextureModDlg (void)
     extern              uint32_t  tex_dbg_idx;
     extern              uint32_t  debug_tex_id;
 
-    ImGui::BeginChild ("ToolHeadings", ImVec2 (750, 32), false, ImGuiWindowFlags_AlwaysUseWindowPadding);
+    ImGui::BeginChild ("ToolHeadings", ImVec2 (font_size * 66, font_size * 2.5), false, ImGuiWindowFlags_AlwaysUseWindowPadding);
 
     if (ImGui::Button ("Refresh Textures"))
     {
@@ -354,6 +358,9 @@ TBFix_TextureModDlg (void)
            list_contents.clear ();
                 sel = tex_dbg_idx;
 
+      if (debug_tex_id == 0)
+        last_ht = 0;
+
       for ( auto it : textures_used_last_dump )
       {
         char szDesc [16] = { };
@@ -370,7 +377,7 @@ TBFix_TextureModDlg (void)
     ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
 
     ImGui::BeginChild ( "Item List",
-                        ImVec2 ( 90, std::max (512L, last_ht) + 128 ),
+                        ImVec2 ( font_size * 6, std::max (font_size * 15, last_ht)),
                           true, ImGuiWindowFlags_AlwaysAutoResize );
 
    if (textures_used_last_dump.size ())
@@ -443,10 +450,10 @@ TBFix_TextureModDlg (void)
         {
           ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
           ImGui::BeginChild ( "Item Selection",
-                              ImVec2 (std::max (256L, (LONG)desc.Width + 24), std::max (512L, (LONG)desc.Height) + 128), true, ImGuiWindowFlags_AlwaysAutoResize );
+                              ImVec2 (std::max (font_size * 19, (LONG)desc.Width + 24), desc.Height + font_size * 10), true, ImGuiWindowFlags_AlwaysAutoResize );
 
           last_width  = desc.Width;
-          last_ht     = desc.Height;
+          last_ht     = desc.Height + font_size * 10;
 
           extern std::wstring
           SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
@@ -503,7 +510,7 @@ TBFix_TextureModDlg (void)
         {
           ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
           ImGui::BeginChild ( "Item Selection2",
-                              ImVec2 (std::max (256L, (LONG)desc.Width + 24), std::max (512L, (LONG)desc.Height) + 128), true, ImGuiWindowFlags_AlwaysAutoResize );
+                              ImVec2 (std::max (font_size * 19, (LONG)desc.Width + 24), desc.Height + font_size * 10), true, ImGuiWindowFlags_AlwaysAutoResize );
 
           extern std::wstring
           SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
@@ -563,7 +570,7 @@ TBFix_TextureModDlg (void)
     ImGui::PopStyleVar   (2);
   }
 
-  if (ImGui::CollapsingHeader ("Live Render Target View", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
+  if (ImGui::CollapsingHeader ("Live Render Target View"))
   {
     static LONG last_ht    = 256L;
     static LONG last_width = 256L;
@@ -601,7 +608,7 @@ TBFix_TextureModDlg (void)
     ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
 
     ImGui::BeginChild ( "Item List2",
-                        ImVec2 ( 90, std::max (512L, last_ht)),
+                        ImVec2 ( font_size * 6, std::max (font_size * 15, last_ht)),
                           true, ImGuiWindowFlags_AlwaysAutoResize );
 
    if (render_textures.size ())
@@ -684,7 +691,7 @@ TBFix_TextureModDlg (void)
                                 ImGuiWindowFlags_AlwaysAutoResize );
 
         last_width  = desc.Width  / 2;
-        last_ht     = std::max (256L, (LONG)desc.Height / 2) + 64 + shaders * 19;
+        last_ht     = (LONG)(desc.Height / 2) + font_size * 3 + shaders * font_size;
 
         extern std::wstring
         SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
