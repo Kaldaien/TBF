@@ -247,7 +247,7 @@ static bool list_dirty = true;
 void
 TBF_DrawRemapList (void)
 {
-  const   LONG font_size = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
+  const   float font_size = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
 
   struct enumerated_remap_s
   {
@@ -291,11 +291,11 @@ TBF_DrawRemapList (void)
   ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
   ImGui::PushStyleColor (ImGuiCol_Border,                   ImVec4 (0.4f, 0.6f, 0.9f, 1.0f));
 
-#define REMAP_LIST_WIDTH  font_size * 30
-#define REMAP_LIST_HEIGHT font_size * 5
+#define REMAP_LIST_WIDTH  font_size * 30.0f
+#define REMAP_LIST_HEIGHT font_size * 5.0f
 
   ImGui::BeginChild ( "Remap List",
-                        ImVec2 ( REMAP_LIST_WIDTH, std::max (44UL, font_size * ((unsigned long)remaps.size () + 3)) ),
+                        ImVec2 ( REMAP_LIST_WIDTH, std::max (44.0f, font_size * ((float)remaps.size () + 3.0f)) ),
                           true,
                             ImGuiWindowFlags_AlwaysAutoResize );
 
@@ -411,7 +411,7 @@ tbf::KeyboardFix::DrawControlPanel (void)
 bool
 tbf::KeyboardFix::RemapDialog (void)
 {
-  const   LONG font_size = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
+  const  float font_size = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
   static bool  was_open  = false;
 
   if (ImGui::BeginPopupModal ("Keyboard Remap", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders))

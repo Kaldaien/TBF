@@ -247,7 +247,7 @@ TBFix_DrawConfigUI (void)
     ImGui::GetIO ();
 
       io.FontGlobalScale = config.input.ui.scale;
-  const   LONG font_size = ImGui::GetFont ()->FontSize * io.FontGlobalScale;
+  const  float font_size = ImGui::GetFont ()->FontSize * io.FontGlobalScale;
 
   ImGui::SetNextWindowPosCenter       (ImGuiSetCond_Always);
   ImGui::SetNextWindowSizeConstraints (ImVec2 (665, 50), ImVec2 ( ImGui::GetIO ().DisplaySize.x * 0.95f,
@@ -766,7 +766,7 @@ TBFix_DrawConfigUI (void)
 
           ImGui::Columns (2);
 
-          for (int i = 0 ; i < std::min (config.audio.channels, channels); i++)
+          for (UINT i = 0 ; i < std::min (config.audio.channels, channels); i++)
           {
             if (SUCCEEDED (pMeterInfo->GetChannelsPeakValues (channels, channel_peaks_)))
             {
@@ -838,7 +838,7 @@ TBFix_DrawConfigUI (void)
       if (tbf::SoundFix::wasapi_init)
       {
         ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 16.0f);
-        ImGui::BeginChild  ("Audio Details", ImVec2 (0, font_size * 6), true);
+        ImGui::BeginChild  ("Audio Details", ImVec2 (0.0f, font_size * 6.0f), true);
 
           ImGui::Columns   (3);
           ImGui::Text      ("");                                                                     ImGui::NextColumn ();

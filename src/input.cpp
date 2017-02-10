@@ -97,8 +97,11 @@ SK_TBF_PluginKeyPress ( BOOL Control,
     *SK_GetCommandProcessor ();
 
   if (Control && Shift)
-{
-    if (vkCode == VK_DELETE) {
+  {
+    if (vkCode == VK_F10)
+      tbf::RenderFix::tex_mgr.queueScreenshot (L"Screenshot.dds");
+
+    else if (vkCode == VK_DELETE) {
       config.render.osd_disclaimer = (! config.render.osd_disclaimer);
     }
 

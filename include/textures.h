@@ -199,6 +199,9 @@ namespace RenderFix {
     void                     trackRenderTarget    (IDirect3DBaseTexture9* rt);
     bool                     isRenderTarget       (IDirect3DBaseTexture9* rt);
 
+    void                     queueScreenshot      (wchar_t* wszFileName, bool hudless = true);
+    bool                     wantsScreenshot      (void);
+    HRESULT                  takeScreenshot       (IDirect3DBaseTexture9* pTex);
 
 
     BOOL                     isTexturePowerOfTwo (UINT sampler)
@@ -225,17 +228,18 @@ namespace RenderFix {
     } used;
 
     std::unordered_map <uint32_t, tbf::RenderFix::Texture*> textures;
-    float                                                   time_saved     = 0.0f;
-    LONG64                                                  bytes_saved    = 0LL;
+    float                                                   time_saved      = 0.0f;
+    LONG64                                                  bytes_saved     = 0LL;
 
-    ULONG                                                   hits           = 0UL;
-    ULONG                                                   misses         = 0UL;
+    ULONG                                                   hits            = 0UL;
+    ULONG                                                   misses          = 0UL;
 
-    LONG64                                                  basic_size     = 0LL;
-    LONG64                                                  injected_size  = 0LL;
-    ULONG                                                   injected_count = 0UL;
+    LONG64                                                  basic_size      = 0LL;
+    LONG64                                                  injected_size   = 0LL;
+    ULONG                                                   injected_count  = 0UL;
 
-    std::string                                             osd_stats      = "";
+    std::string                                             osd_stats       = "";
+    bool                                                    want_screenshot = false;
 
     CRITICAL_SECTION                                        cs_cache;
   } extern tex_mgr;

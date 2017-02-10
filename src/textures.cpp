@@ -45,6 +45,9 @@
 #include <lzma/7zFile.h>
 #include <lzma/7zVersion.h>
 
+#include <atlbase.h>
+#include <memory>
+
 #define TBFIX_TEXTURE_DIR L"TBFix_Res"
 #define TBFIX_TEXTURE_EXT L".dds"
 
@@ -672,17 +675,18 @@ D3D9SetTexture_Detour (
                      //Sampler, pTexture );
   //}
 
+  extern uint32_t vs_checksum;
+  extern uint32_t ps_checksum;
+
   tbf::RenderFix::tex_mgr.applyTexture (pTexture);
   tbf::RenderFix::tracked_rt.active  = (pTexture == tbf::RenderFix::tracked_rt.tracking_tex);
 
   if (tbf::RenderFix::tracked_rt.active)
   {
-    extern uint32_t vs_checksum;
-    extern uint32_t ps_checksum;
-
-    tbf::RenderFix::tracked_rt.pixel_shaders.insert (vs_checksum);
-    tbf::RenderFix::tracked_rt.pixel_shaders.insert (ps_checksum);
+    tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
+    tbf::RenderFix::tracked_rt.pixel_shaders.insert  (ps_checksum);
   }
+
 
   void* dontcare;
   if ( pTexture != nullptr &&
@@ -1701,15 +1705,16 @@ InjectTexture (tbf_tex_load_s* load)
   {
     wchar_t       arc_name [MAX_PATH] = { };
     CFileInStream arc_stream;
-    CLookToRead   look_stream;
+    std::unique_ptr <CLookToRead>
+                  look_stream (new CLookToRead ());
     ISzAlloc      thread_alloc;
     ISzAlloc      thread_tmp_alloc;
 
     FileInStream_CreateVTable (&arc_stream);
-    LookToRead_CreateVTable   (&look_stream, False);
+    LookToRead_CreateVTable   (look_stream.get (), False);
 
-    look_stream.realStream = &arc_stream.s;
-    LookToRead_Init         (&look_stream);
+    look_stream->realStream = &arc_stream.s;
+    LookToRead_Init          (look_stream.get ());
 
     thread_alloc.Alloc     = SzAlloc;
     thread_alloc.Free      = SzFree;
@@ -1742,7 +1747,7 @@ InjectTexture (tbf_tex_load_s* load)
 
     SzArEx_Init (&arc);
 
-    if (SzArEx_Open (&arc, &look_stream.s, &thread_alloc, &thread_tmp_alloc) != SZ_OK)
+    if (SzArEx_Open (&arc, &look_stream->s, &thread_alloc, &thread_tmp_alloc) != SZ_OK)
     {
       tex_log->Log ( L"[Inject Tex]  ** Cannot open archive file: %s",
                        arc_name );
@@ -1774,7 +1779,7 @@ InjectTexture (tbf_tex_load_s* load)
           size_t   offset        = 0;
           size_t   decomp_size   = 0;
 
-          SzArEx_Extract ( &arc,          &look_stream.s, fileno,
+          SzArEx_Extract ( &arc,          &look_stream->s, fileno,
                            &block_idx,    &out,           &out_len,
                            &offset,       &decomp_size,
                            &thread_alloc, &thread_tmp_alloc );
@@ -1854,10 +1859,10 @@ TBFix_UpdateQueueOSD (void)
       
       if (is_resampling)
       {
-        int count = queue_len + resample_count;
+        size_t count = queue_len + resample_count;
 
             char szFormatted [64];
-        sprintf (szFormatted, "  Resampling: %li texture", count);
+        sprintf (szFormatted, "  Resampling: %zi texture", count);
 
         resampling_text  = szFormatted;
         resampling_text += (count != 1) ? 's' : ' ';
@@ -1876,10 +1881,10 @@ TBFix_UpdateQueueOSD (void)
       
       if (is_streaming)
       {
-        int count = stream_count + to_stream;
+        size_t count = stream_count + to_stream;
 
             char szFormatted [64];
-        sprintf (szFormatted, "  Streaming:  %li texture", count);
+        sprintf (szFormatted, "  Streaming:  %zi texture", count);
 
         streaming_text  = szFormatted;
         streaming_text += (count != 1) ? 's' : ' ';
@@ -3782,13 +3787,15 @@ void
 TBF_RefreshDataSources (void)
 {
   CFileInStream arc_stream;
-  CLookToRead   look_stream;
+
+  std::unique_ptr <CLookToRead>
+                look_stream (new CLookToRead ());
 
   FileInStream_CreateVTable (&arc_stream);
-  LookToRead_CreateVTable   (&look_stream, False);
+  LookToRead_CreateVTable   (look_stream.get (), False);
 
-  look_stream.realStream = &arc_stream.s;
-  LookToRead_Init         (&look_stream);
+  look_stream->realStream = &arc_stream.s;
+  LookToRead_Init           (look_stream.get ());
 
   injectable_textures.clear ();
   archives.clear            ();
@@ -3955,7 +3962,7 @@ TBF_RefreshDataSources (void)
             SzArEx_Init (&arc);
 
             if ( SzArEx_Open ( &arc,
-                                 &look_stream.s,
+                                 &look_stream->s,
                                    &thread_alloc,
                                      &thread_tmp_alloc ) == SZ_OK )
             {
@@ -4161,4 +4168,74 @@ tbf::RenderFix::TextureManager::reloadTexture (uint32_t checksum)
     TBFix_LoadQueuedTextures ();
 
   return true;
+}
+
+void 
+tbf::RenderFix::TextureManager::queueScreenshot ( wchar_t* wszFileName,
+                                                  bool     hudless )
+{
+  want_screenshot = true;
+  //screenshot_file = wszFileName;
+}
+
+bool
+tbf::RenderFix::TextureManager::wantsScreenshot (void)
+{
+  return want_screenshot;
+}
+
+HRESULT
+tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DBaseTexture9* pTex)
+{
+  static int count = 0;
+
+  wchar_t wszOut [MAX_PATH] = { };
+   char    szOut [MAX_PATH] = { };
+
+  _swprintf (wszOut, L"TBFix_Screenshot%lu.tga", count  );
+
+  GetCurrentDirectoryA (MAX_PATH, szOut);
+    sprintf ( szOut,  "%s\\TBFix_Screenshot%lu.tga", szOut, count++);
+
+  want_screenshot = false;
+
+  D3DSURFACE_DESC desc;
+
+  CComPtr <IDirect3DTexture9> pRealTex = nullptr;
+
+  pTex->QueryInterface (IID_PPV_ARGS (&pRealTex));
+
+  pRealTex->GetLevelDesc (0, &desc);
+
+  start_load ();
+  HRESULT hr = D3DXSaveTextureToFile (wszOut, D3DXIFF_TGA, pTex, nullptr);
+
+  if (SUCCEEDED (hr)) {
+    extern HMODULE hInjectorDLL;
+
+    typedef void (WINAPI *SK_SteamAPI_AddScreenshotToLibrary_pfn)(const char *pchFilename, const char *pchThumbnailFilename, int nWidth, int nHeight);
+
+    static SK_SteamAPI_AddScreenshotToLibrary_pfn SK_SteamAPI_AddScreenshotToLibrary =
+      (SK_SteamAPI_AddScreenshotToLibrary_pfn)
+        GetProcAddress (hInjectorDLL, "SK_SteamAPI_AddScreenshotToLibrary");
+
+    SK_SteamAPI_AddScreenshotToLibrary (szOut, nullptr, desc.Width, desc.Height);
+
+    // Wait for SSteam to finish -- this is a stupid hack, but I don't want to bother with a callback :)
+    CreateThread (nullptr, 0,
+      [](LPVOID user) ->
+        DWORD
+        {
+          Sleep       (5000UL);
+          DeleteFileA ((char *)user);
+          free        (user);
+          CloseHandle (GetCurrentThread ());
+          return 0;
+        }, _strdup (szOut),
+      0x00,
+    nullptr );
+  }
+  end_load   ();
+
+  return hr;
 }

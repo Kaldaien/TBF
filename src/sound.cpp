@@ -186,7 +186,7 @@ HRESULT
 WINAPI DSound_GetSpeakerConfig (IDirectSound *This, 
                           _Out_ LPDWORD       pdwSpeakerConfig)
 {
-  audio_log->Log ( L"[!] %s (%08Xh, %08Xh) - "
+  audio_log->Log ( L"[!] %s (%ph, %ph) - "
                    L"[Calling Thread: 0x%04x]",
                      L"IDirectSound::GetSpeakerConfig",
                        This,
@@ -217,7 +217,7 @@ HRESULT
 WINAPI DSound_SetSpeakerConfig (IDirectSound *This, 
                           _In_  DWORD         dwSpeakerConfig)
 {
-  audio_log->Log ( L"[!] %s (%08Xh, %08Xh) - "
+  audio_log->Log ( L"[!] %s (%ph, %ph) - "
                    L"[Calling Thread: 0x%04x]",
                      L"IDirectSound::SetSpeakerConfig",
                        This, dwSpeakerConfig,
@@ -247,7 +247,7 @@ HRESULT
 WINAPI DSound_GetSpeakerConfig8 (IDirectSound8 *This, 
                            _Out_ LPDWORD        pdwSpeakerConfig)
 {
-  audio_log->Log ( L"[!] %s (%08Xh, %08Xh) - "
+  audio_log->Log ( L"[!] %s (%ph, %ph) - "
                    L"[Calling Thread: 0x%04x]",
                      L"IDirectSound8::GetSpeakerConfig",
                        This, pdwSpeakerConfig,

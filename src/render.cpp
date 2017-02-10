@@ -32,6 +32,7 @@
 
 #include <d3d9.h>
 #include <d3d9types.h>
+#include <atlbase.h>
 
 tbf::RenderFix::tbf_draw_states_s
   tbf::RenderFix::draw_state;
@@ -385,10 +386,39 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
   vs_checksum = vs_checksums [pShader];
   g_pVS       = pShader;
 
-  ////tbf::RenderFix::last_frame.vertex_shaders.insert (vs_checksum);
+  tbf::RenderFix::last_frame.vertex_shaders.insert (vs_checksum);
 
   if (tbf::RenderFix::tracked_rt.active)
     tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
+
+
+
+  CComPtr <IDirect3DBaseTexture9> pTexture = nullptr;
+
+  if (SUCCEEDED (This->GetTexture (0, &pTexture)) && tbf::RenderFix::tex_mgr.wantsScreenshot ())
+  {
+    if (vs_checksum == 0x1a97b826 /*ps_checksum == 0x46618c0a*/ && tbf::RenderFix::tex_mgr.isRenderTarget (pTexture))
+    {
+      CComPtr <IDirect3DTexture9> pTex = nullptr;
+
+      if (SUCCEEDED (pTexture->QueryInterface (IID_PPV_ARGS (&pTex))))
+      {
+        D3DSURFACE_DESC desc;
+
+        if (SUCCEEDED (pTex->GetLevelDesc (0, &desc)))
+        {
+          static int passes = 0;
+
+          if ( desc.Width  == tbf::RenderFix::width &&
+               desc.Height == tbf::RenderFix::height && passes++ > 1 )
+          {
+            tbf::RenderFix::tex_mgr.takeScreenshot (pTexture);
+            passes = 0;
+          }
+        }
+      }
+    }
+  }
 
   return D3D9SetVertexShader_Original (This, pShader);
 }
@@ -452,7 +482,7 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
   ps_checksum = ps_checksums [pShader];
   g_pPS       = pShader;
 
-  ////tbf::RenderFix::last_frame.pixel_shaders.insert (ps_checksum);
+  tbf::RenderFix::last_frame.pixel_shaders.insert (ps_checksum);
 
   if (tbf::RenderFix::tracked_rt.active)
     tbf::RenderFix::tracked_rt.pixel_shaders.insert (ps_checksum);
@@ -710,6 +740,8 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
   tbf::RenderFix::tracked_rt.active = false;
   tbf::RenderFix::tracked_rt.vertex_shaders.clear ();
   tbf::RenderFix::tracked_rt.pixel_shaders.clear  ();
+
+  tbf::RenderFix::last_frame.clear ();
 
   //if (config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
