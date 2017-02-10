@@ -12,6 +12,8 @@
 #include "render.h"
 #include "textures.h"
 
+#include <atlbase.h>
+
 void
 TBF_DrawFileList (void)
 {
@@ -561,57 +563,45 @@ TBFix_TextureModDlg (void)
     ImGui::PopStyleVar   (2);
   }
 
-#if 0
   if (ImGui::CollapsingHeader ("Live Render Target View", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   {
     static LONG last_ht    = 256L;
     static LONG last_width = 256L;
 
     static std::vector <std::string> list_contents;
-    static bool                      list_dirty     = false;
-    static int                       sel            =     0;
+    static bool                      list_dirty     = true;
+    static uintptr_t                 last_sel_ptr   =    0;
+    static int                            sel       =    0;
 
-    extern std::vector <uint32_t> textures_used_last_dump;
-    extern              uint32_t  tex_dbg_idx;
-    extern              uint32_t  debug_tex_id;
-
-    ImGui::BeginChild ("ToolHeadings2", ImVec2 (750, 32), false, ImGuiWindowFlags_AlwaysUseWindowPadding);
-
-    if (ImGui::Button ("Refresh Targets"))
-    {
-      SK_ICommandProcessor& command =
-        *SK_GetCommandProcessor ();
-
-      list_dirty = true;
-    }
-
-    if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("Refreshes the set of texture checksums used in the last frame drawn.");
-
-    ImGui::Separator ();
-    ImGui::EndChild  ();
+    std::vector <IDirect3DBaseTexture9*> render_textures =
+      tbf::RenderFix::tex_mgr.getUsedRenderTargets ();
 
     if (list_dirty)
     {
-           list_contents.clear ();
-                sel = tex_dbg_idx;
+          sel = 0;
+      int idx = 0;
+          list_contents.clear ();
 
       for ( auto it : render_textures )
       {
         char szDesc [16] = { };
 
-        sprintf (szDesc, "%px", it);
+        sprintf (szDesc, "%08x", (uintptr_t)it);
 
         list_contents.push_back (szDesc);
+
+        if ((uintptr_t)it == last_sel_ptr)
+          sel = idx;
+
+        ++idx;
       }
     }
-
-    ImGui::BeginGroup ();
 
     ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
     ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
 
-    ImGui::BeginChild ( "Item List",
-                        ImVec2 ( 90, std::max (512L, last_ht) + 128 ),
+    ImGui::BeginChild ( "Item List2",
+                        ImVec2 ( 90, std::max (512L, last_ht)),
                           true, ImGuiWindowFlags_AlwaysAutoResize );
 
    if (render_textures.size ())
@@ -624,35 +614,123 @@ TBFix_TextureModDlg (void)
 
      last_sel = sel;
 
-     for ( int line = 0; line < render_textures.size (); line++)
+     for ( int line = 0; line < render_textures.size (); line++ )
      {
-       if (line == sel)
+       D3DSURFACE_DESC desc;
+
+       CComPtr <IDirect3DTexture9> pTex = nullptr;
+
+       if (SUCCEEDED (render_textures [line]->QueryInterface (IID_PPV_ARGS (&pTex))))
        {
-         bool selected = true;
-         ImGui::Selectable (list_contents [line].c_str (), &selected);
-
-         if (sel_changed)
+         if (SUCCEEDED (pTex->GetLevelDesc (0, &desc)))
          {
-           ImGui::SetScrollHere (0.5f); // 0.0f:top, 0.5f:center, 1.0f:bottom
-           sel_changed = false;
-         }
-       }
+           if (line == sel)
+           {
+             bool selected = true;
+             ImGui::Selectable (list_contents [line].c_str (), &selected);
 
-       else
-       {
-         bool selected = false;
+             if (sel_changed)
+             {
+               ImGui::SetScrollHere (0.5f); // 0.0f:top, 0.5f:center, 1.0f:bottom
+               sel_changed = false;
+             }
+           }
 
-         if (ImGui::Selectable (list_contents [line].c_str (), &selected))
-         {
-           sel_changed = true;
-           tex_dbg_idx =  line;
-           sel         =  line;
+           else
+           {
+             bool selected = false;
+
+             if (ImGui::Selectable (list_contents [line].c_str (), &selected))
+             {
+               sel_changed  = true;
+               sel          =  line;
+               last_sel_ptr = (uintptr_t)render_textures [sel];
+               tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
+             }
+           }
          }
        }
      }
+   }
+
+   ImGui::EndChild ();
+
+   ImGui::BeginGroup ();
+
+   ImGui::PopStyleColor ();
+   ImGui::PopStyleVar   ();
+
+   CComPtr <IDirect3DTexture9> pTex = nullptr;
+
+   if (render_textures.size ())
+     render_textures [sel]->QueryInterface (IID_PPV_ARGS (&pTex));
+
+   if (pTex != nullptr)
+   {
+      D3DSURFACE_DESC desc;
+
+      if (SUCCEEDED (pTex->GetLevelDesc (0, &desc)))
+      {
+        int shaders = std::max ( tbf::RenderFix::tracked_rt.pixel_shaders.size  (),
+                                 tbf::RenderFix::tracked_rt.vertex_shaders.size () );
+
+        ImGui::SameLine ();
+
+        ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
+        ImGui::BeginChild ( "Item Selection3",
+                            ImVec2 ( std::max (128L, (LONG)desc.Width  / 2  + 24),
+                                     std::max (256L, (LONG)desc.Height / 2) + 64 + shaders * 19),
+                              true,
+                                ImGuiWindowFlags_AlwaysAutoResize );
+
+        last_width  = desc.Width  / 2;
+        last_ht     = std::max (256L, (LONG)desc.Height / 2) + 64 + shaders * 19;
+
+        extern std::wstring
+        SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
+
+
+        ImGui::Text ( "Dimensions:   %lux%lu",
+                        desc.Width, desc.Height/*,
+                          pTex->d3d9_tex->GetLevelCount ()*/ );
+        ImGui::Text ( "Format:       %ws",
+                        SK_D3D9_FormatToStr (desc.Format).c_str () );
+
+        ImGui::Separator     ();
+
+        ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.95f, 0.95f, 0.05f, 1.0f));
+        ImGui::BeginChildFrame (0, ImVec2 ((float)desc.Width / 2 + 8, (float)desc.Height / 2 + 8), ImGuiWindowFlags_ShowBorders);
+        ImGui::Image           ( pTex,
+                                   ImVec2 ((float)desc.Width / 2, (float)desc.Height / 2),
+                                     ImVec2  (0,0),             ImVec2  (1,1),
+                                     ImColor (255,255,255,255), ImColor (255,255,255,128)
+                               );
+        ImGui::EndChildFrame   ();
+
+        if (shaders > 0)
+        {
+          ImGui::Columns (2);
+
+          for ( auto it : tbf::RenderFix::tracked_rt.vertex_shaders ) {
+            ImGui::Text ("Vertex Shader: %x", it);
+          }
+
+          ImGui::NextColumn ();
+
+          for ( auto it : tbf::RenderFix::tracked_rt.pixel_shaders ) {
+            ImGui::Text ("Pixel Shader: %x", it);
+          }
+
+          ImGui::Columns (1);
+        }
+
+        ImGui::EndChild        ();
+        ImGui::PopStyleColor   (2);
+      }
     }
+
+    ImGui::EndGroup ();
   }
-#endif
 
   if (ImGui::CollapsingHeader ("Misc. Settings"))
   {

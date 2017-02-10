@@ -387,6 +387,9 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
 
   ////tbf::RenderFix::last_frame.vertex_shaders.insert (vs_checksum);
 
+  if (tbf::RenderFix::tracked_rt.active)
+    tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
+
   return D3D9SetVertexShader_Original (This, pShader);
 }
 
@@ -450,6 +453,9 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
   g_pPS       = pShader;
 
   ////tbf::RenderFix::last_frame.pixel_shaders.insert (ps_checksum);
+
+  if (tbf::RenderFix::tracked_rt.active)
+    tbf::RenderFix::tracked_rt.pixel_shaders.insert (ps_checksum);
 
   return D3D9SetPixelShader_Original (This, pShader);
 }
@@ -699,6 +705,11 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
   InterlockedExchange (&tbf::RenderFix::dwRenderThreadID, GetCurrentThreadId ());
 
   hr = SK_EndBufferSwap (hr, device);
+
+  tbf::RenderFix::tex_mgr.resetUsedTextures       ();
+  tbf::RenderFix::tracked_rt.active = false;
+  tbf::RenderFix::tracked_rt.vertex_shaders.clear ();
+  tbf::RenderFix::tracked_rt.pixel_shaders.clear  ();
 
   //if (config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
@@ -1518,6 +1529,8 @@ tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
     need_reset.textures = false;
   }
 
+  tbf::RenderFix::tex_mgr.resetUsedTextures ();
+
   need_reset.graphics = false;
 
   vs_checksums.clear ();
@@ -1864,3 +1877,6 @@ HMODULE            tbf::RenderFix::user32_dll          = 0;
 
 tbf::RenderFix::reset_state_s
                    tbf::RenderFix::need_reset;
+
+tbf::RenderFix::render_target_tracking_s
+                   tbf::RenderFix::tracked_rt;

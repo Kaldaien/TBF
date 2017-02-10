@@ -37,6 +37,7 @@ extern iSK_Logger* tex_log;
 #include <algorithm>
 
 interface ISKTextureD3D9;
+struct IDirect3DBaseTexture9;
 
 const int log_level = 0;
 
@@ -190,6 +191,14 @@ namespace RenderFix {
     ULONG                    getHitCount  (void) { return InterlockedExchangeAdd (&hits,   0UL);    }
     ULONG                    getMissCount (void) { return InterlockedExchangeAdd (&misses, 0UL);    }
 
+    void                     resetUsedTextures (void);
+    void                     applyTexture      (IDirect3DBaseTexture9* tex);
+
+    std::vector <IDirect3DBaseTexture9 *>
+                             getUsedRenderTargets (void);
+    void                     trackRenderTarget    (IDirect3DBaseTexture9* rt);
+    bool                     isRenderTarget       (IDirect3DBaseTexture9* rt);
+
 
 
     BOOL                     isTexturePowerOfTwo (UINT sampler)
@@ -207,6 +216,14 @@ namespace RenderFix {
 
 
   private:
+    struct {
+      std::unordered_set <IDirect3DBaseTexture9*> render_targets;
+    } known;
+    
+    struct {
+      std::unordered_set <IDirect3DBaseTexture9*> render_targets;
+    } used;
+
     std::unordered_map <uint32_t, tbf::RenderFix::Texture*> textures;
     float                                                   time_saved     = 0.0f;
     LONG64                                                  bytes_saved    = 0LL;

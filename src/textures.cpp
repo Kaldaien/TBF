@@ -25,6 +25,7 @@
 
 #include <d3d9.h>
 
+#include "render.h"
 #include "textures.h"
 #include "config.h"
 #include "framerate.h"
@@ -579,7 +580,36 @@ tbf::RenderFix::TextureManager::cacheSizeTotal (void)
   return cacheSizeBasic () + cacheSizeInjected ();
 }
 
-#include "render.h"
+bool
+tbf::RenderFix::TextureManager::isRenderTarget (IDirect3DBaseTexture9* pTex)
+{
+  return known.render_targets.count (pTex) != 0;
+}
+
+void
+tbf::RenderFix::TextureManager::trackRenderTarget (IDirect3DBaseTexture9* pTex)
+{
+  known.render_targets.insert (pTex);
+}
+
+void
+tbf::RenderFix::TextureManager::applyTexture (IDirect3DBaseTexture9* pTex)
+{
+  if (known.render_targets.count (pTex) != 0)
+    used.render_targets.insert (pTex);
+}
+
+void
+tbf::RenderFix::TextureManager::resetUsedTextures (void)
+{
+  used.render_targets.clear ();
+}
+
+std::vector <IDirect3DBaseTexture9 *>
+tbf::RenderFix::TextureManager::getUsedRenderTargets (void)
+{
+  return std::vector <IDirect3DBaseTexture9 *> (used.render_targets.begin (), used.render_targets.end ());
+}
 
 COM_DECLSPEC_NOTHROW
 __declspec (noinline)
@@ -641,6 +671,18 @@ D3D9SetTexture_Detour (
     //dll_log->Log ( L"[FrameTrace] SetTexture      - Sampler: %lu, pTexture: %ph",
                      //Sampler, pTexture );
   //}
+
+  tbf::RenderFix::tex_mgr.applyTexture (pTexture);
+  tbf::RenderFix::tracked_rt.active  = (pTexture == tbf::RenderFix::tracked_rt.tracking_tex);
+
+  if (tbf::RenderFix::tracked_rt.active)
+  {
+    extern uint32_t vs_checksum;
+    extern uint32_t ps_checksum;
+
+    tbf::RenderFix::tracked_rt.pixel_shaders.insert (vs_checksum);
+    tbf::RenderFix::tracked_rt.pixel_shaders.insert (ps_checksum);
+  }
 
   void* dontcare;
   if ( pTexture != nullptr &&
@@ -746,7 +788,7 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
   // Model Shadows
   //
   if (Width == Height && (Width == 64 || Width == 128 || Width == 256) &&
-                          (Usage == D3DUSAGE_RENDERTARGET || Usage == D3DUSAGE_DEPTHSTENCIL)) {
+                          (Usage == D3DUSAGE_RENDERTARGET)) {
     //tex_log->Log (L"[Shadow Mgr] (Model Resolution: (%lu x %lu)", Width, Height);
     // Assert (Levels == 1)
     //
@@ -761,7 +803,7 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     game_created = true;
   }
 
-  else if (Width == Height && (Height == 512 || Height == 1024 || Height == 2048 || Height == 4096) &&
+  else if (Width == Height && (Format == D3DFMT_R32F && Height == 512 || Height == 1024 || Height == 2048) &&
                           (Usage == D3DUSAGE_RENDERTARGET || Usage == D3DUSAGE_DEPTHSTENCIL)) {
       //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
       uint32_t shift = config.render.env_shadow_rescale;
@@ -818,12 +860,6 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     {
       Width *= 2; Height *= 2;
     }
-    //if (Width == 960 && Height == 540) {
-      //Width = 3840; Height = 2160;
-    //}
-    //if (Width == 640 && Height == 360) {
-      //Width = 3840; Height = 2160;
-    //}
 
     int levels = Levels;
 
@@ -836,6 +872,10 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
   HRESULT result = 
     D3D9CreateTexture (This, Width, Height, levels, Usage,
                                 Format, Pool, ppTexture, pSharedHandle);
+
+  if ( ( Usage & D3DUSAGE_RENDERTARGET ) || 
+       ( Usage & D3DUSAGE_DEPTHSTENCIL ) )
+    tbf::RenderFix::tex_mgr.trackRenderTarget (*ppTexture);
 
   return result;
 }
@@ -3233,6 +3273,8 @@ tbf::RenderFix::TextureManager::purge (void)
 void
 tbf::RenderFix::TextureManager::reset (void)
 {
+  known.render_targets.clear ();
+
   int underflows       = 0;
 
   int ext_refs         = 0;

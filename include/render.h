@@ -93,6 +93,16 @@ namespace tbf
       std::unordered_set <uint32_t> pixel_shaders;
       std::unordered_set <uint32_t> vertex_shaders;
     } extern last_frame;
+
+    struct render_target_tracking_s
+    {
+      IDirect3DBaseTexture9*        tracking_tex;
+
+      std::unordered_set <uint32_t> pixel_shaders;
+      std::unordered_set <uint32_t> vertex_shaders;
+
+      bool                          active;
+    } extern tracked_rt;
   }
 }
 
