@@ -198,10 +198,11 @@ namespace RenderFix {
                              getUsedRenderTargets (void);
     void                     trackRenderTarget    (IDirect3DBaseTexture9* rt);
     bool                     isRenderTarget       (IDirect3DBaseTexture9* rt);
+    bool                     isUsedRenderTarget   (IDirect3DBaseTexture9* rt);
 
     void                     queueScreenshot      (wchar_t* wszFileName, bool hudless = true);
     bool                     wantsScreenshot      (void);
-    HRESULT                  takeScreenshot       (IDirect3DBaseTexture9* pTex);
+    HRESULT                  takeScreenshot       (IDirect3DSurface9* pSurf);
 
 
     BOOL                     isTexturePowerOfTwo (UINT sampler)

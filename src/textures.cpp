@@ -94,9 +94,14 @@ tbf::RenderFix::TextureManager
 iSK_Logger* tex_log = nullptr;
 
 #include <set>
+#include <queue>
 
 // Textures that are missing mipmaps
 std::set <IDirect3DBaseTexture9 *> incomplete_textures;
+
+
+// Cleanup
+std::queue <std::wstring> screenshots;
 
 tbf::RenderFix::pad_buttons_t   tbf::RenderFix::pad_buttons;
 
@@ -602,6 +607,12 @@ tbf::RenderFix::TextureManager::applyTexture (IDirect3DBaseTexture9* pTex)
     used.render_targets.insert (pTex);
 }
 
+bool
+tbf::RenderFix::TextureManager::isUsedRenderTarget (IDirect3DBaseTexture9* pTex)
+{
+  return used.render_targets.count (pTex) != 0;
+}
+
 void
 tbf::RenderFix::TextureManager::resetUsedTextures (void)
 {
@@ -685,6 +696,29 @@ D3D9SetTexture_Detour (
   {
     tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
     tbf::RenderFix::tracked_rt.pixel_shaders.insert  (ps_checksum);
+  }
+
+
+  if (tbf::RenderFix::tex_mgr.wantsScreenshot ())
+  {
+    if ( Sampler == 1 && vs_checksum == 0x1a97b826 &&
+                         ps_checksum == 0x46618c0a &&
+         tbf::RenderFix::tex_mgr.isRenderTarget (pTexture) )
+    {
+      D3DSURFACE_DESC             surf_desc;
+      CComPtr <IDirect3DSurface9> pSurf  = nullptr;
+
+      if (SUCCEEDED (This->GetRenderTarget (0, &pSurf)))
+      {
+        pSurf->GetDesc (&surf_desc);
+
+        if ( surf_desc.Width  == tbf::RenderFix::width  &&
+             surf_desc.Height == tbf::RenderFix::height )
+        {
+          tbf::RenderFix::tex_mgr.takeScreenshot (pSurf);
+        }
+      }
+    }
   }
 
 
@@ -3043,6 +3077,11 @@ tbf::RenderFix::TextureManager::Init (void)
       GetProcAddress ( tbf::RenderFix::d3dx9_43_dll,
                          "D3DXSaveTextureToFileW" );
 
+  D3DXSaveSurfaceToFileW =
+    (D3DXSaveSurfaceToFile_pfn)
+      GetProcAddress ( tbf::RenderFix::d3dx9_43_dll,
+                         "D3DXSaveSurfaceToFileW" );
+
   D3DXCreateTextureFromFile =
     (D3DXCreateTextureFromFile_pfn)
       GetProcAddress ( tbf::RenderFix::d3dx9_43_dll,
@@ -3160,6 +3199,14 @@ tbf::RenderFix::TextureManager::Shutdown (void)
                    time_saved / 1000.0f,
                      time_saved / frame_time );
   tex_log->close ();
+
+  while (! screenshots.empty ())
+  {
+    std::wstring file_to_delete = screenshots.front ();
+    screenshots.pop ();
+
+    DeleteFileW (file_to_delete.c_str ());
+  }
 
   FreeLibrary (d3dx9_43_dll);
 }
@@ -4185,7 +4232,7 @@ tbf::RenderFix::TextureManager::wantsScreenshot (void)
 }
 
 HRESULT
-tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DBaseTexture9* pTex)
+tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
 {
   static int count = 0;
 
@@ -4199,43 +4246,31 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DBaseTexture9* pTex)
 
   want_screenshot = false;
 
-  D3DSURFACE_DESC desc;
+  D3DSURFACE_DESC  desc;
+  pSurf->GetDesc (&desc);
 
-  CComPtr <IDirect3DTexture9> pRealTex = nullptr;
+  HRESULT hr =
+    D3DXSaveSurfaceToFileW ( wszOut,
+                               D3DXIFF_TGA, pSurf,
+                                 nullptr, nullptr );
 
-  pTex->QueryInterface (IID_PPV_ARGS (&pRealTex));
-
-  pRealTex->GetLevelDesc (0, &desc);
-
-  start_load ();
-  HRESULT hr = D3DXSaveTextureToFile (wszOut, D3DXIFF_TGA, pTex, nullptr);
-
-  if (SUCCEEDED (hr)) {
+  if (SUCCEEDED (hr))
+  {
     extern HMODULE hInjectorDLL;
 
-    typedef void (WINAPI *SK_SteamAPI_AddScreenshotToLibrary_pfn)(const char *pchFilename, const char *pchThumbnailFilename, int nWidth, int nHeight);
+    typedef void (WINAPI *SK_SteamAPI_AddScreenshotToLibrary_pfn)
+      (const char *pchFilename, const char *pchThumbnailFilename, int nWidth, int nHeight);
 
-    static SK_SteamAPI_AddScreenshotToLibrary_pfn SK_SteamAPI_AddScreenshotToLibrary =
-      (SK_SteamAPI_AddScreenshotToLibrary_pfn)
-        GetProcAddress (hInjectorDLL, "SK_SteamAPI_AddScreenshotToLibrary");
+    static SK_SteamAPI_AddScreenshotToLibrary_pfn
+      SK_SteamAPI_AddScreenshotToLibrary =
+        (SK_SteamAPI_AddScreenshotToLibrary_pfn)
+          GetProcAddress ( hInjectorDLL,
+                             "SK_SteamAPI_AddScreenshotToLibrary" );
 
     SK_SteamAPI_AddScreenshotToLibrary (szOut, nullptr, desc.Width, desc.Height);
 
-    // Wait for SSteam to finish -- this is a stupid hack, but I don't want to bother with a callback :)
-    CreateThread (nullptr, 0,
-      [](LPVOID user) ->
-        DWORD
-        {
-          Sleep       (5000UL);
-          DeleteFileA ((char *)user);
-          free        (user);
-          CloseHandle (GetCurrentThread ());
-          return 0;
-        }, _strdup (szOut),
-      0x00,
-    nullptr );
+    screenshots.push (wszOut);
   }
-  end_load   ();
 
   return hr;
 }
