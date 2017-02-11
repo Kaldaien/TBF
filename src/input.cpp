@@ -93,15 +93,33 @@ SK_TBF_PluginKeyPress ( BOOL Control,
                         BOOL Alt,
                         BYTE vkCode )
 {
+  extern DWORD TBFix_Modal;
+
+  if (timeGetTime () < (TBFix_Modal + 500UL)) {
+    SK_PluginKeyPress_Original (Control, Shift, Alt, vkCode);
+    return;
+  }
+
   SK_ICommandProcessor& command =
     *SK_GetCommandProcessor ();
 
-  if (Control && Shift)
-  {
-    if (vkCode == VK_F10)
-      tbf::RenderFix::tex_mgr.queueScreenshot (L"Screenshot.dds");
+  if (  vkCode        == config.keyboard.hudless.vKey  &&
+       (Control != 0) == config.keyboard.hudless.ctrl  &&
+       (Shift   != 0) == config.keyboard.hudless.shift &&
+       (Alt     != 0) == config.keyboard.hudless.alt   )
+    tbf::RenderFix::tex_mgr.queueScreenshot (L"NOT_IMPLEMENTED", true);
 
-    else if (vkCode == VK_DELETE) {
+#if 0
+  else if ( vkCode  == config.keyboard.screenshot.vKey  &&
+            Control == config.keyboard.screenshot.ctrl  &&
+            Shift   == config.keyboard.screenshot.shift &&
+            Alt     == config.keyboard.screenshot.alt )
+    tbf::RenderFix::tex_mgr.queueScreenshot (L"NOT_IMPLEMENTED", false);
+#endif
+
+  else if (Control && Shift)
+  {
+    if (vkCode == VK_DELETE) {
       config.render.osd_disclaimer = (! config.render.osd_disclaimer);
     }
 

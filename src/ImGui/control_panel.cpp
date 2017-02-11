@@ -228,6 +228,76 @@ TBFix_GamepadConfigDlg (void)
   }
 }
 
+DWORD TBFix_Modal = 0UL;
+
+void
+TBFix_KeybindDialog (keybind_s* keybind)
+{
+  const  float font_size = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
+  static bool  was_open  = false;
+
+  static BYTE bind_keys [256] = { 0 };
+
+  ImGui::SetNextWindowSizeConstraints ( ImVec2 (font_size * 9, font_size * 3), ImVec2 (font_size * 30, font_size * 6));
+
+  if (ImGui::BeginPopupModal ("Keyboard Binding", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders))
+  {
+    ImGui::GetIO ().WantCaptureKeyboard = false;
+
+    int keys = 256;
+
+    if (! was_open)
+    {
+      //keybind->vKey = 0;
+
+      for (int i = 0 ; i < keys ; i++ ) bind_keys [i] = GetKeyState (i);
+
+      was_open = true;
+    }
+
+    BYTE active_keys [256];
+
+    for (int i = 0 ; i < keys ; i++ ) active_keys [i] = GetKeyState (i);
+
+    if (memcmp (active_keys, bind_keys, keys))
+    {
+      int i = 0;
+
+      for (i = (VK_MENU + 1); i < keys; i++)
+      {
+        if ( i == VK_LCONTROL || i == VK_RCONTROL ||
+             i == VK_LSHIFT   || i == VK_RSHIFT   ||
+             i == VK_LMENU    || i == VK_RMENU )
+          continue;
+
+        if ( active_keys [i] != bind_keys [i] )
+          break;
+      }
+
+      if (i != keys)
+      {
+        keybind->vKey = i;
+        was_open      = false;
+        ImGui::CloseCurrentPopup ();
+      }
+
+      //memcpy (bind_keys, active_keys, keys);
+    }
+
+    keybind->ctrl  = GetAsyncKeyState (VK_CONTROL);
+    keybind->shift = GetAsyncKeyState (VK_SHIFT);
+    keybind->alt   = GetAsyncKeyState (VK_MENU);
+
+    keybind->update ();
+
+    ImGui::Text ("Binding:  %ws", keybind->human_readable.c_str ());
+
+    TBFix_Modal = timeGetTime ();
+
+    ImGui::EndPopup ();
+  }
+}
+
 #define IM_ARRAYSIZE(_ARR)  ((int)(sizeof(_ARR)/sizeof(*_ARR)))
 
 IMGUI_API
@@ -725,6 +795,44 @@ TBFix_DrawConfigUI (void)
     }
 
     ImGui::TreePop   (  );
+  }
+
+  if (ImGui::CollapsingHeader ("Screenshots"))
+  {
+    if (ImGui::IsItemHovered ())
+    {
+         char szWorkingDir [MAX_PATH];
+      GetCurrentDirectoryA (MAX_PATH, szWorkingDir);
+
+      ImGui::SetTooltip ("Screenshots are stored in '%s\\Screenshots'", szWorkingDir);
+    }
+
+    ImGui::TreePush ("");
+
+    ImGui::Text ("No HUD Keybinding:  %ws",         config.keyboard.hudless.human_readable.c_str ());
+
+    if (ImGui::IsItemClicked ()) {
+      ImGui::OpenPopup ("Keyboard Binding");
+    }
+
+    TBFix_KeybindDialog (&config.keyboard.hudless);
+
+    ImGui::Checkbox ("Import Screenshot to Steam", &config.screenshots.import_to_steam);
+
+    if (config.screenshots.import_to_steam)
+    {
+      ImGui::TreePush ("");
+      ImGui::Checkbox ("Keep High Quality PNG Screenshot After Import", &config.screenshots.keep);
+
+      if (ImGui::IsItemHovered ())
+        ImGui::SetTooltip ("Screenshots will register in Steam much quicker with this disabled.");
+
+      ImGui::TreePop  ();
+    }
+    else
+      config.screenshots.keep = true;
+
+    ImGui::TreePop ();
   }
 
   if (ImGui::CollapsingHeader ("Audio"))

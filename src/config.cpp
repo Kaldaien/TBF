@@ -83,6 +83,13 @@ struct {
 } render;
 
 struct {
+  tbf::ParameterBool*    keep;
+  tbf::ParameterBool*    add_to_steam;
+  tbf::ParameterStringW* hudless_keybind;
+  tbf::ParameterStringW* regular_keybind;
+} screenshots;
+
+struct {
   tbf::ParameterBool*    remaster;
   tbf::ParameterBool*    uncompressed;
   tbf::ParameterFloat*   lod_bias;
@@ -399,6 +406,41 @@ TBF_LoadConfig (std::wstring name)
       L"ImGui.Settings",
         L"ShowOSDDisclaimer" );
 
+
+  screenshots.hudless_keybind =
+    static_cast <tbf::ParameterStringW *>
+    (g_ParameterFactory.create_parameter <std::wstring> (
+      L"HUDless Screenshot Keybinding")
+    );
+
+  screenshots.hudless_keybind->register_to_ini (
+    render_ini,
+      L"Screenshot.Capture",
+        L"KeybindNoHUD" );
+
+  screenshots.keep =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool> (
+      L"Keep Original (High Quality) Screenshots")
+    );
+
+  screenshots.keep->register_to_ini (
+    render_ini,
+      L"Screenshot.Capture",
+        L"KeepOriginal" );
+
+  screenshots.add_to_steam =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool> (
+      L"Add Screenshot to Steam Library")
+    );
+
+  screenshots.add_to_steam->register_to_ini (
+    render_ini,
+      L"Screenshot.Capture",
+        L"AddToSteamLibrary" );
+
+
   framerate.replace_limiter =
     static_cast <tbf::ParameterBool *>
       (g_ParameterFactory.create_parameter <bool> (
@@ -545,6 +587,12 @@ TBF_LoadConfig (std::wstring name)
   framerate.tolerance->load        (config.framerate.tolerance);
   //framerate.limit_addr->load     (config.framerate.limit_addr);
 
+  screenshots.add_to_steam->load    (config.screenshots.import_to_steam);
+  screenshots.keep->load            (config.screenshots.keep);
+  screenshots.hudless_keybind->load (config.keyboard.hudless.human_readable);
+
+  config.keyboard.hudless.parse ();
+
   textures.remaster->load          (config.textures.remaster);
   textures.uncompressed->load      (config.textures.uncompressed);
   textures.lod_bias->load          (config.textures.lod_bias);
@@ -599,6 +647,12 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   input.gamepad.texture_set->store         (config.input.gamepad.texture_set);
   input.gamepad.virtual_controllers->store (config.input.gamepad.virtual_controllers);
+
+  config.keyboard.hudless.update ();
+
+  screenshots.add_to_steam->store    (config.screenshots.import_to_steam);
+  screenshots.keep->store            (config.screenshots.keep);
+  screenshots.hudless_keybind->store (config.keyboard.hudless.human_readable);
 
   keyboard.swap_wasd->store        (config.keyboard.swap_wasd);
   keyboard.swap_keys->store        (config.keyboard.swap_keys);
@@ -662,5 +716,119 @@ TBF_SaveConfig (std::wstring name, bool close_config)
       delete keyboard_ini;
       keyboard_ini = nullptr;
     }
+  }
+}
+
+
+
+#include <unordered_map>
+
+std::unordered_map <std::wstring, BYTE> humanKeyNameToVirtKeyCode;
+std::unordered_map <BYTE, std::wstring> virtKeyCodeToHumanKeyName;
+
+#include <queue>
+
+void
+keybind_s::update (void)
+{
+  human_readable = L"";
+
+  std::wstring key_name = virtKeyCodeToHumanKeyName [vKey];
+
+  if (! key_name.length ())
+    return;
+
+  std::queue <std::wstring> words;
+
+  if (ctrl)
+    words.push (L"Ctrl");
+
+  if (alt)
+    words.push (L"Alt");
+
+  if (shift)
+    words.push (L"Shift");
+
+  words.push (key_name);
+
+  while (! words.empty ())
+  {
+    human_readable += words.front ();
+    words.pop ();
+
+    if (! words.empty ())
+      human_readable += L"+";
+  }
+}
+
+void
+keybind_s::parse (void)
+{
+  vKey = 0x00;
+
+  static bool init = false;
+
+  if (! init)
+  {
+    for (int i = 0; i < 0xFF; i++)
+    {
+      wchar_t name [32] = { L'\0' };
+    
+      GetKeyNameText ( (MapVirtualKey (i, MAPVK_VK_TO_VSC) & 0xFF) << 16,
+                         name,
+                           32 );
+    
+      if (i != VK_CONTROL && i != VK_MENU && i != VK_SHIFT && i != VK_OEM_PLUS && i != VK_OEM_MINUS)
+      {
+        humanKeyNameToVirtKeyCode [   name] = (BYTE)i;
+        virtKeyCodeToHumanKeyName [(BYTE)i] =    name;
+      }
+    }
+    
+    humanKeyNameToVirtKeyCode [L"Plus"]  = VK_OEM_PLUS;
+    humanKeyNameToVirtKeyCode [L"Minus"] = VK_OEM_MINUS;
+    humanKeyNameToVirtKeyCode [L"Ctrl"]  = VK_CONTROL;
+    humanKeyNameToVirtKeyCode [L"Alt"]   = VK_MENU;
+    humanKeyNameToVirtKeyCode [L"Shift"] = VK_SHIFT;
+    
+    virtKeyCodeToHumanKeyName [VK_CONTROL]    = L"Ctrl";
+    virtKeyCodeToHumanKeyName [VK_MENU]       = L"Alt";
+    virtKeyCodeToHumanKeyName [VK_SHIFT]      = L"Shift";
+    virtKeyCodeToHumanKeyName [VK_OEM_PLUS]   = L"Plus";
+    virtKeyCodeToHumanKeyName [VK_OEM_MINUS]  = L"Minus";
+
+    init = true;
+  }
+
+  wchar_t wszKeyBind [128] = { L'\0' };
+
+  wcsncpy (wszKeyBind, human_readable.c_str (), 128);
+
+  wchar_t* wszBuf;
+  wchar_t* wszTok = std::wcstok (wszKeyBind, L"+", &wszBuf);
+
+  ctrl  = false;
+  alt   = false;
+  shift = false;
+
+  if (wszTok == nullptr)
+  {
+    vKey  = humanKeyNameToVirtKeyCode [wszKeyBind];
+  }
+
+  while (wszTok)
+  {
+    BYTE vKey_ = humanKeyNameToVirtKeyCode [wszTok];
+
+    if (vKey_ == VK_CONTROL)
+      ctrl = true;
+    else if (vKey_ == VK_SHIFT)
+      shift = true;
+    else if (vKey_ == VK_MENU)
+      alt = true;
+    else
+      vKey = vKey_;
+
+    wszTok = std::wcstok (nullptr, L"+", &wszBuf);
   }
 }

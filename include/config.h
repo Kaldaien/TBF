@@ -28,6 +28,22 @@
 extern std::wstring TBF_VER_STR;
 extern std::wstring DEFAULT_BK2;
 
+struct keybind_s
+{
+  std::wstring human_readable;
+
+  struct {
+    bool ctrl,
+         shift,
+         alt;
+  };
+
+  BYTE vKey;
+
+  void parse  (void);
+  void update (void);
+};
+
 struct tbf_config_t
 {
   struct {
@@ -99,9 +115,19 @@ struct tbf_config_t
   } input;
 
   struct {
-    std::wstring swap_keys = L"";
-    bool         swap_wasd       = false;
+    std::wstring swap_keys   = L"";
+    bool         swap_wasd   = false;
+
+    keybind_s hudless     { L"Ctrl+Shift+F10",       { true,  true,  false }, VK_F10  },
+              screenshot  { L"F10",                  { false, false, false }, VK_F10  },
+              config_menu { L"Ctrl+Shift+Backspace", { true,  true,  false }, VK_BACK };
+
   } keyboard;
+
+  struct {
+    bool keep            = true;
+    bool import_to_steam = true;
+  } screenshots;
 
   struct {
     std::wstring

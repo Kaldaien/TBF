@@ -47,6 +47,7 @@
 
 #include <atlbase.h>
 #include <memory>
+#include <ctime>
 
 #define TBFIX_TEXTURE_DIR L"TBFix_Res"
 #define TBFIX_TEXTURE_EXT L".dds"
@@ -66,6 +67,18 @@ typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
   IDirect3DDevice9*  This,
   D3DRENDERSTATETYPE State,
   DWORD              Value
+);
+
+typedef HRESULT (WINAPI *D3DXLoadSurfaceFromSurface_pfn)
+(
+  _In_       LPDIRECT3DSURFACE9  pDestSurface,
+  _In_ const PALETTEENTRY       *pDestPalette,
+  _In_ const RECT               *pDestRect,
+  _In_       LPDIRECT3DSURFACE9  pSrcSurface,
+  _In_ const PALETTEENTRY       *pSrcPalette,
+  _In_ const RECT               *pSrcRect,
+  _In_       DWORD               Filter,
+  _In_       D3DCOLOR            ColorKey
 );
 
 
@@ -101,7 +114,7 @@ std::set <IDirect3DBaseTexture9 *> incomplete_textures;
 
 
 // Cleanup
-std::queue <std::wstring> screenshots;
+std::queue <std::wstring> screenshots_to_delete;
 
 tbf::RenderFix::pad_buttons_t   tbf::RenderFix::pad_buttons;
 
@@ -3200,10 +3213,10 @@ tbf::RenderFix::TextureManager::Shutdown (void)
                      time_saved / frame_time );
   tex_log->close ();
 
-  while (! screenshots.empty ())
+  while (! screenshots_to_delete.empty ())
   {
-    std::wstring file_to_delete = screenshots.front ();
-    screenshots.pop ();
+    std::wstring file_to_delete = screenshots_to_delete.front ();
+    screenshots_to_delete.pop ();
 
     DeleteFileW (file_to_delete.c_str ());
   }
@@ -4236,41 +4249,167 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
 {
   static int count = 0;
 
-  wchar_t wszOut [MAX_PATH] = { };
-   char    szOut [MAX_PATH] = { };
+  wchar_t wszOut   [MAX_PATH] = { };
+  wchar_t wszThumb [MAX_PATH] = { };
+   char    szOut   [MAX_PATH] = { };
+   char    szThumb [MAX_PATH] = { };
 
-  _swprintf (wszOut, L"TBFix_Screenshot%lu.tga", count  );
+   CreateDirectoryW (L"Screenshots", nullptr);
+
+          time_t now;
+   struct tm*    now_tm;
+
+                time (&now);
+  now_tm = localtime (&now);
+
+  const wchar_t* wszTimestamp = config.screenshots.keep ?
+     L"Screenshots\\TBFix_NoHUD_%Y_%m_%d-%H'%M'%S.png" :
+     L"Screenshots\\TBFix_NoHUD_%Y_%m_%d-%H'%M'%S.tga";
+
+   wcsftime (wszOut, MAX_PATH,  wszTimestamp, now_tm);
+  _swprintf (wszThumb, L"Screenshots\\TBFix_NoHUD_Thumbnail%lu.tga", count++ );
 
   GetCurrentDirectoryA (MAX_PATH, szOut);
-    sprintf ( szOut,  "%s\\TBFix_Screenshot%lu.tga", szOut, count++);
+  GetCurrentDirectoryA (MAX_PATH, szThumb);
+
+    sprintf ( szOut,   "%s\\%ws",  szOut,   wszOut);
+    sprintf ( szThumb, "%s\\%ws",  szThumb, wszThumb);
+
+  if (! config.screenshots.keep)
+    screenshots_to_delete.push (wszOut);
+
+  if (config.screenshots.import_to_steam)
+    screenshots_to_delete.push (wszThumb);
 
   want_screenshot = false;
 
   D3DSURFACE_DESC  desc;
   pSurf->GetDesc (&desc);
 
-  HRESULT hr =
-    D3DXSaveSurfaceToFileW ( wszOut,
-                               D3DXIFF_TGA, pSurf,
-                                 nullptr, nullptr );
+  static D3DXLoadSurfaceFromSurface_pfn
+    D3DXLoadSurfaceFromSurface =
+      (D3DXLoadSurfaceFromSurface_pfn)
+        GetProcAddress ( d3dx9_43_dll, "D3DXLoadSurfaceFromSurface" );
 
-  if (SUCCEEDED (hr))
+  extern HMODULE hInjectorDLL;
+  
+  typedef void (WINAPI *SK_SteamAPI_AddScreenshotToLibrary_pfn)
+    (const char *pchFilename, const char *pchThumbnailFilename, int nWidth, int nHeight);
+  
+  static SK_SteamAPI_AddScreenshotToLibrary_pfn
+    SK_SteamAPI_AddScreenshotToLibrary =
+      (SK_SteamAPI_AddScreenshotToLibrary_pfn)
+        GetProcAddress ( hInjectorDLL,
+                           "SK_SteamAPI_AddScreenshotToLibrary" );
+
+  IDirect3DSurface9* pSurfScreenshot = nullptr;
+
+  if (SUCCEEDED ( D3D9CreateRenderTarget ( tbf::RenderFix::pDevice,
+                                             desc.Width, desc.Height,
+                                               desc.Format, desc.MultiSampleType, desc.MultiSampleQuality,
+                                                 TRUE,
+                                                   &pSurfScreenshot, nullptr
+                                         )
+                )
+     )
   {
-    extern HMODULE hInjectorDLL;
+    if ( SUCCEEDED ( D3D9StretchRect ( tbf::RenderFix::pDevice,
+                                         pSurf,           nullptr,
+                                         pSurfScreenshot, nullptr,
+                                           D3DTEXF_NONE
+                                     )
+                   )
+       )
+    {
+      struct screenshot_params_s {
+        D3DSURFACE_DESC    desc;
+        IDirect3DSurface9* pSurf;
+        std::wstring       name_w, thumbnail_w;
+        std::string        name, thumbnail;
+      } *params =
 
-    typedef void (WINAPI *SK_SteamAPI_AddScreenshotToLibrary_pfn)
-      (const char *pchFilename, const char *pchThumbnailFilename, int nWidth, int nHeight);
+        new screenshot_params_s {
+          desc,
+            pSurfScreenshot,
+              wszOut, wszThumb,
+               szOut,  szThumb
+        };
 
-    static SK_SteamAPI_AddScreenshotToLibrary_pfn
-      SK_SteamAPI_AddScreenshotToLibrary =
-        (SK_SteamAPI_AddScreenshotToLibrary_pfn)
-          GetProcAddress ( hInjectorDLL,
-                             "SK_SteamAPI_AddScreenshotToLibrary" );
+      CreateThread ( nullptr, 0,
+                       [](LPVOID user) ->
+                       DWORD
+      {
+        D3DXIMAGE_FILEFORMAT format = config.screenshots.keep ?
+           D3DXIFF_PNG : D3DXIFF_TGA;
 
-    SK_SteamAPI_AddScreenshotToLibrary (szOut, nullptr, desc.Width, desc.Height);
+        screenshot_params_s* params =
+          (screenshot_params_s *)user;
 
-    screenshots.push (wszOut);
+        HRESULT hr =
+          D3DXSaveSurfaceToFileW ( params->name_w.c_str (),
+                                     format, params->pSurf,
+                                       nullptr, nullptr );
+
+        bool with_thumbnail = false;
+
+        if (config.screenshots.import_to_steam && SUCCEEDED (hr))
+        {
+          CComPtr <IDirect3DSurface9> pSurfThumb = nullptr;
+
+          if (SUCCEEDED ( D3D9CreateRenderTarget ( tbf::RenderFix::pDevice,
+                                                     200, (UINT)(((float)params->desc.Height / (float)params->desc.Width) * 200),
+                                                       params->desc.Format,
+                                                         D3DMULTISAMPLE_NONE, 0,
+                                                           TRUE, &pSurfThumb,
+                                                             nullptr
+                                                 )
+                        )
+             )
+          {
+            // Slightly higher quality filtering than if we just used StretchRect with a linear filter,+
+            //   (200 x ...) pixels still sucks, but we can make it suck just a little bit less.
+            if (SUCCEEDED ( D3DXLoadSurfaceFromSurface ( pSurfThumb,
+                                                           nullptr, nullptr,
+                                                             params->pSurf,
+                                                               nullptr, nullptr,
+                                                                 D3DX_DEFAULT, 0xFF000000
+                                                       )
+                          )
+               )
+            {
+              if ( SUCCEEDED (
+                     D3DXSaveSurfaceToFileW ( params->thumbnail_w.c_str (),
+                                                D3DXIFF_TGA, pSurfThumb,
+                                                  nullptr, nullptr
+                                            )
+                             )
+                 )
+              {
+                SK_SteamAPI_AddScreenshotToLibrary (params->name.c_str (), params->thumbnail.c_str (), params->desc.Width, params->desc.Height);
+                with_thumbnail = true;
+              }
+            }
+          }
+
+          if (! with_thumbnail)
+            SK_SteamAPI_AddScreenshotToLibrary (params->name.c_str (), nullptr, params->desc.Width, params->desc.Height);
+        }
+
+        params->pSurf->Release ();
+
+        delete params;
+      
+        CloseHandle (GetCurrentThread ());
+      
+        return 0;
+      },
+
+      params,
+        0,
+          nullptr
+      );
+    } 
   }
 
-  return hr;
+  return S_OK;
 }
