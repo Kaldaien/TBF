@@ -250,14 +250,14 @@ TBFix_KeybindDialog (keybind_s* keybind)
     {
       //keybind->vKey = 0;
 
-      for (int i = 0 ; i < keys ; i++ ) bind_keys [i] = GetKeyState (i);
+      for (int i = 0 ; i < keys ; i++ ) bind_keys [i] = (GetKeyState (i) & 0x8000) != 0;
 
       was_open = true;
     }
 
     BYTE active_keys [256];
 
-    for (int i = 0 ; i < keys ; i++ ) active_keys [i] = GetKeyState (i);
+    for (int i = 0 ; i < keys ; i++ ) active_keys [i] = (GetKeyState (i) & 0x8000) != 0;
 
     if (memcmp (active_keys, bind_keys, keys))
     {
@@ -284,9 +284,9 @@ TBFix_KeybindDialog (keybind_s* keybind)
       //memcpy (bind_keys, active_keys, keys);
     }
 
-    keybind->ctrl  = GetAsyncKeyState (VK_CONTROL);
-    keybind->shift = GetAsyncKeyState (VK_SHIFT);
-    keybind->alt   = GetAsyncKeyState (VK_MENU);
+    keybind->ctrl  = (GetAsyncKeyState (VK_CONTROL) & 0x8000)  != 0; 
+    keybind->shift = (GetAsyncKeyState (VK_SHIFT)    & 0x8000) != 0;
+    keybind->alt   = (GetAsyncKeyState (VK_MENU)     & 0x8000) != 0;
 
     keybind->update ();
 
