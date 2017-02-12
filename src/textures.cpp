@@ -109,12 +109,77 @@ iSK_Logger* tex_log = nullptr;
 #include <set>
 #include <queue>
 
-// Textures that are missing mipmaps
-std::set <IDirect3DBaseTexture9 *> incomplete_textures;
-
 
 // Cleanup
-std::queue <std::wstring> screenshots_to_delete;
+std::queue         <std::wstring>        screenshots_to_delete;
+
+
+class TBF_AutoCritSection
+{
+public:
+  TBF_AutoCritSection (CRITICAL_SECTION* crit_sec) : cs_ (crit_sec) {
+    EnterCriticalSection (cs_);
+  };
+
+  ~TBF_AutoCritSection (void) {
+    LeaveCriticalSection (cs_);
+  }
+
+private:
+  CRITICAL_SECTION* cs_;
+};
+
+
+template <typename _T>
+class TBF_HashSet
+{
+public:
+  TBF_HashSet (void) {
+    InitializeCriticalSection (&cs_);
+  }
+
+  ~TBF_HashSet (void) {
+    DeleteCriticalSection (&cs_);
+  }
+
+  void insert (_T item)
+  {
+    TBF_AutoCritSection auto_crit (&cs_);
+
+    container_.insert (item);
+  }
+
+  void erase (_T item)
+  {
+    TBF_AutoCritSection auto_crit (&cs_);
+
+    container_.erase (item);
+  }
+
+  bool contains (_T item)
+  {
+    TBF_AutoCritSection auto_crit (&cs_);
+
+    return container_.count (item) != 0;
+  }
+
+  bool empty (void)
+  {
+    TBF_AutoCritSection auto_crit (&cs_);
+
+    return container_.empty ();
+  }
+
+protected:
+private:
+  std::unordered_set <_T> container_;
+  CRITICAL_SECTION        cs_;
+};
+
+
+TBF_HashSet <IDirect3DSurface9 *> outstanding_screenshots; // Not excellent screenshots, but screenhots
+                                                           //   that aren't finished yet and we can't reset
+                                                           //     the D3D9 device because of.
 
 tbf::RenderFix::pad_buttons_t   tbf::RenderFix::pad_buttons;
 
@@ -170,7 +235,7 @@ TBF_GetInjectableTexture (uint32_t checksum)
 
 // The set of textures used during the last frame
 std::vector        <uint32_t>                   textures_last_frame;
-std::set           <uint32_t>                   textures_used;
+std::unordered_set <uint32_t>                   textures_used;
 std::unordered_set <uint32_t>                   non_power_of_two_textures;
 
 // Textures that we will not allow injection for
@@ -195,6 +260,143 @@ SK_D3D9_UsageToStr (DWORD dwUsage)
     usage = L"Don't Care";
 
   return usage;
+}
+
+INT
+__stdcall
+SK_D3D9_BytesPerPixel (D3DFORMAT Format)
+{
+  switch (Format)
+  {
+    case D3DFMT_UNKNOWN:
+      return 0;
+
+    case D3DFMT_R8G8B8:       return 3;
+    case D3DFMT_A8R8G8B8:     return 4;
+    case D3DFMT_X8R8G8B8:     return 4;
+    case D3DFMT_R5G6B5:       return 2;
+    case D3DFMT_X1R5G5B5:     return 2;
+    case D3DFMT_A1R5G5B5:     return 2;
+    case D3DFMT_A4R4G4B4:     return 2;
+    case D3DFMT_R3G3B2:       return 8;
+    case D3DFMT_A8:           return 1;
+    case D3DFMT_A8R3G3B2:     return 2;
+    case D3DFMT_X4R4G4B4:     return 2;
+    case D3DFMT_A2B10G10R10:  return 4;
+    case D3DFMT_A8B8G8R8:     return 4;
+    case D3DFMT_X8B8G8R8:     return 4;
+    case D3DFMT_G16R16:       return 4;
+    case D3DFMT_A2R10G10B10:  return 4;
+    case D3DFMT_A16B16G16R16: return 8;
+    case D3DFMT_A8P8:         return 2;
+    case D3DFMT_P8:           return 1;
+    case D3DFMT_L8:           return 1;
+    case D3DFMT_A8L8:         return 2;
+    case D3DFMT_A4L4:         return 1;
+    case D3DFMT_V8U8:         return 2;
+    case D3DFMT_L6V5U5:       return 2;
+    case D3DFMT_X8L8V8U8:     return 4;
+    case D3DFMT_Q8W8V8U8:     return 4;
+    case D3DFMT_V16U16:       return 4;
+    case D3DFMT_A2W10V10U10:  return 4;
+
+#if 0
+    case D3DFMT_UYVY                 :
+      return std::wstring (L"FourCC 'UYVY'");
+    case D3DFMT_R8G8_B8G8            :
+      return std::wstring (L"FourCC 'RGBG'");
+    case D3DFMT_YUY2                 :
+      return std::wstring (L"FourCC 'YUY2'");
+    case D3DFMT_G8R8_G8B8            :
+      return std::wstring (L"FourCC 'GRGB'");
+#endif
+    case D3DFMT_DXT1:          return -1;
+    case D3DFMT_DXT2:          return -2;
+    case D3DFMT_DXT3:          return -2;
+    case D3DFMT_DXT4:          return -1;
+    case D3DFMT_DXT5:          return -2;
+                               
+    case D3DFMT_D16_LOCKABLE:  return  2;
+    case D3DFMT_D32:           return  4;
+    case D3DFMT_D15S1:         return  2;
+    case D3DFMT_D24S8:         return  4;
+    case D3DFMT_D24X8:         return  4;
+    case D3DFMT_D24X4S4:       return  4;
+    case D3DFMT_D16:           return  2;
+    case D3DFMT_D32F_LOCKABLE: return  4;
+    case D3DFMT_D24FS8:        return  4;
+
+/* D3D9Ex only -- */
+#if !defined(D3D_DISABLE_9EX)
+
+    /* Z-Stencil formats valid for CPU access */
+    case D3DFMT_D32_LOCKABLE:  return 4;
+    case D3DFMT_S8_LOCKABLE:   return 1;
+#endif // !D3D_DISABLE_9EX
+
+
+
+    case D3DFMT_L16:           return 2;
+
+#if 0
+    case D3DFMT_VERTEXDATA           :
+      return std::wstring (L"VERTEXDATA") +
+                (include_ordinal ? L" (100)" : L"");
+#endif
+    case D3DFMT_INDEX16:       return 2;
+    case D3DFMT_INDEX32:       return 4;
+
+    case D3DFMT_Q16W16V16U16:  return 8;
+
+#if 0
+    case D3DFMT_MULTI2_ARGB8         :
+      return std::wstring (L"FourCC 'MET1'");
+#endif
+
+    // Floating point surface formats
+
+    // s10e5 formats (16-bits per channel)
+    case D3DFMT_R16F:          return 2;
+    case D3DFMT_G16R16F:       return 4;
+    case D3DFMT_A16B16G16R16F: return 8;
+
+    // IEEE s23e8 formats (32-bits per channel)
+    case D3DFMT_R32F:          return 4;
+    case D3DFMT_G32R32F:       return 8;
+    case D3DFMT_A32B32G32R32F: return 16;
+
+#if 0
+    case D3DFMT_CxV8U8               :
+      return std::wstring (L"CxV8U8") +
+                (include_ordinal ? L" (117)" : L"");
+#endif
+
+/* D3D9Ex only -- */
+#if !defined(D3D_DISABLE_9EX)
+
+    // Monochrome 1 bit per pixel format
+    case D3DFMT_A1:            return -8;
+
+#if 0
+    // 2.8 biased fixed point
+    case D3DFMT_A2B10G10R10_XR_BIAS  :
+      return std::wstring (L"A2B10G10R10_XR_BIAS") +
+                (include_ordinal ? L" (119)" : L"");
+#endif
+
+
+#if 0
+    // Binary format indicating that the data has no inherent type
+    case D3DFMT_BINARYBUFFER         :
+      return std::wstring (L"BINARYBUFFER") +
+                (include_ordinal ? L" (199)" : L"");
+#endif
+
+#endif // !D3D_DISABLE_9EX
+/* -- D3D9Ex only */
+  }
+
+  return 0;
 }
 
 std::wstring
@@ -1502,7 +1704,7 @@ struct SK_StreamSplitter
 
 std::queue <TexLoadRef> textures_to_stream;
 
-std::map   <uint32_t, tbf_tex_load_s *>
+std::unordered_map   <uint32_t, tbf_tex_load_s *>
                               textures_in_flight;
 
 std::queue <TexLoadRef> finished_loads;
@@ -1517,7 +1719,7 @@ CRITICAL_SECTION              cs_tex_inject;
 #define D3DX_FROM_FILE          ((UINT) -3)
 #define D3DFMT_FROM_FILE        ((D3DFORMAT) -3)
 
-std::set <DWORD> inject_tids;
+std::unordered_set <DWORD> inject_tids;
 
 volatile  LONG streaming       = 0L;
 volatile ULONG streaming_bytes = 0L;
@@ -2027,6 +2229,42 @@ TBFix_LoadQueuedTextures (void)
         pSKTex->pTexOverride  = load->pSrc;
         pSKTex->override_size = load->SrcDataSize;
 
+        // The original size info is completely wrong once we start generating mipmaps ;)
+        //
+        if (load->type == tbf_tex_load_s::Resample)
+        {
+          pSKTex->override_size = 0;
+
+          for (UINT i = 0; i < pSKTex->pTexOverride->GetLevelCount (); i++)
+          {
+            D3DSURFACE_DESC                         desc = { };
+            pSKTex->pTexOverride->GetLevelDesc (i, &desc);
+
+            int bytes_per_pel = SK_D3D9_BytesPerPixel (desc.Format);
+
+            // If bytes_per_pel is < 0, we have to handle DXT alignment craziness to be accurate...
+
+            if (bytes_per_pel >= 0)
+              pSKTex->override_size += desc.Width * desc.Height * bytes_per_pel;
+
+            else
+            {
+              // Assume once this stuff gets into VRAM that it is tightly-packed,
+              //   it would be stupid for the driver to do otherwise.
+              UINT stride = bytes_per_pel == -1 ?
+               std::max (1UL, ((desc.Width + 3UL) / 4UL) ) * 8UL :
+               std::max (1UL, ((desc.Width + 3UL) / 4UL) ) * 16UL;
+
+               size_t lod_size = stride * (desc.Height / 4 +
+                                           desc.Height % 4);
+
+               pSKTex->override_size += lod_size;
+            }
+          }
+
+          load->SrcDataSize = (UINT)pSKTex->override_size;
+        }
+
         tbf::RenderFix::tex_mgr.addInjected (load->SrcDataSize);
       }
 
@@ -2138,8 +2376,8 @@ TBFix_LoadQueuedTextures (void)
 
 #include <set>
 
-std::set <uint32_t> resample_blacklist;
-bool                resample_blacklist_init = false;
+std::unordered_set <uint32_t> resample_blacklist;
+bool                          resample_blacklist_init = false;
 
 void
 TBFix_ReloadPadButtons (void)
@@ -3342,6 +3580,17 @@ tbf::RenderFix::TextureManager::purge (void)
 void
 tbf::RenderFix::TextureManager::reset (void)
 {
+  if (! outstanding_screenshots.empty ())
+  {
+    tex_log->LogEx (true, L"[Screenshot] A queued screenshot has not finished, delaying device reset...");
+
+    while (! outstanding_screenshots.empty ())
+      ;
+
+    tex_log->LogEx (false, L"done!\n");
+  }
+  
+
   known.render_targets.clear ();
 
   int underflows       = 0;
@@ -4321,6 +4570,8 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
                    )
        )
     {
+      outstanding_screenshots.insert (pSurfScreenshot);
+
       struct screenshot_params_s {
         D3DSURFACE_DESC    desc;
         IDirect3DSurface9* pSurf;
@@ -4366,6 +4617,8 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
                         )
              )
           {
+            outstanding_screenshots.insert (pSurfThumb);
+
             // Slightly higher quality filtering than if we just used StretchRect with a linear filter,+
             //   (200 x ...) pixels still sucks, but we can make it suck just a little bit less.
             if (SUCCEEDED ( D3DXLoadSurfaceFromSurface ( pSurfThumb,
@@ -4389,11 +4642,15 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
                 with_thumbnail = true;
               }
             }
+
+            outstanding_screenshots.erase (pSurfThumb);
           }
 
           if (! with_thumbnail)
             SK_SteamAPI_AddScreenshotToLibrary (params->name.c_str (), nullptr, params->desc.Width, params->desc.Height);
         }
+
+        outstanding_screenshots.erase (params->pSurf);
 
         params->pSurf->Release ();
 
@@ -4409,6 +4666,11 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
           nullptr
       );
     } 
+
+    else {
+      pSurfScreenshot->Release ();
+      return E_FAIL;
+    }
   }
 
   return S_OK;

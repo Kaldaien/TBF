@@ -185,9 +185,7 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     //
     // Hacky way to force off options in Special K that are known not to work well with this game
     //
-    SK_GetCommandProcessor ()->ProcessCommandLine ("Window.Fullscreen false");
-    SK_GetCommandProcessor ()->ProcessCommandLine ("Window.Borderless false");
-    SK_GetCommandProcessor ()->ProcessCommandLine ("Window.Center     false");
+    SK_GetCommandProcessor ()->ProcessCommandLine ("Window.Center false");
 
 
     CreateThread ( nullptr, 0,

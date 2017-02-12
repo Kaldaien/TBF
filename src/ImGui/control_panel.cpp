@@ -284,9 +284,9 @@ TBFix_KeybindDialog (keybind_s* keybind)
       //memcpy (bind_keys, active_keys, keys);
     }
 
-    keybind->ctrl  = (GetAsyncKeyState (VK_CONTROL) & 0x8000)  != 0; 
-    keybind->shift = (GetAsyncKeyState (VK_SHIFT)    & 0x8000) != 0;
-    keybind->alt   = (GetAsyncKeyState (VK_MENU)     & 0x8000) != 0;
+    keybind->ctrl  = (GetAsyncKeyState (VK_CONTROL) & 0x8000) != 0; 
+    keybind->shift = (GetAsyncKeyState (VK_SHIFT)   & 0x8000) != 0;
+    keybind->alt   = (GetAsyncKeyState (VK_MENU)    & 0x8000) != 0;
 
     keybind->update ();
 

@@ -363,6 +363,13 @@ TBFix_TextureModDlg (void)
       if (debug_tex_id == 0)
         last_ht = 0;
 
+
+      // The underlying list is unsorted for speed, but that's not at all
+      //   intuitive to humans, so sort the thing when we have the RT view open.
+      std::sort ( textures_used_last_dump.begin (),
+                  textures_used_last_dump.end   () );
+
+
       for ( auto it : textures_used_last_dump )
       {
         char szDesc [16] = { };
@@ -444,18 +451,38 @@ TBFix_TextureModDlg (void)
      tbf::RenderFix::Texture* pTex =
        tbf::RenderFix::tex_mgr.getTexture (debug_tex_id);
 
+     extern bool __remap_textures;
+            bool has_alternate = (pTex != nullptr && pTex->d3d9_tex->pTexOverride != nullptr);
+
      if (pTex != nullptr)
      {
         D3DSURFACE_DESC desc;
 
         if (SUCCEEDED (pTex->d3d9_tex->pTex->GetLevelDesc (0, &desc)))
         {
-          ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
+          ImVec4 border_color = config.textures.highlight_debug_tex ? 
+                                  ImVec4 (0.3f, 0.3f, 0.3f, 1.0f) :
+                                    (__remap_textures && has_alternate) ? ImVec4 (0.5f,  0.5f,  0.5f, 1.0f) :
+                                                                          ImVec4 (0.3f,  1.0f,  0.3f, 1.0f);
+
+          ImGui::PushStyleColor (ImGuiCol_Border, border_color);
+
+          ImGui::BeginGroup     ();
           ImGui::BeginChild     ( "Item Selection",
                                   ImVec2 ( std::max (font_size * 19.0f, (float)desc.Width + 24.0f),
                                 (float)desc.Height + font_size * 10.0f),
                                     true,
                                       ImGuiWindowFlags_AlwaysAutoResize );
+
+          if ((! config.textures.highlight_debug_tex) && has_alternate)
+          {
+            if (ImGui::IsItemHovered ())
+              ImGui::SetTooltip ("Click me to make this texture the visible version.");
+            
+            // Allow the user to toggle texture override by clicking the frame
+            if (ImGui::IsItemClicked ())
+              __remap_textures = false;
+          }
 
           last_width  = (float)desc.Width;
           last_ht     = (float)desc.Height + font_size * 10.0f;
@@ -464,9 +491,11 @@ TBFix_TextureModDlg (void)
           SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
 
 
-          ImGui::Text ( "Dimensions:   %lux%lu",
-                          desc.Width, desc.Height/*,
-                            pTex->d3d9_tex->GetLevelCount ()*/ );
+          int num_lods = pTex->d3d9_tex->pTex->GetLevelCount ();
+
+          ImGui::Text ( "Dimensions:   %lux%lu (%lu %s)",
+                          desc.Width, desc.Height,
+                            num_lods, num_lods > 1 ? "LODs" : "LOD" );
           ImGui::Text ( "Format:       %ws",
                           SK_D3D9_FormatToStr (desc.Format).c_str () );
           ImGui::Text ( "Data Size:    %.2f MiB",
@@ -480,8 +509,12 @@ TBFix_TextureModDlg (void)
           {
             if ( ImGui::Button ("Dump Texture to Disk") )
             {
-              TBF_DumpTexture (desc.Format, debug_tex_id, pTex->d3d9_tex->pTex);
+              if (! config.textures.quick_load)
+                TBF_DumpTexture (desc.Format, debug_tex_id, pTex->d3d9_tex->pTex);
             }
+
+            if (config.textures.quick_load && ImGui::IsItemHovered ())
+              ImGui::SetTooltip ("Turn off Texture QuickLoad to use this feature.");
           }
 
           else
@@ -501,11 +534,12 @@ TBFix_TextureModDlg (void)
                                  );
           ImGui::EndChildFrame   ();
           ImGui::EndChild        ();
+          ImGui::EndGroup        ();
           ImGui::PopStyleColor   (2);
         }
      }
 
-     if (pTex != nullptr && pTex->d3d9_tex->pTexOverride != nullptr)
+     if (has_alternate)
      {
        ImGui::SameLine ();
 
@@ -513,12 +547,34 @@ TBFix_TextureModDlg (void)
 
         if (SUCCEEDED (pTex->d3d9_tex->pTexOverride->GetLevelDesc (0, &desc)))
         {
-          ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
+          ImVec4 border_color = config.textures.highlight_debug_tex ? 
+                                  ImVec4 (0.3f, 0.3f, 0.3f, 1.0f) :
+                                    (__remap_textures) ? ImVec4 (0.3f,  1.0f,  0.3f, 1.0f) :
+                                                         ImVec4 (0.5f,  0.5f,  0.5f, 1.0f);
+
+          ImGui::PushStyleColor  (ImGuiCol_Border, border_color);
+
+          ImGui::BeginGroup ();
           ImGui::BeginChild ( "Item Selection2",
-                              ImVec2 ( std::max (font_size * 19.0f, (float)desc.Width + 24.0f),
-                                         (float)desc.Height + font_size * 10.0f),
+                              ImVec2 ( std::max (font_size * 19.0f, (float)desc.Width  + 24.0f),
+                                                                    (float)desc.Height + font_size * 10.0f),
                                 true,
                                   ImGuiWindowFlags_AlwaysAutoResize );
+
+          if (! config.textures.highlight_debug_tex)
+          {
+            if (ImGui::IsItemHovered ())
+              ImGui::SetTooltip ("Click me to make this texture the visible version.");
+
+            // Allow the user to toggle texture override by clicking the frame
+            if (ImGui::IsItemClicked ())
+              __remap_textures = true;
+          }
+
+
+          last_width  = std::max (last_width, (float)desc.Width);
+          last_ht     = std::max (last_ht,    (float)desc.Height + font_size * 10.0f);
+
 
           extern std::wstring
           SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
@@ -528,10 +584,11 @@ TBFix_TextureModDlg (void)
             (TBF_GetInjectableTexture (debug_tex_id) != nullptr),
                reloading = false;;
 
+          int num_lods = pTex->d3d9_tex->pTexOverride->GetLevelCount ();
 
-          ImGui::Text ( "Dimensions:   %lux%lu",
-                          desc.Width, desc.Height/*,
-                            pTex->d3d9_tex->GetLevelCount ()*/ );
+          ImGui::Text ( "Dimensions:   %lux%lu  (%lu %s)",
+                          desc.Width, desc.Height,
+                             num_lods, num_lods > 1 ? "LODs" : "LOD" );
           ImGui::Text ( "Format:       %ws",
                           SK_D3D9_FormatToStr (desc.Format).c_str () );
           ImGui::Text ( "Data Size:    %.2f MiB",
@@ -569,6 +626,7 @@ TBFix_TextureModDlg (void)
           }
 
           ImGui::EndChild        ();
+          ImGui::EndGroup        ();
           ImGui::PopStyleColor   (1);
         }
       }
@@ -586,16 +644,30 @@ TBFix_TextureModDlg (void)
     static std::vector <std::string> list_contents;
     static bool                      list_dirty     = true;
     static uintptr_t                 last_sel_ptr   =    0;
-    static int                            sel       =    0;
+    static int                            sel       =   -1;
 
     std::vector <IDirect3DBaseTexture9*> render_textures =
       tbf::RenderFix::tex_mgr.getUsedRenderTargets ();
 
+    tbf::RenderFix::tracked_rt.tracking_tex = 0;
+
     if (list_dirty)
     {
-          sel = 0;
-      int idx = 0;
+          sel = -1;
+      int idx =  0;
           list_contents.clear ();
+
+      // The underlying list is unsorted for speed, but that's not at all
+      //   intuitive to humans, so sort the thing when we have the RT view open.
+      std::sort ( render_textures.begin (),
+                  render_textures.end   (),
+        []( IDirect3DBaseTexture9 *a,
+            IDirect3DBaseTexture9 *b )
+        {
+          return (uintptr_t)a < (uintptr_t)b;
+        }
+      );
+
 
       for ( auto it : render_textures )
       {
@@ -605,8 +677,10 @@ TBFix_TextureModDlg (void)
 
         list_contents.push_back (szDesc);
 
-        if ((uintptr_t)it == last_sel_ptr)
+        if ((uintptr_t)it == last_sel_ptr) {
           sel = idx;
+          tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
+        }
 
         ++idx;
       }
@@ -677,7 +751,7 @@ TBFix_TextureModDlg (void)
 
    CComPtr <IDirect3DTexture9> pTex = nullptr;
 
-   if (render_textures.size ())
+   if (render_textures.size () && sel >= 0)
      render_textures [sel]->QueryInterface (IID_PPV_ARGS (&pTex));
 
    if (pTex != nullptr)
@@ -689,17 +763,21 @@ TBFix_TextureModDlg (void)
         size_t shaders = std::max ( tbf::RenderFix::tracked_rt.pixel_shaders.size  (),
                                     tbf::RenderFix::tracked_rt.vertex_shaders.size () );
 
+        // Some Render Targets are MASSIVE, let's try to keep the damn things on the screen ;)
+        float effective_width  = std::min (0.75f * ImGui::GetIO ().DisplaySize.x, (float)desc.Width  / 2.0f);
+        float effective_height = std::min (0.75f * ImGui::GetIO ().DisplaySize.y, (float)desc.Height / 2.0f);
+
         ImGui::SameLine ();
 
         ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
         ImGui::BeginChild ( "Item Selection3",
-                            ImVec2 ( std::max (128.0f, (float)desc.Width  / 2.0f  + 24.0f),
-                                     std::max (256.0f, (float)desc.Height / 2.0f) + 64.0f + (float)shaders * 19.0f),
+                            ImVec2 ( std::max (128.0f, effective_width  + 24.0f),
+                                     std::max (256.0f, effective_height + font_size * 4.0f + (float)shaders * font_size) ),
                               true,
                                 ImGuiWindowFlags_AlwaysAutoResize );
 
-        last_width  = (float)desc.Width  / 2.0f;
-        last_ht     = (float)desc.Height / 2.0f + font_size * 3.0f + (float)shaders * font_size;
+        last_width  = effective_width;
+        last_ht     = effective_height + font_size * 4.0f + (float)shaders * font_size;
 
         extern std::wstring
         SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
@@ -714,9 +792,9 @@ TBFix_TextureModDlg (void)
         ImGui::Separator     ();
 
         ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.95f, 0.95f, 0.05f, 1.0f));
-        ImGui::BeginChildFrame (0, ImVec2 ((float)desc.Width / 2.0f + 8.0f, (float)desc.Height / 2.0f + 8.0f), ImGuiWindowFlags_ShowBorders);
+        ImGui::BeginChildFrame (0, ImVec2 (effective_width + 8.0f, effective_height + 8.0f), ImGuiWindowFlags_ShowBorders);
         ImGui::Image           ( pTex,
-                                   ImVec2 ((float)desc.Width / 2.0f, (float)desc.Height / 2.0f),
+                                   ImVec2 (effective_width, effective_height),
                                      ImVec2  (0,0),             ImVec2  (1,1),
                                      ImColor (255,255,255,255), ImColor (255,255,255,128)
                                );

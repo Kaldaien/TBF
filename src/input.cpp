@@ -86,6 +86,13 @@ typedef void (CALLBACK *SK_PluginKeyPress_pfn)( BOOL Control,
                         BYTE vkCode );
 SK_PluginKeyPress_pfn SK_PluginKeyPress_Original = nullptr;
 
+#define TBF_MakeKeyMask(vKey,ctrl,shift,alt) \
+  (UINT)((vKey) | ((ctrl) != 0) << 9)  |     \
+                  ((shift != 0) << 10) |     \
+                  ((alt   != 0) << 11)
+
+#define TBF_ControlShiftKey(vKey) TBF_MakeKeyMask ((vKey), true, true, false)
+
 void
 CALLBACK
 SK_TBF_PluginKeyPress ( BOOL Control,
@@ -93,6 +100,9 @@ SK_TBF_PluginKeyPress ( BOOL Control,
                         BOOL Alt,
                         BYTE vkCode )
 {
+  UINT uiMaskedKeyCode =
+    TBF_MakeKeyMask (vkCode, Control, Shift, Alt);
+
   extern DWORD TBFix_Modal;
 
   if (timeGetTime () < (TBFix_Modal + 500UL)) {
@@ -103,59 +113,59 @@ SK_TBF_PluginKeyPress ( BOOL Control,
   SK_ICommandProcessor& command =
     *SK_GetCommandProcessor ();
 
-  if (  vkCode        == config.keyboard.hudless.vKey  &&
-       (Control != 0) == config.keyboard.hudless.ctrl  &&
-       (Shift   != 0) == config.keyboard.hudless.shift &&
-       (Alt     != 0) == config.keyboard.hudless.alt   )
-    tbf::RenderFix::tex_mgr.queueScreenshot (L"NOT_IMPLEMENTED", true);
+  const UINT uiHUDlessMask =
+    TBF_MakeKeyMask ( config.keyboard.hudless.vKey,
+                      config.keyboard.hudless.ctrl,
+                      config.keyboard.hudless.shift,
+                      config.keyboard.hudless.alt );
 
-#if 0
-  else if ( vkCode  == config.keyboard.screenshot.vKey  &&
-            Control == config.keyboard.screenshot.ctrl  &&
-            Shift   == config.keyboard.screenshot.shift &&
-            Alt     == config.keyboard.screenshot.alt )
-    tbf::RenderFix::tex_mgr.queueScreenshot (L"NOT_IMPLEMENTED", false);
-#endif
-
-  else if (Control && Shift)
+  if (uiMaskedKeyCode == uiHUDlessMask)
   {
-    if (vkCode == VK_DELETE) {
-      config.render.osd_disclaimer = (! config.render.osd_disclaimer);
-    }
+    tbf::RenderFix::tex_mgr.queueScreenshot (L"NOT_IMPLEMENTED", true);
+    return;
+  }
 
-    else if (vkCode == 'U') {
+  switch (uiMaskedKeyCode)
+  {
+    case TBF_ControlShiftKey (VK_DELETE):
+      config.render.osd_disclaimer = (! config.render.osd_disclaimer);
+      break;
+
+
+    case TBF_ControlShiftKey ('U'):
       command.ProcessCommandLine ("Textures.Remap toggle");
 
       tbf::RenderFix::tex_mgr.updateOSD ();
 
       return;
-    }
 
-    else if (vkCode == 'Z') {
+
+    case TBF_ControlShiftKey ('Z'):
       command.ProcessCommandLine  ("Textures.Purge true");
 
       tbf::RenderFix::tex_mgr.updateOSD ();
 
       return;
-    }
 
-    else if (vkCode == 'X') {
+
+    case TBF_ControlShiftKey ('X'):
       command.ProcessCommandLine  ("Textures.Trace true");
 
       tbf::RenderFix::tex_mgr.updateOSD ();
 
       return;
-    }
 
-    else if (vkCode == 'V') {
+
+    case TBF_ControlShiftKey ('V'):
       command.ProcessCommandLine  ("Textures.ShowCache toggle");
 
       tbf::RenderFix::tex_mgr.updateOSD ();
 
       return;
-    }
 
-    else if (vkCode == VK_OEM_6) {
+
+
+    case TBF_ControlShiftKey (VK_OEM_6):
       extern std::vector <uint32_t> textures_used_last_dump;
       extern uint32_t               tex_dbg_idx;
       ++tex_dbg_idx;
@@ -175,9 +185,9 @@ SK_TBF_PluginKeyPress ( BOOL Control,
       tbf::RenderFix::tex_mgr.updateOSD ();
 
       return;
-    }
 
-    else if (vkCode == VK_OEM_4) {
+
+    case TBF_ControlShiftKey (VK_OEM_4):
       extern std::vector <uint32_t> textures_used_last_dump;
       extern uint32_t               tex_dbg_idx;
       extern uint32_t               debug_tex_id;
@@ -197,7 +207,6 @@ SK_TBF_PluginKeyPress ( BOOL Control,
       tbf::RenderFix::tex_mgr.updateOSD ();
 
       return;
-    }
   }
 
   SK_PluginKeyPress_Original (Control, Shift, Alt, vkCode);
