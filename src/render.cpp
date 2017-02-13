@@ -539,72 +539,6 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
     TBFix_LoadQueuedTextures ();
   }
 
-#if 0
-  if ( ((game_state.hasFixedAspect ()     &&
-         config.render.aspect_correction) ||
-        (config.render.blackbar_videos    &&
-         tbf::RenderFix::bink))           &&
-       config.render.clear_blackbars ) {
-    D3DCOLOR color = 0xff000000;
-
-    unsigned int width = tbf::RenderFix::width;
-    unsigned int height = (int)((9.0f / 16.0f) * width);
-
-    // We can't do this, so instead we need to sidebar the stuff
-    if (height > tbf::RenderFix::height) {
-      width  = (int)((16.0f / 9.0f) * tbf::RenderFix::height);
-      height = tbf::RenderFix::height;
-    }
-
-    if (height != tbf::RenderFix::height) {
-      RECT top;
-      top.top    = 0;
-      top.left   = 0;
-      top.right  = tbf::RenderFix::width;
-      top.bottom = top.top + (tbf::RenderFix::height - height) / 2 + 1;
-      D3D9SetScissorRect_Original (tbf::RenderFix::pDevice, &top);
-      tbf::RenderFix::pDevice->SetRenderState (D3DRS_SCISSORTESTENABLE, 1);
-
-      tbf::RenderFix::pDevice->Clear (0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0xff);
-
-      RECT bottom;
-      bottom.top    = tbf::RenderFix::height - (tbf::RenderFix::height - height) / 2;
-      bottom.left   = 0;
-      bottom.right  = tbf::RenderFix::width;
-      bottom.bottom = tbf::RenderFix::height;
-      D3D9SetScissorRect_Original (tbf::RenderFix::pDevice, &bottom);
-
-      tbf::RenderFix::pDevice->Clear (0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0xff);
-
-      tbf::RenderFix::pDevice->SetRenderState (D3DRS_SCISSORTESTENABLE, 0);
-    }
-
-    if (width != tbf::RenderFix::width) {
-      RECT left;
-      left.top    = 0;
-      left.left   = 0;
-      left.right  = left.left + (tbf::RenderFix::width - width) / 2 + 1;
-      left.bottom = tbf::RenderFix::height;
-      D3D9SetScissorRect_Original (tbf::RenderFix::pDevice, &left);
-      tbf::RenderFix::pDevice->SetRenderState (D3DRS_SCISSORTESTENABLE, 1);
-
-      tbf::RenderFix::pDevice->Clear (0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0xff);
-
-      RECT right;
-      right.top    = 0;
-      right.left   = tbf::RenderFix::width - (tbf::RenderFix::width - width) / 2;
-      right.right  = tbf::RenderFix::width;
-      right.bottom = tbf::RenderFix::height;
-      D3D9SetScissorRect_Original (tbf::RenderFix::pDevice, &right);
-      tbf::RenderFix::pDevice->SetRenderState (D3DRS_SCISSORTESTENABLE, 1);
-
-      tbf::RenderFix::pDevice->Clear (0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0xff);
-
-      tbf::RenderFix::pDevice->SetRenderState (D3DRS_SCISSORTESTENABLE, 0);
-    }
-  }
-#endif
-
   tbf::RenderFix::draw_state.cegui_active = true;
 
   typedef BOOL (__stdcall *SKX_DrawExternalOSD_pfn)(const char* szAppName, const char* szText);
@@ -793,47 +727,6 @@ D3D9UpdateSurface_Detour ( IDirect3DDevice9  *This,
   return hr;
 }
 
-typedef HRESULT (STDMETHODCALLTYPE *UpdateTexture_pfn)
-  (IDirect3DDevice9      *This,
-   IDirect3DBaseTexture9 *pSourceTexture,
-   IDirect3DBaseTexture9 *pDestinationTexture);
-
-UpdateTexture_pfn D3D9UpdateTexture_Original = nullptr;
-
-COM_DECLSPEC_NOTHROW
-HRESULT
-STDMETHODCALLTYPE
-D3D9UpdateTexture_Detour (IDirect3DDevice9      *This,
-                          IDirect3DBaseTexture9 *pSourceTexture,
-                          IDirect3DBaseTexture9 *pDestinationTexture)
-{
-  HRESULT hr = D3D9UpdateTexture_Original (This, pSourceTexture,
-                                                 pDestinationTexture);
-
-//#define DUMP_TEXTURES
-  if (SUCCEEDED (hr)) {
-#if 0
-    if ( incomplete_textures.find (pDestinationTexture) != 
-         incomplete_textures.end () ) {
-      dll_log->Log (L" Generating Mipmap LODs for incomplete texture!");
-      (pDestinationTexture->GenerateMipSubLevels ());
-    }
-#endif
-#ifdef DUMP_TEXTURES
-    if (SUCCEEDED (hr)) {
-      if (D3DXSaveTextureToFile != nullptr) {
-        wchar_t wszFileName [MAX_PATH] = { L'\0' };
-        _swprintf ( wszFileName, L"textures\\UpdateTexture_%x.dds",
-          pSourceTexture );
-        D3DXSaveTextureToFile (wszFileName, D3DXIFF_DDS, pDestinationTexture, NULL);
-      }
-    }
-#endif
-  }
-
-  return hr;
-}
-
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -989,36 +882,6 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   return D3D9SetViewport_Original (This, pViewport);
 }
 
-#if 0
-float data [20];
-memcpy (data, pConstantData, sizeof (float) * 20);
-
-float rescale = ((16.0f / 9.0f) / config.render.aspect_ratio);
-
-// Wider
-if (config.render.aspect_ratio > (16.0f / 9.0f)) {
-  int width = (16.0f / 9.0f) * tbf::RenderFix::height;
-  int x_off = (tbf::RenderFix::width - width) / 2;
-
-  data [ 0] *= rescale;
-  data [ 3] *= rescale;
-  data [ 4] *= rescale;
-  data [ 8] *= rescale;
-  data [12] *= rescale;
-} else {
-  int height = (9.0f / 16.0f) * tbf::RenderFix::width;
-  int y_off  = (tbf::RenderFix::height - height) / 2;
-
-  data [ 1] *= rescale;
-  data [ 5] *= rescale;
-  data [ 7] *= rescale;
-  data [ 9] *= rescale;
-  data [13] *= rescale;
-}
-
-return D3D9SetVertexShaderConstantF_Original (This, StartRegister, data, Vector4fCount);
-#endif
-
 void
 TBF_AdjustViewport (IDirect3DDevice9* This, bool UI)
 {
@@ -1094,61 +957,6 @@ D3D9DrawIndexedPrimitive_Detour (IDirect3DDevice9* This,
   ++tbf::RenderFix::draw_state.draws;
   ++draw_count;
 
-// Battle Works Well
-#if 0
-  if (vs_checksum == 107874419/* && ps_checksum == 3087596655*/)
-    needs_aspect = true;
-  if (vs_checksum == 3486499850 && ps_checksum == 2539463060)
-    needs_aspect = true;
-#endif
-
-#if 0
-  if (vs_checksum == VS_CHECKSUM_TITLE && *game_state.base_addr)
-    needs_aspect = true;
-
-  if (vs_checksum == 657093040 && ps_checksum == 363447431)
-    needs_aspect = true;
-
-  if ((config.render.aspect_correction && Type == D3DPT_TRIANGLESTRIP && ((vs_checksum == 0x52BD224A ||
-                                                                           vs_checksum == 0x272A71B0 || // Splash Screen
-                                                                          (vs_checksum == VS_CHECKSUM_TITLE && *game_state.base_addr) ||
-                                                                           vs_checksum == VS_CHECKSUM_SUBS ||
-                                                                           vs_checksum == 107874419) || vs_checksum == VS_CHECKSUM_RADIAL)) ||
-     (config.render.blackbar_videos && tbf::RenderFix::bink && vs_checksum == VS_CHECKSUM_BINK)) {
-
-    D3DVIEWPORT9 vp9_orig;
-    This->GetViewport (&vp9_orig);
-
-    if (vs_checksum == VS_CHECKSUM_RADIAL) {
-      if (world_radial) {
-        TBF_AdjustViewport (This, false);
-      } else {
-        TBF_AdjustViewport (This, true);
-      }
-    } else {
-      if ((vs_checksum != 107874419) || (! fullscreen_blit))
-        TBF_AdjustViewport (This, true);
-      else
-        TBF_AdjustViewport (This, false);
-    }
-
-    HRESULT hr = 
-      D3D9DrawIndexedPrimitive_Original ( This, Type,
-                                            BaseVertexIndex, MinVertexIndex,
-                                              NumVertices, startIndex,
-                                                primCount );
-
-    //if (vs_checksum != 107874419)
-    //This->SetViewport (&vp9_orig);
-    //TBF_AdjustViewport (This, false);
-
-    return hr;
-  }
-  else if (Type == D3DPT_TRIANGLESTRIP) {
-    //dll_log->Log (L" Consider Vertex Shader %4i...", vs_checksum);
-  }
-#endif
-
   return D3D9DrawIndexedPrimitive_Original ( This, Type,
                                               BaseVertexIndex, MinVertexIndex,
                                                 NumVertices, startIndex,
@@ -1202,15 +1010,6 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
       //dll_log->Log (L" 256x256 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
     }
 
-    //else if (pConstantData [0] == -1.0f / 2048.0f) {
-      //dim = 2048UL;
-      //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
-    //}
-
-    //else {
-      //dll_log->Log (L" %fx%f Shadow", -1.0f / pConstantData [0], 1.0f / pConstantData [1]);
-    //}
-
     shift = TBF_MakeShadowBitShift (dim);
 
     float newData [4] = { 0.0f, 0.0f, 0.0f, 0.0f };
@@ -1228,15 +1027,19 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
     }
   }
 
-#if 0
   //
   // Post-Processing
   //
   else if (StartRegister     == 240 &&
            Vector4fCount     == 1   &&
-           pConstantData [0] == -1.0f / 512.0f &&
-           pConstantData [1] ==  1.0f / 256.0f &&
-      config.render.postproc_ratio > 0.0f) {
+         ( ( pConstantData [0] == -1.0f / 512.0f &&
+             pConstantData [1] ==  1.0f / 256.0f ) ||
+           ( pConstantData [0] == -1.0f / 1024.0f &&
+             pConstantData [1] ==  1.0f / 512.0f ) ||
+           ( pConstantData [0] == -1.0f / 2048.0f &&
+             pConstantData [1] ==  1.0f / 1024.0f) ) &&
+      config.render.postproc_ratio > 0.0f)
+  {
     if (SUCCEEDED (This->GetRenderTarget (0, &tbf::RenderFix::pPostProcessSurface)))
       tbf::RenderFix::pPostProcessSurface->Release ();
 
@@ -1258,7 +1061,6 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
 
     return D3D9SetVertexShaderConstantF_Original (This, 240, newData, 1);
   }
-#endif
 
   //
   // Env Shadow
@@ -1279,16 +1081,6 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
 
     else if (pConstantData [0] == -1.0f / 2048.0f) {
       dim = 2048UL;
-      //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
-    }
-
-    else if (pConstantData [0] == -1.0f / 4096.0f) {
-      dim = 4096UL;
-      //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
-    }
-
-    else if (pConstantData [0] == -1.0f / 8192.0f) {
-      dim = 8192UL;
       //dll_log->Log (L" 2048x2048 Shadow: VS CRC: %lu, PS CRC: %lu", vs_checksum, ps_checksum);
     }
 
@@ -1316,19 +1108,20 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
   if (StartRegister == 0 && (Vector4fCount == 2 || Vector4fCount == 3)) {
     IDirect3DSurface9* pSurf = nullptr;
 
-    if (This == tbf::RenderFix::pDevice && SUCCEEDED (This->GetRenderTarget (0, &pSurf)) && pSurf != nullptr) {
+    if (This == tbf::RenderFix::pDevice && SUCCEEDED (This->GetRenderTarget (0, &pSurf)) && pSurf != nullptr)
+    {
       D3DSURFACE_DESC desc;
       pSurf->GetDesc (&desc);
       pSurf->Release ();
 
-#if 0
       //
       // Post-Processing
       //
       if (config.render.postproc_ratio > 0.0f) {
         if (desc.Width  == tbf::RenderFix::width  &&
             desc.Height == tbf::RenderFix::height) {
-          if (pSurf == tbf::RenderFix::pPostProcessSurface) {
+          if (pSurf == tbf::RenderFix::pPostProcessSurface)
+          {
             float newData [12];
 
             float scale_x, scale_y;
@@ -1356,7 +1149,6 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
           }
         }
       }
-#endif
 
       //
       // Model Shadows
@@ -1692,16 +1484,6 @@ tbf::RenderFix::Init (void)
             (LPVOID*)&D3D9SetSamplerState_Original,
                      &SetSamplerState );
 
-#if 0
-  TBF_CreateDLLHook ( L"d3d9.dll", "D3D9SetPixelShaderConstantF_Override",
-                      D3D9SetPixelShaderConstantF_Detour,
-            (LPVOID*)&D3D9SetPixelShaderConstantF_Original );
-#endif
-
-
-
-
-#if 1
   // Needed for shadow re-scaling
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetViewport_Override",
                        D3D9SetViewport_Detour,
@@ -1721,30 +1503,18 @@ tbf::RenderFix::Init (void)
              (LPVOID*)&D3D9SetPixelShader_Original );
 
   // Needed for UI re-scaling
-  TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetScissorRect_Override",
-                       D3D9SetScissorRect_Detour,
-             (LPVOID*)&D3D9SetScissorRect_Original );
+//  TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetScissorRect_Override",
+//                       D3D9SetScissorRect_Detour,
+//             (LPVOID*)&D3D9SetScissorRect_Original );
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9EndScene_Override",
                        D3D9EndScene_Detour,
              (LPVOID*)&D3D9EndScene_Original );
-#endif
-
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9Reset_Override",
                        D3D9Reset_Detour,
             (LPVOID *)&D3D9Reset_Original );
-
-#if 0
-  TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9UpdateTexture_Override",
-                       D3D9UpdateTexture_Detour,
-             (LPVOID*)&D3D9UpdateTexture_Original );
-
-  TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9UpdateSurface_Override",
-                       D3D9UpdateSurface_Detour,
-             (LPVOID*)&D3D9UpdateSurface_Original );
-#endif
 
   user32_dll   = LoadLibrary (L"User32.dll");
 
@@ -1767,6 +1537,7 @@ tbf::RenderFix::Init (void)
                         D3D9TestCooperativeLevel_Detour,
              (LPVOID *)&D3D9TestCooperativeLevel_Original );
 
+#if 0
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9DrawPrimitive_Override",
                         D3D9DrawPrimitive_Detour,
@@ -1786,6 +1557,7 @@ tbf::RenderFix::Init (void)
                        "D3D9DrawIndexedPrimitiveUP_Override",
                         D3D9DrawIndexedPrimitiveUP_Detour,
               (LPVOID*)&D3D9DrawIndexedPrimitiveUP_Original );
+#endif
 
   CommandProcessor* comm_proc = CommandProcessor::getInstance ();
 

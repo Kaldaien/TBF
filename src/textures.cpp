@@ -652,62 +652,6 @@ SK_D3D9_PoolToStr (D3DPOOL pool)
   }
 }
 
-#if 0
-COM_DECLSPEC_NOTHROW
-__declspec (noinline)
-HRESULT
-STDMETHODCALLTYPE
-D3D9StretchRect_Detour (      IDirect3DDevice9    *This,
-                              IDirect3DSurface9   *pSourceSurface,
-                        const RECT                *pSourceRect,
-                              IDirect3DSurface9   *pDestSurface,
-                        const RECT                *pDestRect,
-                              D3DTEXTUREFILTERTYPE Filter )
-{
-#if 0
-  if (tbf::RenderFix::tracer.log && (! dumping))
-  {
-    RECT source, dest;
-
-    if (pSourceRect == nullptr) {
-      D3DSURFACE_DESC desc;
-      pSourceSurface->GetDesc (&desc);
-      source.left   = 0;
-      source.top    = 0;
-      source.bottom = desc.Height;
-      source.right  = desc.Width;
-    } else
-      source = *pSourceRect;
-
-    if (pDestRect == nullptr) {
-      D3DSURFACE_DESC desc;
-      pDestSurface->GetDesc (&desc);
-      dest.left   = 0;
-      dest.top    = 0;
-      dest.bottom = desc.Height;
-      dest.right  = desc.Width;
-    } else
-      dest = *pDestRect;
-
-    dll_log->Log ( L"[FrameTrace] StretchRect      - "
-                   L"%s[%lu,%lu/%lu,%lu] ==> %s[%lu,%lu/%lu,%lu]",
-                   pSourceRect != nullptr ?
-                     L" " : L" *",
-                   source.left, source.top, source.right, source.bottom,
-                   pDestRect != nullptr ?
-                     L" " : L" *",
-                   dest.left,   dest.top,   dest.right,   dest.bottom );
-  }
-#endif
-
-  dumping = false;
-
-  return D3D9StretchRect (This, pSourceSurface, pSourceRect,
-                                         pDestSurface,   pDestRect,
-                                         Filter);
-}
-#endif
-
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -1151,45 +1095,10 @@ D3D9BeginScene_Detour (IDirect3DDevice9* This)
 
   tbf::RenderFix::draw_state.draws = 0;
 
-#if 0
-  if ( This                 != nullptr  &&
-       tsf::RenderFix::pFont == nullptr ) {
-    D3D9_VIRTUAL_OVERRIDE ( &This, 16,
-                            L"IDirect3DDevice9::Reset",
-                            D3D9Reset_Detour,
-                            D3D9Reset,
-                            Reset_pfn );
-
-    D3DXCreateFontW ( This,
-                        22, 0,
-                          FW_NORMAL,
-                            0, false,
-                              DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
-                                DEFAULT_PITCH | FF_DONTCARE,
-sss                                  L"Arial", 
-                                    &tsf::RenderFix::pFont );
-  }
-#endif
-
   HRESULT result = D3D9BeginScene (This);
 
   return result;
 }
-
-#if 0
-COM_DECLSPEC_NOTHROW
-HRESULT
-STDMETHODCALLTYPE
-D3D9EndScene_Detour (IDirect3DDevice9* This)
-{
-  // Ignore anything that's not the primary render device.
-  if (This != tbf::RenderFix::pDevice) {
-    return D3D9EndScene (This);
-  }
-  return D3D9EndScene (This);
-}
-#endif
-
 
 static uint32_t crc32_tab[] = { 
    0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 
@@ -2721,27 +2630,6 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
     if (checksum == tbf::RenderFix::pad_buttons.crc32_xboxone) {
       tbf::RenderFix::pad_buttons.tex_xboxone = *ppTexture;
-
-#if 0
-      if (tbf::RenderFix::pad_buttons.base_img.pSrcData == nullptr && pSrcData != nullptr) {
-        tbf::RenderFix::pad_buttons.base_img.pSrcData    =  new uint8_t [SrcDataSize];
-        tbf::RenderFix::pad_buttons.base_img.SrcDataSize =  SrcDataSize;
-        tbf::RenderFix::pad_buttons.base_img.Width       =  Width;
-        tbf::RenderFix::pad_buttons.base_img.Height      =  Height;
-        tbf::RenderFix::pad_buttons.base_img.MipLevels   =  MipLevels;
-        tbf::RenderFix::pad_buttons.base_img.Usage       =  Usage;
-        tbf::RenderFix::pad_buttons.base_img.Format      =  Format;
-        tbf::RenderFix::pad_buttons.base_img.Pool        =  Pool;
-        tbf::RenderFix::pad_buttons.base_img.Filter      =  Filter;
-        tbf::RenderFix::pad_buttons.base_img.MipFilter   =  MipFilter;
-        tbf::RenderFix::pad_buttons.base_img.ColorKey    =  ColorKey;
-        tbf::RenderFix::pad_buttons.base_img.SrcInfo     = *pSrcInfo;
-
-        memcpy ( tbf::RenderFix::pad_buttons.base_img.pSrcData,
-                   pSrcData,
-                     SrcDataSize );
-      }
-#endif
 
       wchar_t wszFile [MAX_PATH + 2] = { L'\0' };
 
