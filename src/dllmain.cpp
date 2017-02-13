@@ -38,6 +38,8 @@
 
 #include "scanner.h"
 
+#include "tls.h"
+
 #pragma comment (lib, "kernel32.lib")
 
 typedef HRESULT (__stdcall *SK_UpdateSoftware_pfn)   (const wchar_t* wszProduct);
@@ -48,6 +50,8 @@ std::wstring injector_dll;
 
 HMODULE hDLLMod      = { 0 }; // Handle to SELF
 HMODULE hInjectorDLL = { 0 }; // Handle to Special K
+
+volatile DWORD        __TBF_TLS_INDEX   = MAXDWORD;
 
 SKX_SetPluginName_pfn SKX_SetPluginName = nullptr;
 
@@ -245,14 +249,49 @@ DllMain (HMODULE hModule,
     case DLL_PROCESS_ATTACH:
     {
       hDLLMod = hModule;
+
+      __TBF_TLS_INDEX = TlsAlloc ();
+
+      if (__TBF_TLS_INDEX == TLS_OUT_OF_INDEXES)
+      {
+        MessageBox ( NULL,
+                       L"Out of TLS Indexes",
+                         L"Cannot Init. TBFix",
+                           MB_ICONERROR | MB_OK | MB_APPLMODAL );
+        return FALSE;
+      }
+
     } break;
 
+
     case DLL_THREAD_ATTACH:
+    {
+      LPVOID lpvData =
+        (LPVOID)LocalAlloc (LPTR, sizeof TBF_TLS);
+
+      if (lpvData != nullptr)
+      {
+        if (! TlsSetValue (__TBF_TLS_INDEX, lpvData))
+          LocalFree (lpvData);
+      }
+    } break;
+
     case DLL_THREAD_DETACH:
-      break;
+    {
+        LPVOID lpvData =
+          (LPVOID)TlsGetValue (__TBF_TLS_INDEX);
+
+        if (lpvData != nullptr)
+        {
+          LocalFree   (lpvData);
+          TlsSetValue (__TBF_TLS_INDEX, nullptr);
+        }
+    } break;
+
 
     case DLL_PROCESS_DETACH:
     {
+        TlsFree (__TBF_TLS_INDEX);
     } break;
   }
 

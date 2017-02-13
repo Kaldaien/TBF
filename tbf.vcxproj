@@ -145,6 +145,7 @@
     <ClInclude Include="include\log.h" />
     <ClInclude Include="include\parameter.h" />
     <ClInclude Include="include\render.h" />
+    <ClInclude Include="include\tls.h" />
     <ClInclude Include="resource\resource.h" />
     <ClInclude Include="include\scanner.h" />
     <ClInclude Include="include\sound.h" />
@@ -211,6 +212,7 @@
     <ClCompile Include="src\lzma\XzEnc.c" />
     <ClCompile Include="src\lzma\XzIn.c" />
     <ClCompile Include="src\textures.cpp" />
+    <ClCompile Include="src\tls.cpp" />
     <Text Include="include\keyboard.h" />
     <ClCompile Include="src\log.cpp" />
     <ClCompile Include="src\parameter.cpp" />

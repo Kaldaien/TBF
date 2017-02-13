@@ -1620,7 +1620,6 @@ std::queue <TexLoadRef> finished_loads;
 
 CRITICAL_SECTION              cs_tex_stream;
 CRITICAL_SECTION              cs_tex_resample;
-CRITICAL_SECTION              cs_tex_inject;
 
 #define D3DX_DEFAULT            ((UINT) -1)
 #define D3DX_DEFAULT_NONPOW2    ((UINT) -2)
@@ -1628,7 +1627,12 @@ CRITICAL_SECTION              cs_tex_inject;
 #define D3DX_FROM_FILE          ((UINT) -3)
 #define D3DFMT_FROM_FILE        ((D3DFORMAT) -3)
 
-std::unordered_set <DWORD> inject_tids;
+#ifdef NO_TLS
+std::set <DWORD> texinject_tids;
+CRITICAL_SECTION cs_tex_inject;
+#else
+#include "tls.h"
+#endif
 
 volatile  LONG streaming       = 0L;
 volatile ULONG streaming_bytes = 0L;
@@ -1654,21 +1658,35 @@ pending_loads (void)
 void
 start_load (void)
 {
+#ifndef NO_TLS
+  TBF_TLS* pTLS = TBF_GetTLS ();
+
+  if (pTLS != nullptr)
+    pTLS->d3d9.texinject_thread = true;
+#else
   EnterCriticalSection (&cs_tex_inject);
 
   inject_tids.insert (GetCurrentThreadId ());
 
   LeaveCriticalSection (&cs_tex_inject);
+#endif
 }
 
 void
 end_load (void)
 {
+#ifndef NO_TLS
+  TBF_TLS* pTLS = TBF_GetTLS ();
+
+  if (pTLS != nullptr)
+    pTLS->d3d9.texinject_thread = false;
+#else
   EnterCriticalSection (&cs_tex_inject);
 
   inject_tids.erase (GetCurrentThreadId ());
 
   LeaveCriticalSection (&cs_tex_inject);
+#endif
 }
 
 
@@ -2404,6 +2422,11 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 {
   bool inject_thread = false;
 
+#ifndef NO_TLS
+  TBF_TLS* pTLS = TBF_GetTLS ();
+
+  inject_thread = pTLS->d3d9.texinject_thread;
+#else
   EnterCriticalSection (&cs_tex_inject);
 
   if (inject_tids.count (GetCurrentThreadId ()))
@@ -2412,6 +2435,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   }
 
   LeaveCriticalSection (&cs_tex_inject);
+#endif
 
   // Injection would recurse slightly and cause impossible to diagnose reference counting problems
   //   with texture caching if we did not check for this!
@@ -3263,7 +3287,9 @@ tbf::RenderFix::TextureManager::Init (void)
 
   time_saved  = 0.0f;
 
+#ifdef NO_TLS
   InitializeCriticalSectionAndSpinCount (&cs_tex_inject,   10000000);
+#endif
   InitializeCriticalSectionAndSpinCount (&cs_tex_resample, 100000);
   InitializeCriticalSectionAndSpinCount (&cs_tex_stream,   100000);
 
@@ -3326,7 +3352,9 @@ tbf::RenderFix::TextureManager::Shutdown (void)
 
   DeleteCriticalSection (&cs_tex_stream);
   DeleteCriticalSection (&cs_tex_resample);
+#ifdef NO_TLS
   DeleteCriticalSection (&cs_tex_inject);
+#endif
 
   DeleteCriticalSection (&cs_cache);
   DeleteCriticalSection (&osd_cs);
