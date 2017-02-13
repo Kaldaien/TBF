@@ -316,10 +316,17 @@ TBFix_DrawConfigUI (void)
   ImGuiIO& io =
     ImGui::GetIO ();
 
-      io.FontGlobalScale = config.input.ui.scale;
-  const  float font_size = ImGui::GetFont ()->FontSize * io.FontGlobalScale;
+  // Dimensions of the game window on the last frame
+  static long last_width  = -1;
+  static long last_height = -1;
 
-  ImGui::SetNextWindowPosCenter       (ImGuiSetCond_Always);
+  if (last_width != tbf::RenderFix::width || last_height != tbf::RenderFix::height)
+  {
+    last_width  = tbf::RenderFix::width;
+    last_height = tbf::RenderFix::height;
+    ImGui::SetNextWindowPosCenter     (ImGuiSetCond_Always);
+  }
+
   ImGui::SetNextWindowSizeConstraints (ImVec2 (665, 50), ImVec2 ( ImGui::GetIO ().DisplaySize.x * 0.95f,
                                                                     ImGui::GetIO ().DisplaySize.y * 0.95f ) );
 
@@ -344,6 +351,10 @@ TBFix_DrawConfigUI (void)
 
     ImGui::TreePop     ();
   }
+
+      io.FontGlobalScale = config.input.ui.scale;
+  const  float font_size           =  ImGui::GetFont ()->FontSize                                     * io.FontGlobalScale;
+  const  float font_size_multiline = font_size + ImGui::GetStyle ().ItemSpacing.y + ImGui::GetStyle ().ItemInnerSpacing.y;
 
   if (ImGui::CollapsingHeader ("Framerate", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   {
@@ -476,7 +487,7 @@ TBFix_DrawConfigUI (void)
       if (ImGui::IsItemHovered ()) {
         ImGui::BeginTooltip ();
         ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.95f, 0.75f, 0.25f, 1.0f));
-        ImGui::Text           ("Lower CPU Usage and Input Latency\n\n");
+        ImGui::Text           ("Lower CPU Usage and Input Latency (but less stable framerate)\n\n");
         ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.75f, 0.75f, 0.75f, 1.0f));
         ImGui::BulletText     ("This aligns timing of the framerate limiter to your monitor's refresh rate -- it IS NOT VSYNC!");
         ImGui::BulletText     ("If you enable this, you will need to adjust the Limiter Tolerance slider (lower value) for best results.");
@@ -562,7 +573,10 @@ TBFix_DrawConfigUI (void)
 
       ImGui::PushStyleVar(ImGuiStyleVar_ChildWindowRounding, 15.0f);
       ImGui::TreePush  ("");
-      ImGui::BeginChild  ("Texture Details", ImVec2 (0, font_size * 10), true);
+
+      ImGui::BeginChild  ("Texture Details", ImVec2 ( font_size           * 70,
+                                                      font_size_multiline * 6.1f ),
+                                               true );
 
       ImGui::Columns   ( 3 );
         ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 1.0f, 1.0f, 1.0f));
@@ -583,6 +597,8 @@ TBFix_DrawConfigUI (void)
         ImGui::TextColored
                        (ImVec4 (0.3f, 1.0f, 0.3f, 1.0f),
                          "%#5lu     Hits",             tbf::RenderFix::tex_mgr.getHitCount    ()          );  ImGui::NextColumn ();
+        ImGui::Text    ( "Budget: %#7zu MiB  ",        tbf::RenderFix::pDevice->
+                                                                       GetAvailableTextureMem ()  / 1048576UL );
       ImGui::Columns   ( 1 );
 
       ImGui::Separator (   );
@@ -618,8 +634,8 @@ TBFix_DrawConfigUI (void)
 
         ImGui::TextColored (ImVec4 (0.555f, 0.555f, 1.0f, 1.0f),
                          "%.2f  Hit/Miss",          (double)tbf::RenderFix::tex_mgr.getHitCount  () / 
-                                                     (double)tbf::RenderFix::tex_mgr.getMissCount()          ); ImGui::NextColumn ();
-        ImGui::Text    ( "Driver: %#7zu MiB  ",    tbf::RenderFix::tex_mgr.getByteSaved      () >> 20ULL );
+                                                    (double)tbf::RenderFix::tex_mgr.getMissCount ()          ); ImGui::NextColumn ();
+        ImGui::Text    ( "Driver: %#7zu MiB  ",    tbf::RenderFix::tex_mgr.getByteSaved          () >> 20ULL );
 
       ImGui::PopStyleColor
                        (   );
@@ -629,7 +645,6 @@ TBFix_DrawConfigUI (void)
 
       ImGui::TreePush  ("");
       ImGui::Checkbox  ("Enable Texture QuickLoad", &config.textures.quick_load);
-      ImGui::TreePop   (  );
       
       if (ImGui::IsItemHovered ())
       {
@@ -661,15 +676,23 @@ TBFix_DrawConfigUI (void)
         if (ImGui::IsItemHovered ())
           ImGui::SetTooltip ("Lower is actually better, the only reason to adjust this would be if you have an absurd number of CPU cores and pop-in bothers you ;)");
       }
+      ImGui::TreePop      ( );
 
-      ImGui::EndChild    ( );
-      ImGui::PopStyleVar ( );
-      ImGui::TreePop     ( );
+      ImGui::EndChild     ( );
+      ImGui::PopStyleVar  ( );
+      ImGui::TreePop      ( );
     }
 
-    if (ImGui::Button ("Texture Modding Tools")) {
+    if (ImGui::Button ("  Texture Modding Tools  ")) {
       show_texture_mod_dlg = (! show_texture_mod_dlg);
     }
+
+    ImGui::SameLine ();
+
+    ImGui::SliderInt ("Texture Cache Size", &config.textures.max_cache_in_mib, 384, 2048, "%.0f MiB");
+
+    if (ImGui::IsItemHovered ())
+      ImGui::SetTooltip ("Lower this if the reported budget (on the Performance tab) ever becomes negative.");
 
     ImGui::TreePop ();
   }
@@ -714,6 +737,19 @@ TBFix_DrawConfigUI (void)
       tbf::RenderFix::need_reset.textures = true;
     }
 
+    if (ImGui::IsItemHovered ())
+    {
+        ImGui::BeginTooltip ();
+        ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.95f, 0.75f, 0.25f, 1.0f));
+        ImGui::Text           ("Fixes problems caused by the game performing post-processing at a fixed resolution.");
+        ImGui::Separator      ();
+        ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.75f, 0.75f, 0.75f, 1.0f));
+        ImGui::BulletText     ("50%% most closely matches the game's original behavior");
+        ImGui::BulletText     ("Higher values will actually reduce the strength of post-processing effects such as atmospheric bloom");
+        ImGui::PopStyleColor  (2);
+        ImGui::EndTooltip     ();
+    }
+
     ImGui::TreePop ();
   }
 
@@ -749,11 +785,6 @@ TBFix_DrawConfigUI (void)
 
     ImGui::Combo      ("Character Shadow Resolution",     &shadows.radio,     "Normal\0Enhanced\0High\0Ultra\0\0");
     ImGui::Combo      ("Environmental Shadow Resolution", &env_shadows.radio, "Normal\0High\0Ultra\0\0");
-
-    ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.85f, 0.25f, 0.855f, 1.0f));
-    ImGui::Bullet         (); ImGui::SameLine ();
-    ImGui::TextWrapped    ("Changes to these settings will produce weird results until you change Screen Resolution in-game..." );
-    ImGui::PopStyleColor  ();
 
     if (env_shadows.radio != env_shadows.last_sel) {
       config.render.env_shadow_rescale    = env_shadows.radio;
@@ -810,6 +841,9 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePush ("");
 
     ImGui::Text ("No HUD Keybinding:  %ws",         config.keyboard.hudless.human_readable.c_str ());
+    if (ImGui::IsItemHovered ()) {
+      ImGui::SetTooltip ("Click here to change.");
+    }
 
     if (ImGui::IsItemClicked ()) {
       ImGui::OpenPopup ("Keyboard Binding");
@@ -1045,12 +1079,27 @@ TBFix_DrawConfigUI (void)
 
   ImGui::SameLine (0.0f, 60.0f);
 
-  if (ImGui::Selectable ("...", show_test_window))
+  if (ImGui::Selectable (" ... ", show_test_window))
     show_test_window = (! show_test_window);
 
   ImGui::NextColumn ();
 
-  if ( ImGui::Checkbox ("Pause Game While This Menu Is Open", &config.input.ui.pause) )
+  ImGui::Checkbox ("Apply Changes Immediately ", &config.render.auto_apply_changes);
+
+  if (ImGui::IsItemHovered())
+  {
+    ImGui::BeginTooltip ();
+    ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.95f, 0.75f, 0.25f, 1.0f));
+    ImGui::Text           ("Third-Party Software May Not Like This\n\n");
+    ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.75f, 0.75f, 0.75f, 1.0f));
+    ImGui::BulletText     ("You also may not when it takes 5 seconds to change some settings ;)");
+    ImGui::PopStyleColor  (2);
+    ImGui::EndTooltip     ();
+  }
+
+  ImGui::SameLine ();
+
+  if ( ImGui::Checkbox ("Pause Game While Menu Is Open ", &config.input.ui.pause) )
     TBFix_PauseGame (config.input.ui.pause);
 
   bool extra_details = false;
@@ -1072,12 +1121,26 @@ TBFix_DrawConfigUI (void)
     
     if (tbf::RenderFix::need_reset.graphics || tbf::RenderFix::need_reset.textures)
     {
-      ImGui::PushStyleColor  (ImGuiCol_Text, ImVec4 (1.0f, 0.8f, 0.2f, 1.0f));
-      ImGui::Bullet          ( ); ImGui::SameLine ();
-      ImGui::TextWrapped     ( "You have made changes that will not apply until you change Screen Modes in Graphics Settings, "
-                              "or by performing Alt + Tab with the game set to Fullscreen mode.\n" );
-      ImGui::PopStyleColor   ( );
-      ImGui::PopTextWrapPos  ( );
+      if (! config.render.auto_apply_changes)
+      {
+        ImGui::PushStyleColor  (ImGuiCol_Text, ImVec4 (1.0f, 0.8f, 0.2f, 1.0f));
+        ImGui::Bullet          ( ); ImGui::SameLine ();
+        
+        ImGui::TextWrapped     ( "You have made changes to settings that require the game to re-load resources...");
+        ImGui::Button          ( "  Apply Now  " );
+        
+        if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("Click this before complaining that things look weird.");
+        if (ImGui::IsItemClicked ()) tbf::RenderFix::TriggerReset ();
+        
+        ImGui::PopStyleColor   ( );
+        ImGui::PopTextWrapPos  ( );
+      }
+
+      else
+      {
+        ImGui::TextColored           (ImVec4 (0.95f, 0.65f, 0.15f, 1.0f), "Applying Changes...");
+        tbf::RenderFix::TriggerReset ();
+      }
     }
   }
   

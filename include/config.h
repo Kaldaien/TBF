@@ -83,6 +83,7 @@ struct tbf_config_t
     bool      dump_shaders       = false;
     bool      fix_map_res        = false;
     bool      osd_disclaimer     = true;
+    bool      auto_apply_changes = false;
   } render;
 
   struct {

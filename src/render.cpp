@@ -43,8 +43,14 @@ typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
   DWORD              Value
 );
 
+typedef HRESULT (STDMETHODCALLTYPE *TestCooperativeLevel_pfn)
+(
+  IDirect3DDevice9* This
+);
+
 extern SetRenderState_pfn D3D9SetRenderState_Original;
 
+TestCooperativeLevel_pfn                D3D9TestCooperativeLevel_Original            = nullptr;
 DrawPrimitive_pfn                       D3D9DrawPrimitive_Original                   = nullptr;
 DrawIndexedPrimitive_pfn                D3D9DrawIndexedPrimitive_Original            = nullptr;
 DrawPrimitiveUP_pfn                     D3D9DrawPrimitiveUP_Original                 = nullptr;
@@ -55,6 +61,12 @@ SK_SetPresentParamsD3D9_pfn             SK_SetPresentParamsD3D9_Original        
 extern bool pending_loads            (void);
 extern void TBFix_LoadQueuedTextures (void);
 
+
+enum reset_stage_s {
+  Initiate = 0x0, // Fake device loss
+  Respond  = 0x1, // Fake device not reset
+  Clear    = 0x2  // Return status to normal
+} trigger_reset;
 
 bool fullscreen_blit  = false;
 bool needs_aspect     = false;
@@ -704,7 +716,10 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
 
   InterlockedExchange (&tbf::RenderFix::dwRenderThreadID, GetCurrentThreadId ());
 
-  hr = SK_EndBufferSwap (hr, device);
+  if (trigger_reset == reset_stage_s::Clear)
+    hr = SK_EndBufferSwap (hr, device);
+  else
+    hr = D3DERR_DEVICELOST;
 
   tbf::RenderFix::tex_mgr.resetUsedTextures       ();
   tbf::RenderFix::tracked_rt.active = false;
@@ -1548,6 +1563,8 @@ tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
 
   width   = pPresentationParameters->BackBufferWidth;
   height  = pPresentationParameters->BackBufferHeight;
+
+  fullscreen = (! pPresentationParameters->Windowed);
 }
 
 typedef HRESULT (__stdcall *Reset_pfn)(
@@ -1568,9 +1585,30 @@ D3D9Reset_Detour ( IDirect3DDevice9      *This,
   HRESULT hr =
     D3D9Reset_Original (This, pPresentationParameters);
 
+  trigger_reset = reset_stage_s::Clear;
+
   tbf::FrameRateFix::need_reset = true;
 
   return hr;
+}
+
+COM_DECLSPEC_NOTHROW
+HRESULT
+STDMETHODCALLTYPE
+D3D9TestCooperativeLevel_Detour ( IDirect3DDevice9 *This )
+{
+  if (trigger_reset == reset_stage_s::Initiate)
+  {
+    trigger_reset = reset_stage_s::Respond;
+    return D3DERR_DEVICELOST;
+  }
+
+  else if (trigger_reset == reset_stage_s::Respond)
+  {
+    return D3DERR_DEVICENOTRESET;
+  }
+
+  return D3D9TestCooperativeLevel_Original (This);
 }
 
 __declspec (noinline)
@@ -1623,6 +1661,8 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
 
   //tbf::window.hwnd = tbf::RenderFix::hWndDevice;
 
+  tbf::RenderFix::fullscreen = (! pparams->Windowed);
+
   tbf::RenderFix::pDevice = device;
                           
   tbf::RenderFix::width   = pparams->BackBufferWidth;
@@ -1643,6 +1683,8 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
 void
 tbf::RenderFix::Init (void)
 {
+  trigger_reset = reset_stage_s::Clear;
+
   d3dx9_43_dll = LoadLibrary (L"D3DX9_43.DLL");
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetSamplerState_Override",
@@ -1719,6 +1761,11 @@ tbf::RenderFix::Init (void)
                        "SK_SetPresentParamsD3D9",
                         SK_SetPresentParamsD3D9_Detour,
              (LPVOID *)&SK_SetPresentParamsD3D9_Original );
+
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
+                       "D3D9TestCooperativeLevel_Override",
+                        D3D9TestCooperativeLevel_Detour,
+             (LPVOID *)&D3D9TestCooperativeLevel_Original );
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9DrawPrimitive_Override",
@@ -1859,6 +1906,13 @@ tbf::RenderFix::CommandProcessor::OnVarChange (SK_IVariable* var, void* val)
 #endif
 
   return true;
+}
+
+
+void
+tbf::RenderFix::TriggerReset (void)
+{
+  trigger_reset = reset_stage_s::Initiate;
 }
 
 

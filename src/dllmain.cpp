@@ -203,8 +203,21 @@ SKPlugIn_Init (HMODULE hModSpecialK)
             }
           }
 
-          // Wait for Denuvo to finish its thing...
-          Sleep                   (15000UL);
+          // Wait for Denuvo to finish its thing, once we have a render window we know we're in the clear.
+          while (tbf::RenderFix::hWndDevice == nullptr)
+          {
+            Sleep (1500UL);
+          }
+
+          if (tbf::RenderFix::fullscreen)
+          {
+            //
+            // Fix input problems in game (namely, ESC key doesn't register unti Alt+Tab).
+            //
+            SendMessage (tbf::RenderFix::hWndDevice, WM_ACTIVATE, MAKEWPARAM (WA_INACTIVE, 0), (LPARAM)(HWND (0)));
+            SendMessage (tbf::RenderFix::hWndDevice, WM_ACTIVATE, MAKEWPARAM (WA_ACTIVE,   0), (LPARAM)(HWND (0)));
+          }
+
           tbf::FrameRateFix::Init ();
     
           CloseHandle             (GetCurrentThread ());

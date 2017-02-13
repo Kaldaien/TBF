@@ -80,6 +80,7 @@ struct {
   tbf::ParameterBool*    pause_on_ui;
   tbf::ParameterBool*    show_osd_disclaimer;
   tbf::ParameterFloat*   ui_scale;
+  tbf::ParameterBool*    auto_apply_changes;
 } render;
 
 struct {
@@ -406,6 +407,17 @@ TBF_LoadConfig (std::wstring name)
       L"ImGui.Settings",
         L"ShowOSDDisclaimer" );
 
+  render.auto_apply_changes =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool>(
+      L"Automagically Apply Changes to Graphics Settings")
+    );
+
+  render.auto_apply_changes->register_to_ini (
+    render_ini,
+      L"ImGui.Settings",
+        L"ApplyChangesImmediately" );
+
 
   screenshots.hudless_keybind =
     static_cast <tbf::ParameterStringW *>
@@ -579,6 +591,7 @@ TBF_LoadConfig (std::wstring name)
   render.postproc_ratio->load      (config.render.postproc_ratio);
   render.pause_on_ui->load         (config.input.ui.pause);
   render.show_osd_disclaimer->load (config.render.osd_disclaimer);
+  render.auto_apply_changes->load  (config.render.auto_apply_changes);
   render.ui_scale->load            (config.input.ui.scale);
 
   config.input.ui.scale = std::min (std::max (1.0f, config.input.ui.scale), 3.0f);
@@ -631,6 +644,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.postproc_ratio->store      (config.render.postproc_ratio);
   render.pause_on_ui->store         (config.input.ui.pause);
   render.show_osd_disclaimer->store (config.render.osd_disclaimer);
+  render.auto_apply_changes->store  (config.render.auto_apply_changes);
   render.ui_scale->store            (config.input.ui.scale);
 
   textures.remaster->store          (config.textures.remaster);

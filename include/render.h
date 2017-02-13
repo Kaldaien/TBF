@@ -43,6 +43,8 @@ namespace tbf
     void Reset    ( IDirect3DDevice9      *This,
                     D3DPRESENT_PARAMETERS *pPresentationParameters );
 
+    void TriggerReset (void);
+
     // Indicates whether setting changes need a device reset
     struct reset_state_s {
       bool textures = false;

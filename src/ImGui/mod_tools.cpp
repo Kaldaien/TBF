@@ -225,10 +225,17 @@ TBF_DrawFileList (void)
     ImGui::EndChild      (   );
     ImGui::PopStyleColor ( 1 );
 
-    if (ImGui::Button ("Refresh Data Sources"))
+    if (ImGui::Button ("  Refresh Data Sources  "))
     {
       TBF_RefreshDataSources ();
       list_dirty = true;
+    }
+
+    ImGui::SameLine ();
+
+    if (ImGui::Button ("  Reload All Textures  "))
+    {
+      tbf::RenderFix::TriggerReset ();
     }
 
     ImGui::EndGroup ();
@@ -307,7 +314,7 @@ TBFix_TextureModDlg (void)
 
     ImGui::BeginChild ("ToolHeadings", ImVec2 (font_size * 66.0f, font_size * 2.5f), false, ImGuiWindowFlags_AlwaysUseWindowPadding);
 
-    if (ImGui::Button ("Refresh Textures"))
+    if (ImGui::Button ("  Refresh Textures  "))
     {
       SK_ICommandProcessor& command =
         *SK_GetCommandProcessor ();
@@ -323,7 +330,7 @@ TBFix_TextureModDlg (void)
 
     ImGui::SameLine ();
 
-    if (ImGui::Button ("Clear Debug"))
+    if (ImGui::Button (" Clear Debug "))
     {
       sel                         = -1;
       debug_tex_id                =  0;
@@ -507,7 +514,7 @@ TBFix_TextureModDlg (void)
 
           if (! TBF_IsTextureDumped (debug_tex_id))
           {
-            if ( ImGui::Button ("Dump Texture to Disk") )
+            if ( ImGui::Button ("  Dump Texture to Disk  ") )
             {
               if (! config.textures.quick_load)
                 TBF_DumpTexture (desc.Format, debug_tex_id, pTex->d3d9_tex->pTex);
@@ -519,7 +526,7 @@ TBFix_TextureModDlg (void)
 
           else
           {
-            if ( ImGui::Button ("Delete Dumped Texture from Disk") )
+            if ( ImGui::Button ("  Delete Dumped Texture from Disk  ") )
             {
               TBF_DeleteDumpedTexture (desc.Format, debug_tex_id);
             }
@@ -600,7 +607,7 @@ TBFix_TextureModDlg (void)
 
           if (injected)
           {
-            if ( ImGui::Button ("Reload This Texture") && tbf::RenderFix::tex_mgr.reloadTexture (debug_tex_id) )
+            if ( ImGui::Button ("  Reload This Texture  ") && tbf::RenderFix::tex_mgr.reloadTexture (debug_tex_id) )
             {
               reloading    = true;
 
@@ -609,7 +616,7 @@ TBFix_TextureModDlg (void)
           }
 
           else {
-            ImGui::Button ("Resample This Texture"); // NO-OP, but preserves alignment :P
+            ImGui::Button ("  Resample This Texture  "); // NO-OP, but preserves alignment :P
           }
 
           if (! reloading)
@@ -771,8 +778,8 @@ TBFix_TextureModDlg (void)
 
         ImGui::PushStyleColor  (ImGuiCol_Border, ImVec4 (0.5f, 0.5f, 0.5f, 1.0f));
         ImGui::BeginChild ( "Item Selection3",
-                            ImVec2 ( std::max (128.0f, effective_width  + 24.0f),
-                                     std::max (256.0f, effective_height + font_size * 4.0f + (float)shaders * font_size) ),
+                            ImVec2 ( std::max (font_size * 30.0f, effective_width  + 24.0f),
+                                     std::max (256.0f,            effective_height + font_size * 4.0f + (float)shaders * font_size) ),
                               true,
                                 ImGuiWindowFlags_AlwaysAutoResize );
 
