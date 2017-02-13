@@ -1302,7 +1302,8 @@ public:
   SK_TextureWorkerThread (SK_TextureThreadPool* pool)
   {
     pool_ = pool;
-    job_  = nullptr;
+
+    InterlockedExchangePointer ((PVOID *)&job_, nullptr);
 
     control_.start =
       CreateEvent (nullptr, FALSE, FALSE, nullptr);
@@ -1334,7 +1335,7 @@ public:
   }
 
   void startJob  (tbf_tex_load_s* job) {
-    job_ = job;
+    InterlockedExchangePointer ((PVOID *)&job_, job);
     SetEvent (control_.start);
   }
 
@@ -1345,8 +1346,41 @@ public:
   void finishJob (void);
 
   bool isBusy   (void) {
-    return (job_ != nullptr);
+    return (InterlockedCompareExchangePointer ((PVOID *)&job_, nullptr, nullptr) != nullptr);
   }
+
+  size_t bytesLoaded(void) {
+    return InterlockedExchangeAdd (&bytes_loaded_, 0ULL);
+  }
+
+  int    jobsRetired  (void) {
+    return InterlockedExchangeAdd (&jobs_retired_, 0L);
+  }
+
+  FILETIME idleTime   (void) {
+    GetThreadTimes ( thread_,
+                       &runtime_.start, &runtime_.end,
+                         &runtime_.kernel, &runtime_.user );
+
+    FILETIME now;
+    GetSystemTimeAsFileTime (&now);
+
+    ULONGLONG elapsed =
+      ULARGE_INTEGER { now.dwLowDateTime,            now.dwHighDateTime            }.QuadPart -
+      ULARGE_INTEGER { runtime_.start.dwLowDateTime, runtime_.start.dwHighDateTime }.QuadPart;
+
+    ULONGLONG busy =
+      ULARGE_INTEGER { runtime_.kernel.dwLowDateTime, runtime_.kernel.dwHighDateTime }.QuadPart +
+      ULARGE_INTEGER { runtime_.user.dwLowDateTime,   runtime_.user.dwHighDateTime   }.QuadPart;
+
+    ULARGE_INTEGER idle;
+    idle.QuadPart = elapsed - busy;
+
+    return FILETIME { idle.LowPart,
+                      idle.HighPart };
+  }
+  FILETIME userTime   (void) { return runtime_.user;   };
+  FILETIME kernelTime (void) { return runtime_.kernel; };
 
   void shutdown (void) {
     SetEvent (control_.shutdown);
@@ -1363,11 +1397,24 @@ protected:
   unsigned int          thread_id_;
   HANDLE                thread_;
 
-  tbf_tex_load_s*       job_;
+  volatile tbf_tex_load_s*
+                        job_;
+
+  volatile ULONGLONG    bytes_loaded_ = 0ULL;
+  volatile LONG         jobs_retired_ = 0L;
 
   struct {
-    union {
-      struct {
+    FILETIME start, end;
+    FILETIME user,  kernel;
+    FILETIME idle; // Computed: (now - start) - (user + kernel)
+  } runtime_ { 0, 0, 0, 0, 0 };
+
+  struct
+  {
+    union
+    {
+      struct
+      {
         HANDLE start;
         HANDLE trim;
         HANDLE shutdown;
@@ -1495,6 +1542,26 @@ public:
 
   void shutdown (void) {
     SetEvent (events_.shutdown);
+  }
+
+  std::vector <tbf_tex_thread_stats_s> getWorkerStats (void)
+  {
+    std::vector <tbf_tex_thread_stats_s> stats;
+
+    for ( auto it : workers_ )
+    {
+      tbf_tex_thread_stats_s stat;
+
+      stat.bytes_loaded   = it->bytesLoaded ();
+      stat.jobs_retired   = it->jobsRetired ();
+      stat.runtime.idle   = it->idleTime    ();
+      stat.runtime.kernel = it->kernelTime  ();
+      stat.runtime.user   = it->userTime    ();
+
+      stats.push_back (stat);
+    }
+
+    return stats;
   }
 
 
@@ -3795,9 +3862,9 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
   // Ghetto sync. barrier, since Windows 7 does not support them...
   while ( InterlockedCompareExchange (
             &num_threads_init,
-              config.textures.worker_threads,
-                config.textures.worker_threads
-          ) < (ULONG)config.textures.worker_threads )
+              config.textures.worker_threads * 3,
+                config.textures.worker_threads * 3
+          ) < (ULONG)config.textures.worker_threads * 3 )
   {
     SwitchToThread ();
   }
@@ -3822,7 +3889,8 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
 
     // New Work Ready
     if (dwWaitStatus == wait.job_start) {
-      tbf_tex_load_s* pStream = pThread->job_;
+      tbf_tex_load_s* pStream = 
+        (tbf_tex_load_s *)InterlockedCompareExchangePointer ((PVOID *)&pThread->job_, nullptr, nullptr);
 
       start_load ();
       {
@@ -3950,26 +4018,54 @@ SK_TextureThreadPool::Spooler (LPVOID user)
     tbf_tex_load_s* pJob =
       pPool->getNextJob ();
 
-    while (pJob != nullptr) {
-      auto it = pPool->workers_.begin ();
+    while (pJob != nullptr)
+    {
+      // Alternate the direction we look for idle workers to reduce
+      //   starvation (important since each thread is pinned to one CPU).
+      static int direction = 1;
+      bool       started   = false;
 
-      bool started = false;
+      if (direction > 0)
+      {
+        auto it = pPool->workers_.begin ();
 
-      while (it != pPool->workers_.end ()) {
-        if (! (*it)->isBusy ()) {
-          if (! started) {
-            (*it)->startJob (pJob);
-            started = true;
-          } else {
-            (*it)->trim ();
+        while (it != pPool->workers_.end ()) {
+          if (! (*it)->isBusy ()) {
+            if (! started) {
+              (*it)->startJob (pJob);
+              started = true;
+            } else {
+              (*it)->trim ();
+            }
           }
-        }
 
-        ++it;
+          ++it;
+        }
       }
 
+      else
+      {
+        auto it = pPool->workers_.rbegin ();
+
+        while (it != pPool->workers_.rend ()) {
+          if (! (*it)->isBusy ()) {
+            if (! started) {
+              (*it)->startJob (pJob);
+              started = true;
+            } else {
+              (*it)->trim ();
+            }
+          }
+
+          ++it;
+        }
+      }
+
+      direction = -direction;
+
       // All worker threads are busy, so wait...
-      if (! started) {
+      if (! started)
+      {
         WaitForSingleObject (pPool->events_.results_waiting, INFINITE);
       } else {
         pJob =
@@ -4001,7 +4097,11 @@ SK_TextureThreadPool::Spooler (LPVOID user)
 void
 SK_TextureWorkerThread::finishJob (void)
 {
-  job_ = nullptr;
+  InterlockedExchangeAdd     (&bytes_loaded_,
+           ((tbf_tex_load_s *)InterlockedCompareExchangePointer ((PVOID *)&job_, nullptr, nullptr))
+                             ->SrcDataSize);
+  InterlockedIncrement       (&jobs_retired_);
+  InterlockedExchangePointer ((PVOID *)&job_, nullptr);
 }
 HMODULE tbf::RenderFix::d3dx9_43_dll = 0;
 
@@ -4590,4 +4690,16 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
   }
 
   return S_OK;
+}
+
+
+std::vector <tbf_tex_thread_stats_s>
+tbf::RenderFix::TextureManager::getThreadStats (void)
+{
+  std::vector <tbf_tex_thread_stats_s> stats =
+    resample_pool->getWorkerStats ();
+
+  // For Inject (Small, Large) -> Push Back
+
+  return stats;
 }

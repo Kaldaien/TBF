@@ -65,6 +65,17 @@ typedef struct D3DXIMAGE_INFO {
   D3DXIMAGE_FILEFORMAT ImageFileFormat;
 } D3DXIMAGE_INFO, *LPD3DXIMAGE_INFO;
 
+struct tbf_tex_thread_stats_s {
+  ULONGLONG bytes_loaded;
+  LONG      jobs_retired;
+
+  struct {
+    FILETIME start, end;
+    FILETIME user,  kernel;
+    FILETIME idle; // Computed: (now - start) - (user + kernel)
+  } runtime;
+};
+
 namespace tbf {
 namespace RenderFix {
 #if 0
@@ -203,6 +214,9 @@ namespace RenderFix {
     void                     queueScreenshot      (wchar_t* wszFileName, bool hudless = true);
     bool                     wantsScreenshot      (void);
     HRESULT                  takeScreenshot       (IDirect3DSurface9* pSurf);
+
+    std::vector<tbf_tex_thread_stats_s>
+                             getThreadStats       (void);
 
 
     BOOL                     isTexturePowerOfTwo (UINT sampler)

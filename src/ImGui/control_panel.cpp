@@ -680,6 +680,23 @@ TBFix_DrawConfigUI (void)
 
       ImGui::EndChild     ( );
       ImGui::PopStyleVar  ( );
+
+      if (ImGui::CollapsingHeader ("Thread Stats"))
+      {
+        std::vector <tbf_tex_thread_stats_s> stats =
+          tbf::RenderFix::tex_mgr.getThreadStats ();
+
+        int thread_id = 0;
+
+        for ( auto it : stats ) {
+          ImGui::Text ("Thread #%lu  -  %6lu jobs retired, %5lu MiB loaded  -  %.6f User / %.6f Kernel / %.6f Idle",
+                          thread_id++,
+                            it.jobs_retired, it.bytes_loaded >> 20UL,
+                              (double)ULARGE_INTEGER { it.runtime.user.dwLowDateTime,   it.runtime.user.dwHighDateTime   }.QuadPart / 10000000.0,
+                              (double)ULARGE_INTEGER { it.runtime.kernel.dwLowDateTime, it.runtime.kernel.dwHighDateTime }.QuadPart / 10000000.0,
+                              (double)ULARGE_INTEGER { it.runtime.idle.dwLowDateTime,   it.runtime.idle.dwHighDateTime   }.QuadPart / 10000000.0 );
+        }
+      }
       ImGui::TreePop      ( );
     }
 
