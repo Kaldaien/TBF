@@ -317,8 +317,6 @@ tbf::FileIO::Init (void)
                          ReadFile_Detour,
               (LPVOID *)&ReadFile_Original );
   }
-
-  TBF_ApplyQueuedHooks ();
 }
 
 void

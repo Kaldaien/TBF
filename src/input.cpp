@@ -223,8 +223,6 @@ tbf::InputFix::Init (void)
            (LPVOID *)&SK_PluginKeyPress_Original );
 
   tbf::KeyboardFix::Init ();
-
-  //TBF_ApplyQueuedHooks (); // That happens when we init the kyboard fix
 }
 
 void
@@ -1035,8 +1033,6 @@ TBF_InitSDLOverride (void)
                        SDL_HapticOpenFromJoystick_Detour,
             (LPVOID *)&SDL_HapticOpenFromJoystick_Original );
   }
-
-  TBF_ApplyQueuedHooks ();
 
   tbf::InputFix::ai_fix.joysticks [0].handle = (SDL_Joystick *)(LPVOID)0xDEADBEEFULL;
   tbf::InputFix::ai_fix.joysticks [0].guid = { 0x62, 0x62, 0x7E, 0xBB,

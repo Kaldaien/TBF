@@ -1329,7 +1329,8 @@ tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
   ULONG count = InterlockedIncrement (&reset_count);
 
   if (count == 1UL) {
-    tex_mgr.Init      ();
+    tex_mgr.Init         ();
+    TBF_ApplyQueuedHooks ();
   }
 
   else {
@@ -1560,8 +1561,6 @@ tbf::RenderFix::Init (void)
 #endif
 
   CommandProcessor* comm_proc = CommandProcessor::getInstance ();
-
-  TBF_ApplyQueuedHooks ();
 }
 
 void

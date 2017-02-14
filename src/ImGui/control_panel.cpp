@@ -672,7 +672,12 @@ TBFix_DrawConfigUI (void)
       if (config.textures.quick_load) {
         ImGui::SameLine ();
 
-        if (ImGui::SliderInt("# of Threads", &config.textures.worker_threads, 2, 10)) {
+        
+        if (ImGui::SliderInt ("# of Threads", &config.textures.worker_threads, 3, 9))
+        {
+          // Only allow odd numbers of threads
+          config.textures.worker_threads += 1 - (config.textures.worker_threads & 0x1);
+
           need_restart = true;
         }
 
@@ -692,7 +697,7 @@ TBFix_DrawConfigUI (void)
         int thread_id = 0;
 
         for ( auto it : stats ) {
-          ImGui::Text ("Thread #%lu  -  %6lu jobs retired, %5lu MiB loaded  -  %.6f User / %.6f Kernel / %.6f Idle",
+          ImGui::Text ("Thread #%lu  -  %6lu jobs retired, %5lu MiB loaded  -  %.6f User / %.6f Kernel / %3.1f Idle",
                           thread_id++,
                             it.jobs_retired, it.bytes_loaded >> 20UL,
                               (double)ULARGE_INTEGER { it.runtime.user.dwLowDateTime,   it.runtime.user.dwHighDateTime   }.QuadPart / 10000000.0,
@@ -1213,15 +1218,15 @@ TBFix_ImGui_DrawFrame (DWORD dwFlags, void* user)
 void
 TBFix_ImGui_Init (void)
 {
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                         "SK_ImGui_Toggle",
-                        TBFix_ToggleConfigUI,
+                           TBFix_ToggleConfigUI,
              (LPVOID *)&SK_ImGui_Toggle_Original );
 
-  TBF_CreateDLLHook ( config.system.injector.c_str (),
-                        "SK_ImGui_DrawFrame",
-                     TBFix_ImGui_DrawFrame,
-             (LPVOID *)&SK_ImGui_DrawFrame_Original );
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
+                         "SK_ImGui_DrawFrame",
+                      TBFix_ImGui_DrawFrame,
+              (LPVOID *)&SK_ImGui_DrawFrame_Original );
 }
 
 

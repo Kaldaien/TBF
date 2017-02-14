@@ -205,6 +205,8 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     //
     SK_GetCommandProcessor ()->ProcessCommandLine ("Window.Center false");
 
+    TBF_ApplyQueuedHooks ();
+
 
     CreateThread ( nullptr, 0,
       [](LPVOID user) ->

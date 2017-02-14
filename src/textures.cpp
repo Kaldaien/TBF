@@ -3271,6 +3271,11 @@ tbf::RenderFix::TextureManager::Init (void)
               (LPVOID*)&D3D9StretchRect );
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
+                       "D3D9CreateRenderTarget_Override",
+                        D3D9CreateRenderTarget_Detour,
+              (LPVOID*)&D3D9CreateRenderTarget );
+
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9CreateDepthStencilSurface_Override",
                         D3D9CreateDepthStencilSurface_Detour,
               (LPVOID*)&D3D9CreateDepthStencilSurface );
@@ -3299,8 +3304,6 @@ tbf::RenderFix::TextureManager::Init (void)
                         "D3DXCreateTextureFromFileInMemoryEx",
                          D3DXCreateTextureFromFileInMemoryEx_Detour,
               (LPVOID *)&D3DXCreateTextureFromFileInMemoryEx_Original );
-
-  TBF_ApplyQueuedHooks ();
 
   D3DXSaveTextureToFile =
     (D3DXSaveTextureToFile_pfn)
@@ -3331,24 +3334,6 @@ tbf::RenderFix::TextureManager::Init (void)
     (D3DXGetImageInfoFromFile_pfn)
       GetProcAddress ( tbf::RenderFix::d3dx9_43_dll,
                          "D3DXGetImageInfoFromFileW" );
-
-  // We don't hook this, but we still use it...
-  if (D3D9CreateRenderTarget == nullptr) {
-    static HMODULE hModD3D9 =
-      GetModuleHandle (config.system.injector.c_str ());
-    D3D9CreateRenderTarget =
-      (CreateRenderTarget_pfn)
-        GetProcAddress (hModD3D9, "D3D9CreateRenderTarget_Override");
-  }
-
-  // We don't hook this, but we still use it...
-  if (D3D9CreateDepthStencilSurface == nullptr) {
-    static HMODULE hModD3D9 =
-      GetModuleHandle (config.system.injector.c_str ());
-    D3D9CreateDepthStencilSurface =
-      (CreateDepthStencilSurface_pfn)
-        GetProcAddress (hModD3D9, "D3D9CreateDepthStencilSurface_Override");
-  }
 
   InterlockedExchange64 (&bytes_saved, 0LL);
 
