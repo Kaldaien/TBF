@@ -479,20 +479,23 @@ TBFix_DrawConfigUI (void)
         tbf::FrameRateFix::BlipFramerate    ();
       }
 
-      bool* wait_for_vblank =
-        (bool *)SK_GetCommandProcessor ()->ProcessCommandLine ("WaitForVBLANK").getVariable ()->getValuePointer ();
+      if (*(bool *)SK_GetCommandProcessor ()->ProcessCommandLine ("RenderHooks.D3D9Ex").getVariable ()->getValuePointer ())
+      {
+        bool* wait_for_vblank =
+          (bool *)SK_GetCommandProcessor ()->ProcessCommandLine ("WaitForVBLANK").getVariable ()->getValuePointer ();
 
-      ImGui::Checkbox ("Wait for VBLANK", wait_for_vblank);
-
-      if (ImGui::IsItemHovered ()) {
-        ImGui::BeginTooltip ();
-        ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.95f, 0.75f, 0.25f, 1.0f));
-        ImGui::Text           ("Lower CPU Usage and Input Latency (but less stable framerate)\n\n");
-        ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.75f, 0.75f, 0.75f, 1.0f));
-        ImGui::BulletText     ("This aligns timing of the framerate limiter to your monitor's refresh rate -- it IS NOT VSYNC!");
-        ImGui::BulletText     ("If you enable this, you will need to adjust the Limiter Tolerance slider (lower value) for best results.");
-        ImGui::PopStyleColor  (2);
-        ImGui::EndTooltip     ();
+        ImGui::Checkbox ("Wait for VBLANK", wait_for_vblank);
+        
+        if (ImGui::IsItemHovered ()) {
+          ImGui::BeginTooltip ();
+          ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.95f, 0.75f, 0.25f, 1.0f));
+          ImGui::Text           ("Lower CPU Usage and Input Latency (but less stable framerate)\n\n");
+          ImGui::PushStyleColor (ImGuiCol_Text, ImColor (0.75f, 0.75f, 0.75f, 1.0f));
+          ImGui::BulletText     ("This aligns timing of the framerate limiter to your monitor's refresh rate -- it IS NOT VSYNC!");
+          ImGui::BulletText     ("If you enable this, you will need to adjust the Limiter Tolerance slider (lower value) for best results.");
+          ImGui::PopStyleColor  (2);
+          ImGui::EndTooltip     ();
+        }
       }
     }
 
