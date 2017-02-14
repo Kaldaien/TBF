@@ -90,7 +90,7 @@ namespace tbf
     extern bool             need_reset;
 
     // This is actually setup in the SK DLL that loads this one
-    extern uint32_t         target_fps;
+    extern float            target_fps;
 
     // Cache the game's tick scale for timing -- this can be changed without
     //   our knowledge, so this is more or less a hint rather than a rule

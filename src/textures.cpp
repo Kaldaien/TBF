@@ -4512,6 +4512,15 @@ tbf::RenderFix::TextureManager::wantsScreenshot (void)
 HRESULT
 tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
 {
+  if (pSurf == nullptr)
+    return E_POINTER;
+
+  D3DSURFACE_DESC               desc = { };
+  HRESULT hr = pSurf->GetDesc (&desc); 
+
+  if (FAILED (hr))
+    return hr;
+
   static int count = 0;
 
   wchar_t wszOut   [MAX_PATH] = { };
@@ -4547,9 +4556,6 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
     screenshots_to_delete.push (wszThumb);
 
   want_screenshot = false;
-
-  D3DSURFACE_DESC  desc;
-  pSurf->GetDesc (&desc);
 
   static D3DXLoadSurfaceFromSurface_pfn
     D3DXLoadSurfaceFromSurface =

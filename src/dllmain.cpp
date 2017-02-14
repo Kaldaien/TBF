@@ -169,6 +169,20 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     TBF_ImportFunctionFromSpecialK ( "SK_FetchVersionInfo",
                                        SK_FetchVersionInfo );
 
+
+  if (! wcsstr (injector_dll.c_str (), L"SpecialK"))
+  {
+    if ( SK_FetchVersionInfo != nullptr &&
+         SK_UpdateSoftware   != nullptr )
+    {
+      if (SK_FetchVersionInfo (L"TBF"))
+      {
+        SK_UpdateSoftware     (L"TBF");
+      }
+    }
+  }
+
+
   if (TBF_Init_MinHook () == MH_OK) {
     extern void
     TBF_InitSDLOverride (void);
@@ -195,23 +209,13 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     CreateThread ( nullptr, 0,
       [](LPVOID user) ->
         DWORD {
-          if (! wcsstr (injector_dll.c_str (), L"SpecialK"))
-          {
-            if ( SK_FetchVersionInfo != nullptr &&
-                 SK_UpdateSoftware   != nullptr )
-            {
-              if (SK_FetchVersionInfo (L"TBF"))
-              {
-                SK_UpdateSoftware     (L"TBF");
-              }
-            }
-          }
-
           // Wait for Denuvo to finish its thing, once we have a render window we know we're in the clear.
           while (tbf::RenderFix::hWndDevice == nullptr)
           {
-            Sleep (1500UL);
+            Sleep (150UL);
           }
+
+          tbf::FrameRateFix::Init ();
 
           if (tbf::RenderFix::fullscreen)
           {
@@ -221,8 +225,6 @@ SKPlugIn_Init (HMODULE hModSpecialK)
             SendMessage (tbf::RenderFix::hWndDevice, WM_ACTIVATE, MAKEWPARAM (WA_INACTIVE, 0), (LPARAM)(HWND (0)));
             SendMessage (tbf::RenderFix::hWndDevice, WM_ACTIVATE, MAKEWPARAM (WA_ACTIVE,   0), (LPARAM)(HWND (0)));
           }
-
-          tbf::FrameRateFix::Init ();
     
           CloseHandle             (GetCurrentThread ());
     

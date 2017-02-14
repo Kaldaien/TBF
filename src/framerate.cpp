@@ -87,7 +87,7 @@ bool               tbf::FrameRateFix::need_reset               = false;
 CRITICAL_SECTION   tbf::FrameRateFix::alter_speed_cs           = { 0 };
 
 bool               tbf::FrameRateFix::variable_speed_installed = false;
-uint32_t           tbf::FrameRateFix::target_fps               = 0;
+float              tbf::FrameRateFix::target_fps               = 0.0f;
 
 HMODULE            tbf::FrameRateFix::bink_dll                 = 0;
 HMODULE            tbf::FrameRateFix::kernel32_dll             = 0;
@@ -316,10 +316,14 @@ tbf::FrameRateFix::Init (void)
 
      __try
      {
-       if ( *pTickAddr <= 2 )
-       {
-         variable_speed_installed = true;
-       }
+       // Sit and spin -- Initialization happens from a separate thread, so this is
+       //                   acceptable behavior.
+       while (! ( (*pTickAddr == 1) ||
+                  (*pTickAddr == 2) ) )
+         Sleep (150UL);
+
+
+       variable_speed_installed = true;
      }
 
      __except ( ( GetExceptionCode () == EXCEPTION_ACCESS_VIOLATION ) ? 
@@ -393,7 +397,7 @@ tbf::FrameRateFix::RenderTick (void)
                          60.0f / (float)*pTickScale );
 
     tick_scale =             *pTickScale;
-    target_fps = 60 / std::max (0, tick_scale);
+    target_fps = 60.0f / std::max (1.0f, (float)tick_scale);
 
     SK_GetCommandProcessor ()->ProcessCommandFormatted (
       "TargetFPS %f",

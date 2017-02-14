@@ -834,10 +834,187 @@ TBFix_TextureModDlg (void)
 
   if (ImGui::CollapsingHeader ("Live Shader View"))
   {
-    ImGui::TreePush ("");
-    ImGui::Text ("TODO");
-    // Vertex Shader List ==> Pixel Shader List ==> Disassembled Shaders ==> Textures / RenderTargets Used
-    ImGui::TreePop  ();
+    static float last_ht    = 256.0f;
+    static float last_width = 256.0f;
+
+    static std::vector <std::string> list_contents;
+    static bool                      list_dirty     = true;
+    static uint32_t                  last_sel       =    0;
+    static int                            sel       =   -1;
+
+    std::vector <uint32_t> pixel_shaders ( tbf::RenderFix::last_frame.pixel_shaders.begin (),
+                                           tbf::RenderFix::last_frame.pixel_shaders.end   () );
+
+    if (list_dirty)
+    {
+          sel = -1;
+      int idx =  0;
+          list_contents.clear ();
+
+      // The underlying list is unsorted for speed, but that's not at all
+      //   intuitive to humans, so sort the thing when we have the RT view open.
+      std::sort ( pixel_shaders.begin (),
+                  pixel_shaders.end   () );
+
+
+
+      for ( auto it : pixel_shaders )
+      {
+        char szDesc [16] = { };
+
+        sprintf (szDesc, "%llx", (uintptr_t)it);
+
+        list_contents.emplace_back (szDesc);
+
+        if ((uint32_t)it == last_sel)
+        {
+          sel = idx;
+          //tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
+        }
+
+        ++idx;
+      }
+    }
+
+    ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
+    ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
+
+    ImGui::BeginChild ( "Pixel Shaders",
+                        ImVec2 ( font_size * 10.0f, std::max (font_size * 15.0f, last_ht)),
+                          true, ImGuiWindowFlags_AlwaysAutoResize );
+
+   if (pixel_shaders.size ())
+   {
+     static      int last_sel = 0;
+     static bool sel_changed  = false;
+
+     if (sel != last_sel)
+       sel_changed = true;
+
+     last_sel = sel;
+
+     for ( int line = 0; line < pixel_shaders.size (); line++ )
+     {
+       if (line == sel)
+       {
+         bool selected = true;
+         ImGui::Selectable (list_contents [line].c_str (), &selected);
+
+         if (sel_changed)
+         {
+           ImGui::SetScrollHere (0.5f); // 0.0f:top, 0.5f:center, 1.0f:bottom
+           sel_changed = false;
+         }
+       }
+
+       else
+       {
+         bool selected = false;
+
+         if (ImGui::Selectable (list_contents [line].c_str (), &selected))
+         {
+           sel_changed  = true;
+           sel          =  line;
+           last_sel     = (uint32_t)pixel_shaders [sel];
+           //tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
+         }
+       }
+     }
+   }
+
+   ImGui::EndChild ();
+
+   ImGui::BeginGroup ();
+
+   ImGui::PopStyleColor ();
+   ImGui::PopStyleVar   ();
+
+    ImGui::EndGroup ();
+
+
+    std::vector <uint32_t> vertex_shaders ( tbf::RenderFix::last_frame.vertex_shaders.begin (),
+                                            tbf::RenderFix::last_frame.vertex_shaders.end   () );
+
+    if (list_dirty)
+    {
+          sel = -1;
+      int idx =  0;
+          list_contents.clear ();
+
+      // The underlying list is unsorted for speed, but that's not at all
+      //   intuitive to humans, so sort the thing when we have the RT view open.
+      std::sort ( vertex_shaders.begin (),
+                  vertex_shaders.end   () );
+
+      for ( auto it : vertex_shaders )
+      {
+        char szDesc [16] = { };
+
+        sprintf (szDesc, "%llx", (uintptr_t)it);
+
+        list_contents.emplace_back (szDesc);
+
+        if ((uint32_t)it == last_sel)
+        {
+          sel = idx;
+          //tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
+        }
+
+        ++idx;
+      }
+    }
+
+    ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
+    ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
+
+    ImGui::BeginChild ( "Vertex Shaders",
+                        ImVec2 ( font_size * 10.0f, std::max (font_size * 15.0f, last_ht)),
+                          true, ImGuiWindowFlags_AlwaysAutoResize );
+
+
+
+   if (vertex_shaders.size ())
+   {
+     static      int last_sel = 0;
+     static bool sel_changed  = false;
+
+     if (sel != last_sel)
+       sel_changed = true;
+
+     last_sel = sel;
+
+     for ( int line = 0; line < vertex_shaders.size (); line++ )
+     {
+       if (line == sel)
+       {
+         bool selected = true;
+         ImGui::Selectable (list_contents [line].c_str (), &selected);
+
+         if (sel_changed)
+         {
+           ImGui::SetScrollHere (0.5f); // 0.0f:top, 0.5f:center, 1.0f:bottom
+           sel_changed = false;
+         }
+       }
+
+       else
+       {
+         bool selected = false;
+
+         if (ImGui::Selectable (list_contents [line].c_str (), &selected))
+         {
+           sel_changed  = true;
+           sel          =  line;
+           last_sel     = (uint32_t)vertex_shaders [sel];
+           //tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
+         }
+       }
+     }
+   }
+
+   ImGui::EndChild      ();
+   ImGui::PopStyleVar   ();
+   ImGui::PopStyleColor ();
   }
 
   if (ImGui::CollapsingHeader ("Misc. Settings"))
