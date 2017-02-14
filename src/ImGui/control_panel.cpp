@@ -1087,6 +1087,21 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePop ();
   }
 
+  if (ImGui::CollapsingHeader ("Fun Stuff"))
+  {
+    ImGui::TreePush ("");
+
+    ImGui::Checkbox ("Hollow Eye Mode", &config.fun_stuff.hollow_eye_mode);
+    if (ImGui::IsItemHovered ())
+      ImGui::SetTooltip ("The stuff nightmares are made from.");
+
+    ImGui::Checkbox ("Disable Smoke",   &config.fun_stuff.disable_smoke);
+    if (ImGui::IsItemHovered ())
+      ImGui::SetTooltip ("Does not disable all smoke... just the super obnoxious concentric ring (banding from hell) variety that makes you want to gouge your eyes out in dungeons.");
+
+    ImGui::TreePop  ();
+  }
+
   ImGui::PopItemWidth ();
 
   ImGui::Separator (   );

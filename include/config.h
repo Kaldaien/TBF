@@ -103,6 +103,13 @@ struct tbf_config_t
   } textures;
 
   struct {
+    bool     hollow_eye_mode     =  false;
+    uint32_t hollow_eye_vs_crc32 =  0xf063a9f3;
+    bool     disable_smoke       =  false;
+    uint32_t smoke_ps_crc32      =  0x868bd533;
+  } fun_stuff;
+
+  struct {
     struct {
       std::wstring texture_set         = L"XboxOne";
       int          virtual_controllers = 0;

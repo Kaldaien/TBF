@@ -33,6 +33,8 @@
 #include <d3d9.h>
 #include <d3d9types.h>
 
+#include <atlbase.h>
+
 tbf::RenderFix::tbf_draw_states_s
   tbf::RenderFix::draw_state;
 
@@ -68,9 +70,7 @@ enum reset_stage_s {
   Clear    = 0x2  // Return status to normal
 } trigger_reset;
 
-bool fullscreen_blit  = false;
 bool needs_aspect     = false;
-bool world_radial     = false;
 int TEST_VS = 107874419;
 
 uint32_t
@@ -291,7 +291,8 @@ SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
 {
   static bool dump = config.render.dump_shaders;
 
-  if (dump) {
+  if (dump)
+  {
     if (GetFileAttributes (L"TBFix_Res\\dump\\shaders") !=
          FILE_ATTRIBUTE_DIRECTORY) {
       CreateDirectoryW (L"TBFix_Res",                nullptr);
@@ -299,29 +300,24 @@ SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
       CreateDirectoryW (L"TBFix_Res\\dump\\shaders", nullptr);
     }
 
-    wchar_t wszDumpName [MAX_PATH];
-    ZeroMemory (wszDumpName, sizeof (wchar_t) * MAX_PATH);
+    wchar_t wszDumpName [MAX_PATH] = { L'\0' };
 
     swprintf_s ( wszDumpName,
                    MAX_PATH, 
                      L"TBFix_Res\\dump\\shaders\\%s_%08x.html",
                        wszPrefix, crc32 );
 
-    if (D3DXDisassembleShader == nullptr)
-      D3DXDisassembleShader =
-        (D3DXDisassembleShader_pfn)
-          GetProcAddress ( tbf::RenderFix::d3dx9_43_dll,
-                             "D3DXDisassembleShader" );
-
     if ( D3DXDisassembleShader           != nullptr &&
-         GetFileAttributes (wszDumpName) == INVALID_FILE_ATTRIBUTES ) {
-      LPD3DXBUFFER pDisasm;
+         GetFileAttributes (wszDumpName) == INVALID_FILE_ATTRIBUTES )
+    {
+      CComPtr <ID3DXBuffer> pDisasm = nullptr;
 
       HRESULT hr =
         D3DXDisassembleShader ((DWORD *)pbFunc, TRUE, "", &pDisasm);
 
-      if (SUCCEEDED (hr)) {
-        FILE* fDump = _wfsopen (wszDumpName,  L"Wb", _SH_DENYWR);
+      if (SUCCEEDED (hr))
+      {
+        FILE* fDump = _wfsopen (wszDumpName,  L"wb", _SH_DENYWR);
 
         if (fDump != NULL) {
           fwrite ( pDisasm->GetBufferPointer (),
@@ -330,8 +326,6 @@ SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
                          fDump );
           fclose (fDump);
         }
-
-        pDisasm->Release ();
       }
     }
   }
@@ -370,15 +364,19 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
     return D3D9SetVertexShader_Original (This, pShader);
 
 
-  if (g_pVS != pShader) {
-    if (pShader != nullptr) {
-      if (vs_checksums.find (pShader) == vs_checksums.end ()) {
+  if (g_pVS != pShader)
+  {
+    if (pShader != nullptr)
+    {
+      if (vs_checksums.find (pShader) == vs_checksums.end ())
+      {
         UINT len;
         pShader->GetFunction (nullptr, &len);
 
         void* pbFunc = malloc (len);
 
-        if (pbFunc != nullptr) {
+        if (pbFunc != nullptr)
+        {
           pShader->GetFunction (pbFunc, &len);
 
           vs_checksums [pShader] = crc32 (0, pbFunc, len);
@@ -389,9 +387,9 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
         }
       }
     }
-    else {
+
+    else
       vs_checksum = 0;
-    }
   }
 
   vs_checksum = vs_checksums [pShader];
@@ -438,15 +436,19 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
     return D3D9SetPixelShader_Original (This, pShader);
 
 
-  if (g_pPS != pShader) {
-    if (pShader != nullptr) {
-      if (ps_checksums.find (pShader) == ps_checksums.end ()) {
+  if (g_pPS != pShader)
+  {
+    if (pShader != nullptr)
+    {
+      if (ps_checksums.find (pShader) == ps_checksums.end ())
+      {
         UINT len;
         pShader->GetFunction (nullptr, &len);
 
         void* pbFunc = malloc (len);
 
-        if (pbFunc != nullptr) {
+        if (pbFunc != nullptr)
+        {
           pShader->GetFunction (pbFunc, &len);
 
           ps_checksums [pShader] = crc32 (0, pbFunc, len);
@@ -456,9 +458,10 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
           free (pbFunc);
         }
       }
-    } else {
-      ps_checksum = 0;
     }
+
+    else
+      ps_checksum = 0;
   }
 
   ps_checksum = ps_checksums [pShader];
@@ -481,17 +484,34 @@ const uint32_t VS_CHECKSUM_BINK  = 3463109298UL;
 const uint32_t PS_CHECKSUM_UI    =  363447431UL;
 const uint32_t VS_CHECKSUM_UI    =  657093040UL;
 
-const uint32_t VS_CHECKSUM_SUBS   = 0xCE6ADAB2UL;
-const uint32_t VS_CHECKSUM_TITLE  = -653456248;  /// Main menu
-const uint32_t VS_CHECKSUM_RADIAL = -18938562;  /// Radial Gauges
-//  107874419  /// Progress Bar
+bool
+TBF_ShouldSkipRenderPass (void)
+{
+  const bool tracked_vs = ( vs_checksum == tbf::RenderFix::tracked_vs.crc32 );
+  const bool tracked_ps = ( ps_checksum == tbf::RenderFix::tracked_ps.crc32 );
 
-//
-// Model Shadow Shaders (primary)
-//
-const uint32_t PS_CHECKSUM_CHAR_SHADOW = 1180797962UL;
-const uint32_t VS_CHECKSUM_CHAR_SHADOW =  446150694UL;
+  if (tracked_vs) tbf::RenderFix::tracked_vs.num_draws++;
+  if (tracked_ps) tbf::RenderFix::tracked_ps.num_draws++;
 
+
+  if (tracked_vs && tbf::RenderFix::tracked_vs.cancel_draws)
+    return true;
+
+  if (tracked_ps && tbf::RenderFix::tracked_ps.cancel_draws)
+    return true;
+
+
+  if (config.fun_stuff.hollow_eye_mode && vs_checksum == config.fun_stuff.hollow_eye_vs_crc32)
+    return true;
+
+  extern uint32_t current_tex;
+
+  if (config.fun_stuff.disable_smoke   && ps_checksum == config.fun_stuff.smoke_ps_crc32 && current_tex == 0x16f618a8)
+    return true;
+
+
+  return false;
+}
 
 typedef void (STDMETHODCALLTYPE *SK_BeginBufferSwap_pfn)(void);
 SK_BeginBufferSwap_pfn SK_BeginBufferSwap = nullptr;
@@ -601,7 +621,6 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
   game_state.in_skit = false;
 
   needs_aspect       = false;
-  fullscreen_blit    = false;
   draw_count         = 0;
   next_draw          = 0;
 
@@ -957,6 +976,11 @@ D3D9DrawIndexedPrimitive_Detour (IDirect3DDevice9* This,
   ++tbf::RenderFix::draw_state.draws;
   ++draw_count;
 
+
+  if (TBF_ShouldSkipRenderPass ())
+    return S_OK;
+
+
   return D3D9DrawIndexedPrimitive_Original ( This, Type,
                                               BaseVertexIndex, MinVertexIndex,
                                                 NumVertices, startIndex,
@@ -1212,6 +1236,11 @@ D3D9DrawPrimitive_Detour (IDirect3DDevice9* This,
 
   tbf::RenderFix::draw_state.draws++;
 
+
+  if (TBF_ShouldSkipRenderPass ())
+    return S_OK;
+
+
 #if 0
   if (tsf::RenderFix::tracer.log) {
     dll_log->Log ( L"[FrameTrace] DrawPrimitive - %X, StartVertex: %lu, PrimitiveCount: %lu",
@@ -1266,6 +1295,11 @@ D3D9DrawPrimitiveUP_Detour ( IDirect3DDevice9* This,
 
   tbf::RenderFix::draw_state.draws++;
 
+
+  if (TBF_ShouldSkipRenderPass ())
+    return S_OK;
+
+
   return
     D3D9DrawPrimitiveUP_Original ( This,
                                      PrimitiveType,
@@ -1304,6 +1338,11 @@ D3D9DrawIndexedPrimitiveUP_Detour ( IDirect3DDevice9* This,
 #endif
 
   tbf::RenderFix::draw_state.draws++;
+
+
+  if (TBF_ShouldSkipRenderPass ())
+    return S_OK;
+
 
   return
     D3D9DrawIndexedPrimitiveUP_Original (
@@ -1440,19 +1479,7 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
   }
 
   if (pparams->hDeviceWindow != nullptr)
-  {
-    if (tbf::RenderFix::hWndDevice == nullptr)
-    {
-      //SK_GetCommandProcessor ()->ProcessCommandFormatted (
-        //"TargetFPS %f",
-          //config.window.foreground_fps
-      //);
-    }
-
     tbf::RenderFix::hWndDevice = pparams->hDeviceWindow;
-  }
-
-  //tbf::window.hwnd = tbf::RenderFix::hWndDevice;
 
   tbf::RenderFix::fullscreen = (! pparams->Windowed);
 
@@ -1538,7 +1565,6 @@ tbf::RenderFix::Init (void)
                         D3D9TestCooperativeLevel_Detour,
              (LPVOID *)&D3D9TestCooperativeLevel_Original );
 
-#if 0
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9DrawPrimitive_Override",
                         D3D9DrawPrimitive_Detour,
@@ -1558,7 +1584,11 @@ tbf::RenderFix::Init (void)
                        "D3D9DrawIndexedPrimitiveUP_Override",
                         D3D9DrawIndexedPrimitiveUP_Detour,
               (LPVOID*)&D3D9DrawIndexedPrimitiveUP_Original );
-#endif
+
+  D3DXDisassembleShader =
+    (D3DXDisassembleShader_pfn)
+      GetProcAddress ( tbf::RenderFix::d3dx9_43_dll,
+                         "D3DXDisassembleShader" );
 
   CommandProcessor* comm_proc = CommandProcessor::getInstance ();
 }
@@ -1710,3 +1740,9 @@ tbf::RenderFix::reset_state_s
 
 tbf::RenderFix::render_target_tracking_s
                    tbf::RenderFix::tracked_rt;
+
+tbf::RenderFix::shader_tracking_s
+                   tbf::RenderFix::tracked_vs;
+
+tbf::RenderFix::shader_tracking_s
+                   tbf::RenderFix::tracked_ps;

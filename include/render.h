@@ -98,13 +98,21 @@ namespace tbf
 
     struct render_target_tracking_s
     {
-      IDirect3DBaseTexture9*        tracking_tex;
+      IDirect3DBaseTexture9*        tracking_tex  = nullptr;
 
       std::unordered_set <uint32_t> pixel_shaders;
       std::unordered_set <uint32_t> vertex_shaders;
 
-      bool                          active;
+      bool                          active        = false;
     } extern tracked_rt;
+
+    struct shader_tracking_s
+    {
+      uint32_t                      crc32        =  0x00;
+      bool                          cancel_draws = false;
+      bool                          active       = false;
+      int                           num_draws    =     0;
+    } extern tracked_vs, tracked_ps;
   }
 }
 
