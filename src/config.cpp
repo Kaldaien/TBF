@@ -82,6 +82,19 @@ struct {
   tbf::ParameterFloat*   ui_scale;
   tbf::ParameterBool*    auto_apply_changes;
   tbf::ParameterBool*    never_show_eula;
+
+  struct {
+    tbf::ParameterInt*   preset;
+    tbf::ParameterBool*  override_game;
+    tbf::ParameterFloat* threshold;
+    tbf::ParameterInt*   max_search_steps;
+    tbf::ParameterInt*   max_search_steps_diag;
+    tbf::ParameterFloat* corner_rounding;
+    tbf::ParameterFloat* predication_threshold;
+    tbf::ParameterFloat* predication_scale;
+    tbf::ParameterFloat* predication_strength;
+    tbf::ParameterFloat* reprojection_weight;
+  } smaa;
 } render;
 
 struct {
@@ -431,6 +444,129 @@ TBF_LoadConfig (std::wstring name)
         L"UserClaimsToHaveReadEULA" );
 
 
+
+  render.smaa.preset =
+    static_cast <tbf::ParameterInt *>
+    (g_ParameterFactory.create_parameter <int>(
+      L"Preset")
+    );
+
+  render.smaa.preset->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"QualityPreset"
+  );
+
+  render.smaa.override_game =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool>(
+      L"Override Game's Settings")
+    );
+
+  render.smaa.override_game->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"OverrideGame"
+  );
+
+  render.smaa.threshold =
+    static_cast <tbf::ParameterFloat *>
+    (g_ParameterFactory.create_parameter <float>(
+      L"Threshold")
+    );
+
+  render.smaa.threshold->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"Threshold"
+  );
+
+  render.smaa.max_search_steps =
+    static_cast <tbf::ParameterInt *>
+    (g_ParameterFactory.create_parameter <int>(
+      L"Max Search Steps")
+    );
+
+  render.smaa.max_search_steps->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"MaxSearchSteps"
+  );
+
+  render.smaa.max_search_steps_diag =
+    static_cast <tbf::ParameterInt *>
+    (g_ParameterFactory.create_parameter <int>(
+      L"Max Search Steps Diagonal")
+    );
+
+  render.smaa.max_search_steps_diag->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"MaxSearchStepsDiagonal"
+  );
+
+  render.smaa.corner_rounding =
+    static_cast <tbf::ParameterFloat *>
+    (g_ParameterFactory.create_parameter <float> (
+      L"Corner Rounding %")
+    );
+
+  render.smaa.corner_rounding->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"CornerRoundingPercent"
+  );
+
+  render.smaa.predication_threshold =
+    static_cast <tbf::ParameterFloat *>
+    (g_ParameterFactory.create_parameter <float> (
+      L"Predication Threshold")
+    );
+
+  render.smaa.predication_threshold->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"PredicationThreshold"
+  );
+
+  render.smaa.predication_scale =
+    static_cast <tbf::ParameterFloat *>
+    (g_ParameterFactory.create_parameter <float> (
+      L"Predication Scale")
+    );
+
+  render.smaa.predication_scale->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"PredicationScale"
+  );
+
+  render.smaa.predication_strength =
+    static_cast <tbf::ParameterFloat *>
+    (g_ParameterFactory.create_parameter <float> (
+      L"Predication Strength")
+    );
+
+  render.smaa.predication_strength->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"PredicationStrength"
+  );
+
+  render.smaa.reprojection_weight =
+    static_cast <tbf::ParameterFloat *>
+    (g_ParameterFactory.create_parameter <float> (
+      L"Reprojection Weight")
+    );
+
+  render.smaa.reprojection_weight->register_to_ini(
+    render_ini,
+      L"AntiAliasing.SMAA",
+        L"ReprojectionWeight"
+  );
+
+
+
   screenshots.hudless_keybind =
     static_cast <tbf::ParameterStringW *>
     (g_ParameterFactory.create_parameter <std::wstring> (
@@ -607,6 +743,17 @@ TBF_LoadConfig (std::wstring name)
   render.ui_scale->load            (config.input.ui.scale);
   render.never_show_eula->load     (config.input.ui.never_show_eula);
 
+  render.smaa.preset->load                (config.render.smaa.quality_preset);
+  render.smaa.override_game->load         (config.render.smaa.override_game);
+  render.smaa.threshold->load             (config.render.smaa.threshold);
+  render.smaa.max_search_steps->load      (config.render.smaa.max_search_steps);
+  render.smaa.max_search_steps_diag->load (config.render.smaa.max_search_steps_diag);
+  render.smaa.corner_rounding->load       (config.render.smaa.corner_rounding);
+  render.smaa.predication_threshold->load (config.render.smaa.predication_threshold);
+  render.smaa.predication_scale->load     (config.render.smaa.predication_scale);
+  render.smaa.predication_strength->load  (config.render.smaa.predication_strength);
+  render.smaa.reprojection_weight->load   (config.render.smaa.reprojection_weight);
+
   config.input.ui.scale = std::min (std::max (1.0f, config.input.ui.scale), 3.0f);
 
   framerate.replace_limiter->load  (config.framerate.replace_limiter);
@@ -660,6 +807,17 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.auto_apply_changes->store  (config.render.auto_apply_changes);
   render.never_show_eula->store     (config.input.ui.never_show_eula);
   render.ui_scale->store            (config.input.ui.scale);
+
+  render.smaa.preset->store                (config.render.smaa.quality_preset);
+  render.smaa.override_game->store         (config.render.smaa.override_game);
+  render.smaa.threshold->store             (config.render.smaa.threshold);
+  render.smaa.max_search_steps->store      (config.render.smaa.max_search_steps);
+  render.smaa.max_search_steps_diag->store (config.render.smaa.max_search_steps_diag);
+  render.smaa.corner_rounding->store       (config.render.smaa.corner_rounding);
+  render.smaa.predication_threshold->store (config.render.smaa.predication_threshold);
+  render.smaa.predication_scale->store     (config.render.smaa.predication_scale);
+  render.smaa.predication_strength->store  (config.render.smaa.predication_strength);
+  render.smaa.reprojection_weight->store   (config.render.smaa.reprojection_weight);
 
   textures.remaster->store          (config.textures.remaster);
   textures.uncompressed->store      (config.textures.uncompressed);

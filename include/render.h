@@ -98,6 +98,8 @@ namespace tbf
 
     struct render_target_tracking_s
     {
+      void clear (void) { pixel_shaders.clear (); vertex_shaders.clear (); active = false; }
+
       IDirect3DBaseTexture9*        tracking_tex  = nullptr;
 
       std::unordered_set <uint32_t> pixel_shaders;
@@ -108,10 +110,13 @@ namespace tbf
 
     struct shader_tracking_s
     {
+      void clear (void) { active = false; num_draws = 0; textures.clear (); }
+
       uint32_t                      crc32        =  0x00;
       bool                          cancel_draws = false;
       bool                          active       = false;
       int                           num_draws    =     0;
+      std::unordered_set <uint32_t> textures;
     } extern tracked_vs, tracked_ps;
 
     struct shader_disasm_s {

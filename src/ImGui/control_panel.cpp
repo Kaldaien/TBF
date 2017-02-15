@@ -744,6 +744,95 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePop ();
   }
 
+  if (ImGui::CollapsingHeader ("Anti-Aliasing"))
+  {
+    ImGui::TreePush ("");
+
+    if (ImGui::CollapsingHeader ("SMAA Tuning Knobs"))
+    {
+      ImGui::Checkbox    ("Override Game's Tuning Fish", &config.render.smaa.override_game);
+
+      if (config.render.smaa.override_game)
+      {
+        ImGui::TreePush ("");
+
+        bool changed = ImGui::Combo ( "SMAA Quality Preset", &config.render.smaa.quality_preset,
+                                        " Low\0"
+                                        " Medium\0"
+                                        " High\0"
+                                        " Ultra\0"
+                                        " Custom\00", 5 );
+
+        if (changed)
+        {
+          switch (config.render.smaa.quality_preset)
+          {
+            // Low
+            case 0:
+              config.render.smaa.threshold             = 0.15f;
+              config.render.smaa.max_search_steps      =     4;
+              config.render.smaa.max_search_steps_diag =     0;
+              config.render.smaa.corner_rounding       =     0;
+              break;
+
+            // Medium
+            case 1:
+              config.render.smaa.threshold             = 0.1f;
+              config.render.smaa.max_search_steps      =    8;
+              config.render.smaa.max_search_steps_diag =    0;
+              config.render.smaa.corner_rounding       =    0;
+              break;
+
+            // High
+            case 2:
+              config.render.smaa.threshold             = 0.1f;
+              config.render.smaa.max_search_steps      =   16;
+              config.render.smaa.max_search_steps_diag =    8;
+              config.render.smaa.corner_rounding       =   25;
+              break;
+
+            // Ultra
+            case 3:
+              config.render.smaa.threshold             = 0.05f;
+              config.render.smaa.max_search_steps      =    32;
+              config.render.smaa.max_search_steps_diag =    16;
+              config.render.smaa.corner_rounding       =    25;
+              break;
+          }
+        }
+
+        bool customized = false;
+
+        ImGui::TreePush ("");
+
+        customized |= ImGui::SliderFloat ("Edge Sensitivity",         &config.render.smaa.threshold,             0.0f, 0.5f);
+        customized |= ImGui::SliderInt   ("Lateral Search Depth",     &config.render.smaa.max_search_steps,      0,     112);
+        customized |= ImGui::SliderInt   ("Diagonal Search Depth",    &config.render.smaa.max_search_steps_diag, 0,      20);
+        customized |= ImGui::SliderFloat ("Corner Rounding",          &config.render.smaa.corner_rounding,       0,     100, "%.2f%%");
+
+        bool expanded = ImGui::TreeNode ("Advanced SMAA Settings");  if (ImGui::IsItemHovered ()) ImGui::SetTooltip ("As if the other stuff wasn't advanced =P");
+
+        if (expanded)
+        {
+          ImGui::TreePop ();
+          customized |= ImGui::SliderFloat ("Predication Threshold",    &config.render.smaa.predication_threshold, 0.0f,  100.0f);
+          customized |= ImGui::SliderFloat ("Predication Scale",        &config.render.smaa.predication_scale,     1.0f,    5.0f);
+          customized |= ImGui::SliderFloat ("Predication Strength",     &config.render.smaa.predication_strength,  0.0f,    1.0f);
+          customized |= ImGui::SliderFloat ("Reprojection Weight",      &config.render.smaa.reprojection_weight,   0.0f,   80.0f);
+        }
+
+        ImGui::TreePop ();
+
+        if (customized)
+          config.render.smaa.quality_preset = 4; // User is no longer using a quality preset...
+
+        ImGui::TreePop ();
+      }
+    }
+
+    ImGui::TreePop ();
+  }
+
   if (ImGui::CollapsingHeader ("Post-Processing"))
   {
     ImGui::TreePush ("");

@@ -104,6 +104,9 @@ TBF_MakeShadowBitShift (uint32_t dim);
 tbf::RenderFix::TextureManager
   tbf::RenderFix::tex_mgr;
 
+extern uint32_t vs_checksum;
+extern uint32_t ps_checksum;
+
 iSK_Logger* tex_log = nullptr;
 
 #include <set>
@@ -845,9 +848,6 @@ D3D9SetTexture_Detour (
                      //Sampler, pTexture );
   //}
 
-  extern uint32_t vs_checksum;
-  extern uint32_t ps_checksum;
-
   tbf::RenderFix::tex_mgr.applyTexture (pTexture);
   tbf::RenderFix::tracked_rt.active  = (pTexture == tbf::RenderFix::tracked_rt.tracking_tex);
 
@@ -890,7 +890,11 @@ D3D9SetTexture_Detour (
 
     current_tex = pSKTex->tex_crc32;
 
-    textures_used.insert (pSKTex->tex_crc32);
+    // TODO: Should we record on which sampler the texture is attached?
+    if (vs_checksum == tbf::RenderFix::tracked_vs.crc32)  tbf::RenderFix::tracked_vs.textures.emplace (pSKTex->tex_crc32);
+    if (ps_checksum == tbf::RenderFix::tracked_ps.crc32)  tbf::RenderFix::tracked_ps.textures.emplace (pSKTex->tex_crc32);
+
+    textures_used.emplace (pSKTex->tex_crc32);
 
     QueryPerformanceCounter (&pSKTex->last_used);
 
@@ -3199,6 +3203,10 @@ D3D9SetRenderTarget_Detour (
     }
 #endif
   //}
+
+  // TODO: Should we record which index the target is attached to?
+  //if (vs_checksum == tbf::RenderFix::tracked_vs.crc32)  tbf::RenderFix::tracked_vs.render_targets.emplace (pRenderTarget);
+  //if (ps_checksum == tbf::RenderFix::tracked_ps.crc32)  tbf::RenderFix::tracked_ps.render_targets.emplace (pRenderTarget);
 
   return D3D9SetRenderTarget (This, RenderTargetIndex, pRenderTarget);
 }

@@ -38,6 +38,35 @@
 tbf::RenderFix::tbf_draw_states_s
   tbf::RenderFix::draw_state;
 
+extern uint32_t current_tex;
+
+struct smaa_constants_s
+{
+  struct
+  {
+    float inv_x, inv_y,
+          width, height;
+  } metrics;
+
+  struct
+  {
+    float threshold,
+          max_search_steps, max_search_steps_diag,
+          corner_rounding;
+  } general;
+
+  struct
+  {
+    float threshold, scale, strength;
+  } predication;
+
+  struct
+  {
+    float weight;
+  } reprojection;
+};
+
+
 typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
 (
   IDirect3DDevice9*  This,
@@ -440,6 +469,8 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
   if (tbf::RenderFix::tracked_rt.active)
     tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
 
+  if (vs_checksum == tbf::RenderFix::tracked_vs.crc32) tbf::RenderFix::tracked_vs.textures.emplace (current_tex);
+
   return D3D9SetVertexShader_Original (This, pShader);
 }
 
@@ -512,6 +543,8 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
   if (tbf::RenderFix::tracked_rt.active)
     tbf::RenderFix::tracked_rt.pixel_shaders.insert (ps_checksum);
 
+  if (ps_checksum == tbf::RenderFix::tracked_ps.crc32) tbf::RenderFix::tracked_ps.textures.emplace (current_tex);
+
   return D3D9SetPixelShader_Original (This, pShader);
 }
 
@@ -546,8 +579,6 @@ TBF_ShouldSkipRenderPass (void)
 
   if (config.fun_stuff.disable_pause_dim && ps_checksum == config.fun_stuff.pause_dim_ps_crc32)
     return true;
-
-  extern uint32_t current_tex;
 
   if (config.fun_stuff.disable_smoke   && ps_checksum == config.fun_stuff.smoke_ps_crc32 && current_tex == 0x16f618a8)
     return true;
@@ -718,11 +749,11 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
     hr = D3DERR_DEVICELOST;
 
   tbf::RenderFix::tex_mgr.resetUsedTextures       ();
-  tbf::RenderFix::tracked_rt.active = false;
-  tbf::RenderFix::tracked_rt.vertex_shaders.clear ();
-  tbf::RenderFix::tracked_rt.pixel_shaders.clear  ();
 
   tbf::RenderFix::last_frame.clear ();
+  tbf::RenderFix::tracked_rt.clear ();
+  tbf::RenderFix::tracked_vs.clear ();
+  tbf::RenderFix::tracked_ps.clear ();
 
   //if (config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
@@ -1235,6 +1266,37 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
     }
   }
 
+
+  if (config.render.smaa.override_game && ( vs_checksum == config.render.smaa.smaa_vs0_crc32 ||
+                                            vs_checksum == config.render.smaa.smaa_vs1_crc32 ||
+                                            vs_checksum == config.render.smaa.smaa_vs2_crc32 ))
+  {
+    //dll_log->Log (L"[SMAA Log] Crc32: %x, Start Register: %lu, Vec4Count: %lu ", vs_checksum, StartRegister, Vector4fCount);
+
+    if (StartRegister == 16 && Vector4fCount == 3)
+    {
+      float override_params [12];
+      memcpy (override_params, pConstantData, sizeof (float) * 12);
+
+      smaa_constants_s* smaa_constants =
+        (smaa_constants_s *)override_params;
+
+      smaa_constants->general.threshold             =        config.render.smaa.threshold;
+      smaa_constants->general.max_search_steps      = (float)config.render.smaa.max_search_steps;
+      smaa_constants->general.max_search_steps_diag = (float)config.render.smaa.max_search_steps_diag;
+      smaa_constants->general.corner_rounding       =        config.render.smaa.corner_rounding;
+
+      smaa_constants->predication.threshold         =        config.render.smaa.predication_threshold;
+      smaa_constants->predication.scale             =        config.render.smaa.predication_scale;
+      smaa_constants->predication.strength          =        config.render.smaa.predication_strength;
+
+      smaa_constants->reprojection.weight           =        config.render.smaa.reprojection_weight;
+
+      return D3D9SetVertexShaderConstantF_Original (This, StartRegister, override_params, Vector4fCount);
+    }
+  }
+
+
   return D3D9SetVertexShaderConstantF_Original (This, StartRegister, pConstantData, Vector4fCount);
 }
 
@@ -1256,6 +1318,34 @@ D3D9SetPixelShaderConstantF_Detour (IDirect3DDevice9* This,
   CONST float*      pConstantData,
   UINT              Vector4fCount)
 {
+  if (config.render.smaa.override_game && ( ps_checksum == config.render.smaa.smaa_ps0_crc32 ||
+                                            ps_checksum == config.render.smaa.smaa_ps1_crc32 ))
+  {
+    //dll_log->Log (L"[SMAA Log] Crc32: %x, Start Register: %lu, Vec4Count: %lu ", ps_checksum, StartRegister, Vector4fCount);
+
+    if (StartRegister == 0 && Vector4fCount == 3)
+    {
+      float override_params [12];
+      memcpy (override_params, pConstantData, sizeof (float) * 12);
+
+      smaa_constants_s* smaa_constants =
+        (smaa_constants_s *)override_params;
+
+      smaa_constants->general.threshold             =        config.render.smaa.threshold;
+      smaa_constants->general.max_search_steps      = (float)config.render.smaa.max_search_steps;
+      smaa_constants->general.max_search_steps_diag = (float)config.render.smaa.max_search_steps_diag;
+      smaa_constants->general.corner_rounding       =        config.render.smaa.corner_rounding;
+
+      smaa_constants->predication.threshold         =        config.render.smaa.predication_threshold;
+      smaa_constants->predication.scale             =        config.render.smaa.predication_scale;
+      smaa_constants->predication.strength          =        config.render.smaa.predication_strength;
+
+      smaa_constants->reprojection.weight           =        config.render.smaa.reprojection_weight;
+
+      return D3D9SetPixelShaderConstantF_Original (This, StartRegister, override_params, Vector4fCount);
+    }
+  }
+
   return D3D9SetPixelShaderConstantF_Original (This, StartRegister, pConstantData, Vector4fCount);
 }
 
@@ -1560,6 +1650,10 @@ tbf::RenderFix::Init (void)
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetViewport_Override",
                        D3D9SetViewport_Detour,
              (LPVOID*)&D3D9SetViewport_Original );
+
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetPixelShaderConstantF_Override",
+                       D3D9SetPixelShaderConstantF_Detour,
+             (LPVOID*)&D3D9SetPixelShaderConstantF_Original );
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetVertexShaderConstantF_Override",
                        D3D9SetVertexShaderConstantF_Detour,

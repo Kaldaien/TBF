@@ -16,6 +16,9 @@
 
 #include <atlbase.h>
 
+extern std::wstring
+SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
+
 void
 TBF_DrawFileList (bool& can_scroll)
 {
@@ -250,6 +253,248 @@ TBF_DrawFileList (bool& can_scroll)
   ImGui::PopItemWidth ();
 }
 
+
+extern std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> ps_disassembly;
+extern std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> vs_disassembly;
+
+enum class tbf_shader_class {
+  Unknown = 0x00,
+  Pixel   = 0x01,
+  Vertex  = 0x02
+};
+
+void
+TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
+{
+  ImGui::BeginGroup ();
+
+  static float last_width = 256.0f;
+  const  float font_size  = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
+
+  struct shader_class_imp_s
+  {
+    std::vector <std::string> contents;
+    bool                      dirty      = true;
+    uint32_t                  last_sel   =    0;
+    int                            sel   =   -1;
+    float                     last_ht    = 256.0f;
+    ImVec2                    last_min   = ImVec2 (0.0f, 0.0f);
+    ImVec2                    last_max   = ImVec2 (0.0f, 0.0f);
+  };
+
+  struct {
+    shader_class_imp_s vs;
+    shader_class_imp_s ps;
+  } static list_base;
+
+  shader_class_imp_s*
+    list    = ( shader_type == tbf_shader_class::Pixel ? &list_base.ps :
+                                                         &list_base.vs );
+
+  tbf::RenderFix::shader_tracking_s*
+    tracker = ( shader_type == tbf_shader_class::Pixel ? &tbf::RenderFix::tracked_ps :
+                                                         &tbf::RenderFix::tracked_vs );
+
+  std::vector <uint32_t>
+    shaders   ( shader_type == tbf_shader_class::Pixel ? tbf::RenderFix::last_frame.pixel_shaders.begin  () :
+                                                         tbf::RenderFix::last_frame.vertex_shaders.begin (),
+                shader_type == tbf_shader_class::Pixel ? tbf::RenderFix::last_frame.pixel_shaders.end    () :
+                                                         tbf::RenderFix::last_frame.vertex_shaders.end   () );
+
+  std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s>&
+    disassembly = ( shader_type == tbf_shader_class::Pixel ? ps_disassembly :
+                                                             vs_disassembly );
+
+  const char*
+    szShaderWord =  shader_type == tbf_shader_class::Pixel ? "Pixel" :
+                                                             "Vertex";
+
+  if (list->dirty)
+  {
+        list->sel = -1;
+    int idx    =  0;
+        list->contents.clear ();
+
+    // The underlying list is unsorted for speed, but that's not at all
+    //   intuitive to humans, so sort the thing when we have the RT view open.
+    std::sort ( shaders.begin (),
+                shaders.end   () );
+
+
+
+    for ( auto it : shaders )
+    {
+      char szDesc [16] = { };
+
+      sprintf (szDesc, "%08llx", (uintptr_t)it);
+
+      list->contents.emplace_back (szDesc);
+
+      if ((uint32_t)it == list->last_sel)
+      {
+        list->sel = idx;
+        //tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
+      }
+
+      ++idx;
+    }
+  }
+
+  if (ImGui::IsMouseHoveringRect (list->last_min, list->last_max))
+  {
+         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) list->sel--;
+    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) list->sel++;
+  }
+
+  ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
+  ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
+
+  ImGui::BeginChild ( szShaderWord,
+                      ImVec2 ( font_size * 7.0f, std::max (font_size * 15.0f, list->last_ht)),
+                        true, ImGuiWindowFlags_AlwaysAutoResize );
+
+  if (ImGui::IsWindowHovered ())
+  {
+    can_scroll = false;
+
+    ImGui::BeginTooltip ();
+    ImGui::TextColored  (ImVec4 (0.9f, 0.6f, 0.2f, 1.0f), "You can cancel all render passes using the selected %s shader to disable an effect", szShaderWord);
+    ImGui::Separator    ();
+    ImGui::BulletText   ("Press [ while the mouse is hovering this list to select the previous shader");
+    ImGui::BulletText   ("Press ] while the mouse is hovering this list to select the next shader");
+    ImGui::EndTooltip   ();
+
+         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) list->sel--;
+    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) list->sel++;
+  }
+
+  if (shaders.size ())
+  {
+    struct {
+      int  last_sel    = 0;
+      bool sel_changed = false;
+    } static shader_state [3];
+
+    int&  last_sel    = shader_state [(int)shader_type].last_sel;
+    bool& sel_changed = shader_state [(int)shader_type].sel_changed;
+
+    if (list->sel != last_sel)
+      sel_changed = true;
+
+    last_sel = list->sel;
+
+    for ( int line = 0; line < shaders.size (); line++ )
+    {
+      if (line == list->sel)
+      {
+        bool selected    = true;
+
+        ImGui::Selectable (list->contents [line].c_str (), &selected);
+
+        if (sel_changed)
+        {
+          ImGui::SetScrollHere (0.5f);
+
+          sel_changed    = false;
+          list->last_sel = (uint32_t)shaders [list->sel];
+          tracker->crc32 = (uint32_t)shaders [list->sel];
+        }
+      }
+
+      else
+      {
+        bool selected    = false;
+
+        if (ImGui::Selectable (list->contents [line].c_str (), &selected))
+        {
+          sel_changed    = true;
+          list->sel      =  line;
+          list->last_sel = (uint32_t)shaders [list->sel];
+          tracker->crc32 = (uint32_t)shaders [list->sel];
+        }
+      }
+    }
+  }
+
+  ImGui::EndChild      ();
+  ImGui::PopStyleColor ();
+
+  ImGui::SameLine      ();
+  ImGui::BeginGroup    ();
+
+  if (ImGui::IsItemHoveredRect ()) {
+         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) list->sel--;
+    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) list->sel++;
+  }
+
+  if (tracker->crc32 != 0x00)
+  {
+    ImGui::Checkbox ("Cancel Draws Using Selected Shader",  &tracker->cancel_draws);  ImGui::SameLine ();
+
+    if (tracker->cancel_draws)
+      ImGui::TextDisabled ("%lu Skipped Draw%c Last Frame (%lu textures)", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->textures.size ());
+    else
+      ImGui::TextDisabled ("%lu Draw%c Last Frame         (%lu textures)", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->textures.size ());
+
+    if (ImGui::IsMouseHoveringRect (list->last_min, list->last_max) && tracker->textures.size ())
+    {
+      ImGui::BeginTooltip ();
+
+      D3DFORMAT fmt = D3DFMT_UNKNOWN;
+
+      for ( auto it : tracker->textures )
+      {
+        ISKTextureD3D9* pTex = tbf::RenderFix::tex_mgr.getTexture (it)->d3d9_tex;
+
+        if (pTex && pTex->pTex)
+        {
+          D3DSURFACE_DESC desc;
+          if (SUCCEEDED (pTex->pTex->GetLevelDesc (0, &desc)))
+          {
+            fmt = desc.Format;
+            ImGui::Image ( pTex->pTex, ImVec2  ( std::max (64.0f, (float)desc.Width / 16.0f),
+      ((float)desc.Height / (float)desc.Width) * std::max (64.0f, (float)desc.Width / 16.0f) ),
+                                       ImVec2  (0,0),             ImVec2  (1,1),
+                                       ImColor (255,255,255,255), ImColor (242,242,13,255) );
+          }
+          ImGui::SameLine ();
+        }
+
+        ImGui::BeginGroup ();
+        ImGui::Text       ("Texture: %08lx", it);
+        ImGui::Text       ("Format:  %ws",   SK_D3D9_FormatToStr (fmt).c_str ());
+        ImGui::EndGroup   ();
+      }
+
+      ImGui::EndTooltip ();
+    }
+
+    ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.80f, 0.80f, 1.0f, 1.0f));
+    ImGui::TextWrapped    (disassembly [tracker->crc32].header.c_str ());
+
+    ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.99f, 0.99f, 0.01f, 1.0f));
+    ImGui::TextWrapped    (disassembly [tracker->crc32].code.c_str ());
+
+    ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.5f, 0.95f, 0.5f, 1.0f));
+    ImGui::TextWrapped    (disassembly [tracker->crc32].footer.c_str ());
+
+    ImGui::PopStyleColor (3);
+  }
+  else
+    tbf::RenderFix::tracked_ps.cancel_draws = false;
+
+  ImGui::EndGroup      ();
+
+  list->last_ht    = ImGui::GetItemRectSize ().y;
+
+  list->last_min   = ImGui::GetItemRectMin ();
+  list->last_max   = ImGui::GetItemRectMax ();
+
+  ImGui::PopStyleVar   ();
+  ImGui::EndGroup      ();
+}
+
+
 bool
 TBFix_TextureModDlg (void)
 {
@@ -454,14 +699,14 @@ TBFix_TextureModDlg (void)
    if (ImGui::IsItemHovered ())
    {
      ImGui::BeginTooltip ();
-     ImGui::TextColored (ImVec4 (0.9f, 0.6f, 0.2f, 1.0f), "The \"debug\" texture will appear black to make identifying textures to modify easier.");
-     ImGui::Separator  ();
-     ImGui::BulletText ("Press Ctrl + Shift + [ to select the previous texture from this list");
-     ImGui::BulletText ("Press Ctrl + Shift + ] to select the next texture from this list");
-     ImGui::EndTooltip ();
+     ImGui::TextColored  (ImVec4 (0.9f, 0.6f, 0.2f, 1.0f), "The \"debug\" texture will appear black to make identifying textures to modify easier.");
+     ImGui::Separator    ();
+     ImGui::BulletText   ("Press Ctrl + Shift + [ to select the previous texture from this list");
+     ImGui::BulletText   ("Press Ctrl + Shift + ] to select the next texture from this list");
+     ImGui::EndTooltip   ();
    }
 
-   ImGui::SameLine ();
+   ImGui::SameLine     ();
    ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 20.0f);
 
    last_ht    = std::max (last_ht,    16.0f);
@@ -507,9 +752,6 @@ TBFix_TextureModDlg (void)
 
           last_width  = (float)desc.Width;
           last_ht     = (float)desc.Height + font_size * 10.0f;
-
-          extern std::wstring
-          SK_D3D9_FormatToStr (D3DFORMAT Format, bool include_ordinal = true);
 
 
           int num_lods = pTex->d3d9_tex->pTex->GetLevelCount ();
@@ -828,15 +1070,13 @@ TBFix_TextureModDlg (void)
         {
           ImGui::Columns (2);
 
-          for ( auto it : tbf::RenderFix::tracked_rt.vertex_shaders ) {
+          for ( auto it : tbf::RenderFix::tracked_rt.vertex_shaders )
             ImGui::Text ("Vertex Shader: %08x", it);
-          }
 
           ImGui::NextColumn ();
 
-          for ( auto it : tbf::RenderFix::tracked_rt.pixel_shaders ) {
+          for ( auto it : tbf::RenderFix::tracked_rt.pixel_shaders )
             ImGui::Text ("Pixel Shader: %08x", it);
-          }
 
           ImGui::Columns (1);
         }
@@ -851,287 +1091,22 @@ TBFix_TextureModDlg (void)
 
   if (ImGui::CollapsingHeader ("Live Shader View"))
   {
-    ImGui::BeginGroup ();
+    ImGui::TreePush ("");
 
-    static float last_ps_ht = 256.0f;
-    static float last_vs_ht = 256.0f;
-    static float last_width = 256.0f;
+    if (ImGui::CollapsingHeader ("Pixel Shaders"))
+      TBF_LiveShaderClassView (tbf_shader_class::Pixel, can_scroll);
 
-    struct {
-      std::vector <std::string> list_contents;
-      bool                      list_dirty     = true;
-      uint32_t                  last_sel       =    0;
-      int                            sel       =   -1;
-    } static ps, vs;
+    if (ImGui::CollapsingHeader ("Vertex Shaders"))
+      TBF_LiveShaderClassView (tbf_shader_class::Vertex, can_scroll);
 
-    std::vector <uint32_t> pixel_shaders ( tbf::RenderFix::last_frame.pixel_shaders.begin (),
-                                           tbf::RenderFix::last_frame.pixel_shaders.end   () );
-
-    if (ps.list_dirty)
-    {
-          ps.sel = -1;
-      int idx    =  0;
-          ps.list_contents.clear ();
-
-      // The underlying list is unsorted for speed, but that's not at all
-      //   intuitive to humans, so sort the thing when we have the RT view open.
-      std::sort ( pixel_shaders.begin (),
-                  pixel_shaders.end   () );
-
-
-
-      for ( auto it : pixel_shaders )
-      {
-        char szDesc [16] = { };
-
-        sprintf (szDesc, "%08llx", (uintptr_t)it);
-
-        ps.list_contents.emplace_back (szDesc);
-
-        if ((uint32_t)it == ps.last_sel)
-        {
-          ps.sel = idx;
-          //tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
-        }
-
-        ++idx;
-      }
-    }
-
-    ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
-    ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
-
-    ImGui::BeginChild ( "Pixel Shaders",
-                        ImVec2 ( font_size * 7.0f, std::max (font_size * 15.0f, last_ps_ht)),
-                          true, ImGuiWindowFlags_AlwaysAutoResize );
-
-    if (ImGui::IsWindowHovered ())
-    {
-      can_scroll = false;
-
-      ImGui::BeginTooltip ();
-      ImGui::TextColored (ImVec4 (0.9f, 0.6f, 0.2f, 1.0f), "You can cancel all render passes using the selected pixel shader to disable an effect");
-      ImGui::Separator  ();
-      ImGui::BulletText ("Press [ while the mouse is hovering this list to select the previous shader");
-      ImGui::BulletText ("Press ] while the mouse is hovering this list to select the next shader");
-      ImGui::EndTooltip ();
-
-           if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) ps.sel--;
-      else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) ps.sel++;
-    }
-
-    if (pixel_shaders.size ())
-    {
-      static int  last_sel    = 0;
-      static bool sel_changed = false;
-
-      if (ps.sel != last_sel)
-        sel_changed = true;
-
-      last_sel = ps.sel;
-
-      for ( int line = 0; line < pixel_shaders.size (); line++ )
-      {
-        if (line == ps.sel)
-        {
-          bool selected = true;
-          ImGui::Selectable (ps.list_contents [line].c_str (), &selected);
-
-          if (sel_changed)
-          {
-            ImGui::SetScrollHere (0.5f); // 0.0f:top, 0.5f:center, 1.0f:bottom
-            sel_changed = false;
-            ps.last_sel  = (uint32_t)pixel_shaders [ps.sel];
-            tbf::RenderFix::tracked_ps.crc32 = (uint32_t)pixel_shaders [ps.sel];
-          }
-        }
-
-        else
-        {
-          bool selected = false;
-
-          if (ImGui::Selectable (ps.list_contents [line].c_str (), &selected))
-          {
-            sel_changed  = true;
-            ps.sel       =  line;
-            ps.last_sel  = (uint32_t)pixel_shaders [ps.sel];
-            tbf::RenderFix::tracked_ps.crc32 = (uint32_t)pixel_shaders [ps.sel];
-          }
-        }
-      }
-    }
-
-   ImGui::EndChild ();
-
-   ImGui::SameLine   ();
-   ImGui::BeginGroup ();
-
-   if (tbf::RenderFix::tracked_ps.crc32 != 0x00)
-   {
-     ImGui::Checkbox ("Cancel Draws Using Selected Pixel Shader",  &tbf::RenderFix::tracked_ps.cancel_draws);
-
-     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.80f, 0.80f, 1.0f, 1.0f));
-
-     extern std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> ps_disassembly;
-     ImGui::TextWrapped (ps_disassembly [tbf::RenderFix::tracked_ps.crc32].header.c_str ());
-
-     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.99f, 0.99f, 0.01f, 1.0f));
-     ImGui::TextWrapped (ps_disassembly [tbf::RenderFix::tracked_ps.crc32].code.c_str ());
-
-     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.5f, 0.95f, 0.5f, 1.0f));
-     ImGui::TextWrapped (ps_disassembly [tbf::RenderFix::tracked_ps.crc32].footer.c_str ());
-
-     ImGui::PopStyleColor (3);
-   }
-   else
-     tbf::RenderFix::tracked_ps.cancel_draws = false;
-
-   ImGui::EndGroup ();
-
-   last_ps_ht = ImGui::GetItemRectSize ().y;
-
-   ImGui::EndGroup ();
-
-   ImGui::PopStyleColor ();
-   ImGui::PopStyleVar   ();
-
-
-    std::vector <uint32_t> vertex_shaders ( tbf::RenderFix::last_frame.vertex_shaders.begin (),
-                                            tbf::RenderFix::last_frame.vertex_shaders.end   () );
-
-    if (vs.list_dirty)
-    {
-          vs.sel = -1;
-      int idx    =  0;
-          vs.list_contents.clear ();
-
-      // The underlying list is unsorted for speed, but that's not at all
-      //   intuitive to humans, so sort the thing when we have the RT view open.
-      std::sort ( vertex_shaders.begin (),
-                  vertex_shaders.end   () );
-
-      for ( auto it : vertex_shaders )
-      {
-        char szDesc [16] = { };
-
-        sprintf (szDesc, "%08llx", (uintptr_t)it);
-
-        vs.list_contents.emplace_back (szDesc);
-
-        if ((uint32_t)it == vs.last_sel)
-        {
-          vs.sel = idx;
-          //tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
-        }
-
-        ++idx;
-      }
-    }
-
-    ImGui::BeginGroup ();
-
-    ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
-    ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
-
-    ImGui::BeginChild ( "Vertex Shaders",
-                        ImVec2 ( font_size * 7.0f, std::max (font_size * 15.0f, last_vs_ht)),
-                          true, ImGuiWindowFlags_AlwaysAutoResize );
-
-    if (ImGui::IsWindowHovered ())
-    {
-      can_scroll = false;
-
-      ImGui::BeginTooltip ();
-      ImGui::TextColored (ImVec4 (0.9f, 0.6f, 0.2f, 1.0f), "You can cancel all render passes using the selected vertex shader to disable an effect");
-      ImGui::Separator  ();
-      ImGui::BulletText ("Press [ while the mouse is hovering this list to select the previous shader");
-      ImGui::BulletText ("Press ] while the mouse is hovering this list to select the next shader");
-      ImGui::EndTooltip ();
-
-           if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) vs.sel--;
-      else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) vs.sel++;
-    }
-
-   if (vertex_shaders.size ())
-   {
-     static int  last_sel    = 0;
-     static bool sel_changed = false;
-
-     if (vs.sel != last_sel)
-       sel_changed = true;
-
-     last_sel = vs.sel;
-
-     for ( int line = 0; line < vertex_shaders.size (); line++ )
-     {
-       if (line == vs.sel)
-       {
-         bool selected = true;
-         ImGui::Selectable (vs.list_contents [line].c_str (), &selected);
-
-         if (sel_changed)
-         {
-           ImGui::SetScrollHere (0.5f); // 0.0f:top, 0.5f:center, 1.0f:bottom
-           sel_changed = false;
-           vs.last_sel  = (uint32_t)vertex_shaders [vs.sel];
-           tbf::RenderFix::tracked_vs.crc32 = (uint32_t)vertex_shaders [vs.sel];
-         }
-       }
-
-       else
-       {
-         bool selected = false;
-
-         if (ImGui::Selectable (vs.list_contents [line].c_str (), &selected))
-         {
-           sel_changed  = true;
-           vs.sel       =  line;
-           vs.last_sel  = (uint32_t)vertex_shaders [vs.sel];
-           tbf::RenderFix::tracked_vs.crc32 = (uint32_t)vertex_shaders [vs.sel];
-         }
-       }
-     }
-   }
-
-   ImGui::EndChild      ();
-   ImGui::PopStyleVar   ();
-   ImGui::PopStyleColor ();
-
-   ImGui::SameLine      ();
-   ImGui::BeginGroup    ();
-
-   if (tbf::RenderFix::tracked_vs.crc32 != 0x00)
-   {
-     ImGui::Checkbox ("Cancel Draws Using Selected Vertex Shader", &tbf::RenderFix::tracked_vs.cancel_draws);
-
-     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.8f, 0.8f, 1.0f, 1.0f));
-
-     extern std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> vs_disassembly;
-     ImGui::TextWrapped (vs_disassembly [tbf::RenderFix::tracked_vs.crc32].header.c_str ());
-
-     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.99f, 0.99f, 0.01f, 1.0f));
-     ImGui::TextWrapped (vs_disassembly [tbf::RenderFix::tracked_vs.crc32].code.c_str ());
-
-     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.5f, 0.95f, 0.5f, 1.0f));
-     ImGui::TextWrapped (vs_disassembly [tbf::RenderFix::tracked_vs.crc32].footer.c_str ());
-
-     ImGui::PopStyleColor (3);
-   }
-   else
-     tbf::RenderFix::tracked_vs.cancel_draws = false;
-
-   ImGui::EndGroup      ();
-
-   last_vs_ht = ImGui::GetItemRectSize ().y;
-
-   ImGui::EndGroup      ();
+    ImGui::TreePop ();
   }
 
   if (ImGui::CollapsingHeader ("Misc. Settings"))
   {
     ImGui::TreePush ("");
-    if (ImGui::Checkbox ("Dump ALL Shaders   (TBFix_Res\\dump\\shaders\\<ps|vs>_<checksum>.html", &config.render.dump_shaders)) tbf::RenderFix::need_reset.graphics = true;
-    if (ImGui::Checkbox ("Dump ALL Textures  (TBFix_Res\\dump\\textures\\<format>\\*.dds)",       &config.textures.dump))       tbf::RenderFix::need_reset.graphics = true;
+    if (ImGui::Checkbox ("Dump ALL Shaders   (TBFix_Res\\dump\\shaders\\<ps|vs>_<checksum>.html)", &config.render.dump_shaders)) tbf::RenderFix::need_reset.graphics = true;
+    if (ImGui::Checkbox ("Dump ALL Textures  (TBFix_Res\\dump\\textures\\<format>\\*.dds)",        &config.textures.dump))       tbf::RenderFix::need_reset.graphics = true;
 
     if (ImGui::IsItemHovered ())
     {

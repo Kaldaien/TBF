@@ -84,6 +84,28 @@ struct tbf_config_t
     bool      fix_map_res        = false;
     bool      osd_disclaimer     = true;
     bool      auto_apply_changes = false;
+
+    struct {
+      int     quality_preset        =     3;
+      bool    override_game         = false;
+
+      float   threshold             =  0.2f;
+      int     max_search_steps      =    16;
+      int     max_search_steps_diag =     8;
+      float   corner_rounding       =    25;
+
+      float   predication_threshold = 0.01f;
+      float   predication_scale     =     2;
+      float   predication_strength  =  0.4f;
+      float   reprojection_weight   = 30.0f;
+
+     uint32_t smaa_vs0_crc32        = 0x75967358;
+     uint32_t smaa_vs1_crc32        = 0x524c55c7;
+     uint32_t smaa_vs2_crc32        = 0x3f685075;
+     uint32_t smaa_ps0_crc32        = 0x2ee6cfb6;
+     uint32_t smaa_ps1_crc32        = 0x031ff454;
+
+    } smaa;
   } render;
 
   struct {
