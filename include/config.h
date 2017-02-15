@@ -118,9 +118,10 @@ struct tbf_config_t
     } gamepad;
 
     struct {
-      bool         visible       = false;
-      bool         pause         = true;
-      float        scale         = 1.0f;
+      bool      visible         = false;
+      bool      pause           = true;
+      float     scale           = 1.0f;
+      bool      never_show_eula = false;
     } ui;
   } input;
 

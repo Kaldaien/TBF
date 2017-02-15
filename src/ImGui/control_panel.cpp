@@ -313,6 +313,28 @@ TBFix_DrawConfigUI (void)
 
   ImGui_ImplDX9_NewFrame ();
 
+  static bool first_frame = true;
+
+    extern HMODULE hInjectorDLL;
+
+    typedef void (__stdcall *SK_ImGui_DrawEULA_pfn)(LPVOID reserved);
+
+    static SK_ImGui_DrawEULA_pfn SK_ImGui_DrawEULA =
+      (SK_ImGui_DrawEULA_pfn)GetProcAddress ( hInjectorDLL,
+                                                "SK_ImGui_DrawEULA" );
+
+  struct {
+    bool show             = true;
+    bool never_show_again = config.input.ui.never_show_eula;
+  } static show_eula;
+  
+  if (show_eula.show && (! show_eula.never_show_again)) {
+    SK_ImGui_DrawEULA (&show_eula);
+
+    if (show_eula.never_show_again) config.input.ui.never_show_eula = true;
+  }
+
+
   ImGuiIO& io =
     ImGui::GetIO ();
 

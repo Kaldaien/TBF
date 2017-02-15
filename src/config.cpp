@@ -81,6 +81,7 @@ struct {
   tbf::ParameterBool*    show_osd_disclaimer;
   tbf::ParameterFloat*   ui_scale;
   tbf::ParameterBool*    auto_apply_changes;
+  tbf::ParameterBool*    never_show_eula;
 } render;
 
 struct {
@@ -418,6 +419,17 @@ TBF_LoadConfig (std::wstring name)
       L"ImGui.Settings",
         L"ApplyChangesImmediately" );
 
+  render.never_show_eula =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool>(
+      L"Never show the EULA again")
+    );
+
+  render.never_show_eula->register_to_ini (
+    render_ini,
+      L"ImGui.Settings",
+        L"UserClaimsToHaveReadEULA" );
+
 
   screenshots.hudless_keybind =
     static_cast <tbf::ParameterStringW *>
@@ -593,6 +605,7 @@ TBF_LoadConfig (std::wstring name)
   render.show_osd_disclaimer->load (config.render.osd_disclaimer);
   render.auto_apply_changes->load  (config.render.auto_apply_changes);
   render.ui_scale->load            (config.input.ui.scale);
+  render.never_show_eula->load     (config.input.ui.never_show_eula);
 
   config.input.ui.scale = std::min (std::max (1.0f, config.input.ui.scale), 3.0f);
 
@@ -645,6 +658,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.pause_on_ui->store         (config.input.ui.pause);
   render.show_osd_disclaimer->store (config.render.osd_disclaimer);
   render.auto_apply_changes->store  (config.render.auto_apply_changes);
+  render.never_show_eula->store     (config.input.ui.never_show_eula);
   render.ui_scale->store            (config.input.ui.scale);
 
   textures.remaster->store          (config.textures.remaster);
