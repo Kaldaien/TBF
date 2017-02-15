@@ -242,8 +242,12 @@ crc32(uint32_t crc, const void *buf, size_t size)
 }
 
 #include <map>
-std::unordered_map <LPVOID, uint32_t> vs_checksums;
-std::unordered_map <LPVOID, uint32_t> ps_checksums;
+
+std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> vs_disassembly;
+std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> ps_disassembly;
+
+std::unordered_map <LPVOID, uint32_t>      vs_checksums;
+std::unordered_map <LPVOID, uint32_t>      ps_checksums;
 
 tbf::RenderFix::frame_state_s tbf::RenderFix::last_frame;
 
@@ -328,6 +332,42 @@ SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
         }
       }
     }
+  }
+
+  CComPtr <ID3DXBuffer> pDisasm = nullptr;
+
+  HRESULT hr =
+    D3DXDisassembleShader ((DWORD *)pbFunc, FALSE, "", &pDisasm);
+
+  if (SUCCEEDED (hr) && strlen ((const char *)pDisasm->GetBufferPointer ()))
+  {
+    char* szDisasm = strdup ((const char *)pDisasm->GetBufferPointer ());
+
+    char* comments_end  =                strstr (szDisasm,          "\n ");
+    char* footer_begins = comments_end ? strstr (comments_end + 1, "\n\n") : nullptr;
+
+    if (comments_end)  *comments_end  = '\0'; else (comments_end  = "  ");
+    if (footer_begins) *footer_begins = '\0'; else (footer_begins = "  ");
+
+    if (! wcsicmp (wszPrefix, L"ps"))
+    {
+      ps_disassembly.emplace ( crc32, tbf::RenderFix::shader_disasm_s {
+                                        szDisasm,
+                                          comments_end + 1,
+                                            footer_begins + 1 }
+                             );
+    }
+
+    else
+    {
+      vs_disassembly.emplace ( crc32, tbf::RenderFix::shader_disasm_s {
+                                        szDisasm,
+                                          comments_end + 1,
+                                            footer_begins + 1 }
+                             );
+    }
+
+    free (szDisasm);
   }
 }
 
@@ -502,6 +542,9 @@ TBF_ShouldSkipRenderPass (void)
 
 
   if (config.fun_stuff.hollow_eye_mode && vs_checksum == config.fun_stuff.hollow_eye_vs_crc32)
+    return true;
+
+  if (config.fun_stuff.disable_pause_dim && ps_checksum == config.fun_stuff.pause_dim_ps_crc32)
     return true;
 
   extern uint32_t current_tex;
@@ -860,10 +903,11 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   //
   // Environmental Shadows
   //
-  if (pViewport->Width == pViewport->Height && 
-    (pViewport->Width == 512 ||
-       pViewport->Width == 1024 ||
-       pViewport->Width == 2048)) {
+  if (  pViewport->Width == pViewport->Height && 
+      ( pViewport->Width == 512  ||
+        pViewport->Width == 1024 ||
+        pViewport->Width == 2048 ) )
+  {
     //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu)", pViewport->Width, pViewport->Height);
     D3DVIEWPORT9 rescaled_shadow = *pViewport;
 

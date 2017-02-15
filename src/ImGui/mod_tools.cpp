@@ -17,7 +17,7 @@
 #include <atlbase.h>
 
 void
-TBF_DrawFileList (void)
+TBF_DrawFileList (bool& can_scroll)
 {
   const float font_size = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
 
@@ -117,6 +117,9 @@ TBF_DrawFileList (void)
                           true,
                             ImGuiWindowFlags_AlwaysAutoResize );
 
+  if (ImGui::IsWindowHovered ())
+    can_scroll = false;
+
   auto DataSourceTooltip =
     [](int sel) ->
       void
@@ -196,6 +199,9 @@ TBF_DrawFileList (void)
                            ImVec2 (font_size * 30, list_size.y - font_size * 2),
                              true );
 
+    if (ImGui::IsWindowHovered ())
+      can_scroll = false;
+
     for ( auto it : sources [sel].checksums )
     {
       tbf_tex_record_s* injectable =
@@ -251,9 +257,14 @@ TBFix_TextureModDlg (void)
 
   bool show_dlg = true;
 
+  ImGui::SetNextWindowSizeConstraints ( ImVec2 (256.0f, 384.0f), ImVec2 ( ImGui::GetIO ().DisplaySize.x * 0.75f, ImGui::GetIO ().DisplaySize.y * 0.75f ) );
+
   ImGui::Begin ( "Tales Engine Texture Mod Toolkit (v " TBF_VERSION_STR_A ")",
                    &show_dlg,
                      ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders );
+
+  bool can_scroll = ImGui::IsMouseHoveringRect ( ImVec2 (ImGui::GetWindowPos ().x,                             ImGui::GetWindowPos ().y),
+                                                 ImVec2 (ImGui::GetWindowPos ().x + ImGui::GetWindowSize ().x, ImGui::GetWindowPos ().y + ImGui::GetWindowSize ().y) );
 
   ImGui::PushItemWidth (ImGui::GetWindowWidth () * 0.666f);
 
@@ -296,7 +307,7 @@ TBFix_TextureModDlg (void)
 
   if (ImGui::CollapsingHeader("Injectable Data Sources", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   {
-    TBF_DrawFileList  ();
+    TBF_DrawFileList  (can_scroll);
   }
 
   if (ImGui::CollapsingHeader ("Live Texture View", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
@@ -395,6 +406,9 @@ TBFix_TextureModDlg (void)
     ImGui::BeginChild ( "Item List",
                         ImVec2 ( font_size * 6.0f, std::max (font_size * 15.0f, last_ht)),
                           true, ImGuiWindowFlags_AlwaysAutoResize );
+
+    if (ImGui::IsWindowHovered ())
+      can_scroll = false;
 
    if (textures_used_last_dump.size ())
    {
@@ -700,6 +714,9 @@ TBFix_TextureModDlg (void)
                         ImVec2 ( font_size * 6.0f, std::max (font_size * 15.0f, last_ht)),
                           true, ImGuiWindowFlags_AlwaysAutoResize );
 
+    if (ImGui::IsWindowHovered ())
+      can_scroll = false;
+
    if (render_textures.size ())
    {
      static      int last_sel = 0;
@@ -836,7 +853,8 @@ TBFix_TextureModDlg (void)
   {
     ImGui::BeginGroup ();
 
-    static float last_ht    = 256.0f;
+    static float last_ps_ht = 256.0f;
+    static float last_vs_ht = 256.0f;
     static float last_width = 256.0f;
 
     struct {
@@ -884,11 +902,13 @@ TBFix_TextureModDlg (void)
     ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
 
     ImGui::BeginChild ( "Pixel Shaders",
-                        ImVec2 ( font_size * 7.0f, std::max (font_size * 15.0f, last_ht)),
+                        ImVec2 ( font_size * 7.0f, std::max (font_size * 15.0f, last_ps_ht)),
                           true, ImGuiWindowFlags_AlwaysAutoResize );
 
     if (ImGui::IsWindowHovered ())
     {
+      can_scroll = false;
+
       ImGui::BeginTooltip ();
       ImGui::TextColored (ImVec4 (0.9f, 0.6f, 0.2f, 1.0f), "You can cancel all render passes using the selected pixel shader to disable an effect");
       ImGui::Separator  ();
@@ -943,13 +963,33 @@ TBFix_TextureModDlg (void)
 
    ImGui::EndChild ();
 
-   ImGui::SameLine ();
+   ImGui::SameLine   ();
+   ImGui::BeginGroup ();
 
    if (tbf::RenderFix::tracked_ps.crc32 != 0x00)
+   {
      ImGui::Checkbox ("Cancel Draws Using Selected Pixel Shader",  &tbf::RenderFix::tracked_ps.cancel_draws);
+
+     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.80f, 0.80f, 1.0f, 1.0f));
+
+     extern std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> ps_disassembly;
+     ImGui::TextWrapped (ps_disassembly [tbf::RenderFix::tracked_ps.crc32].header.c_str ());
+
+     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.99f, 0.99f, 0.01f, 1.0f));
+     ImGui::TextWrapped (ps_disassembly [tbf::RenderFix::tracked_ps.crc32].code.c_str ());
+
+     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.5f, 0.95f, 0.5f, 1.0f));
+     ImGui::TextWrapped (ps_disassembly [tbf::RenderFix::tracked_ps.crc32].footer.c_str ());
+
+     ImGui::PopStyleColor (3);
+   }
    else
      tbf::RenderFix::tracked_ps.cancel_draws = false;
-   
+
+   ImGui::EndGroup ();
+
+   last_ps_ht = ImGui::GetItemRectSize ().y;
+
    ImGui::EndGroup ();
 
    ImGui::PopStyleColor ();
@@ -994,11 +1034,13 @@ TBFix_TextureModDlg (void)
     ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
 
     ImGui::BeginChild ( "Vertex Shaders",
-                        ImVec2 ( font_size * 7.0f, std::max (font_size * 15.0f, last_ht)),
+                        ImVec2 ( font_size * 7.0f, std::max (font_size * 15.0f, last_vs_ht)),
                           true, ImGuiWindowFlags_AlwaysAutoResize );
 
     if (ImGui::IsWindowHovered ())
     {
+      can_scroll = false;
+
       ImGui::BeginTooltip ();
       ImGui::TextColored (ImVec4 (0.9f, 0.6f, 0.2f, 1.0f), "You can cancel all render passes using the selected vertex shader to disable an effect");
       ImGui::Separator  ();
@@ -1056,11 +1098,31 @@ TBFix_TextureModDlg (void)
    ImGui::PopStyleColor ();
 
    ImGui::SameLine      ();
+   ImGui::BeginGroup    ();
 
    if (tbf::RenderFix::tracked_vs.crc32 != 0x00)
+   {
      ImGui::Checkbox ("Cancel Draws Using Selected Vertex Shader", &tbf::RenderFix::tracked_vs.cancel_draws);
+
+     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.8f, 0.8f, 1.0f, 1.0f));
+
+     extern std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> vs_disassembly;
+     ImGui::TextWrapped (vs_disassembly [tbf::RenderFix::tracked_vs.crc32].header.c_str ());
+
+     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.99f, 0.99f, 0.01f, 1.0f));
+     ImGui::TextWrapped (vs_disassembly [tbf::RenderFix::tracked_vs.crc32].code.c_str ());
+
+     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.5f, 0.95f, 0.5f, 1.0f));
+     ImGui::TextWrapped (vs_disassembly [tbf::RenderFix::tracked_vs.crc32].footer.c_str ());
+
+     ImGui::PopStyleColor (3);
+   }
    else
      tbf::RenderFix::tracked_vs.cancel_draws = false;
+
+   ImGui::EndGroup      ();
+
+   last_vs_ht = ImGui::GetItemRectSize ().y;
 
    ImGui::EndGroup      ();
   }
@@ -1082,6 +1144,10 @@ TBFix_TextureModDlg (void)
   }
 
   ImGui::PopItemWidth ();
+
+  if (can_scroll)
+    ImGui::SetScrollY (ImGui::GetScrollY () + 5.0 * ImGui::GetFont ()->FontSize * -ImGui::GetIO ().MouseWheel);
+
   ImGui::End          ();
 
   return show_dlg;

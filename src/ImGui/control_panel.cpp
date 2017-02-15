@@ -785,45 +785,64 @@ TBFix_DrawConfigUI (void)
   }
 #endif
 
-  if (ImGui::CollapsingHeader ("Shadows"))
+  D3DCAPS9 caps;
+  if (SUCCEEDED (tbf::RenderFix::pDevice->GetDeviceCaps (&caps)))
   {
-    ImGui::TreePush ("");
-    struct shadow_imp_s
+    if (ImGui::CollapsingHeader ("Shadows"))
     {
-      shadow_imp_s (int scale)
+
+      ImGui::TreePush ("");
+      struct shadow_imp_s
       {
-        scale = std::abs (scale);
+        shadow_imp_s (int scale)
+        {
+          scale = std::abs (scale);
 
-        if (scale > 3)
-          scale = 3;
+          if (scale > 3)
+            scale = 3;
 
-        radio    = scale;
-        last_sel = radio;
+          radio    = scale;
+          last_sel = radio;
+        }
+
+        int radio    = 0;
+        int last_sel = 0;
+      };
+
+      static shadow_imp_s shadows     (config.render.shadow_rescale);
+      static shadow_imp_s env_shadows (config.render.env_shadow_rescale);
+
+
+
+      ImGui::Combo      ("Character Shadow Resolution",     &shadows.radio,     "Normal\0Enhanced\0High\0Ultra\0\0");
+
+      if (caps.MaxTextureWidth >= 8192 && caps.MaxTextureHeight >= 8192) {
+        env_shadows.radio = std::min (env_shadows.radio, 3);
+        ImGui::Combo      ("Environmental Shadow Resolution", &env_shadows.radio, "Normal\0High\0Ultra\0\0");
+      }
+      else if (caps.MaxTextureWidth >= 4096 && caps.MaxTextureHeight >= 4096) {
+        env_shadows.radio = std::min (env_shadows.radio, 2);
+        ImGui::Combo      ("Environmental Shadow Resolution", &env_shadows.radio, "Normal\0High\0\0");
+      }
+      else {
+        env_shadows.radio = std::min (env_shadows.radio, 1);
+        ImGui::Combo      ("Environmental Shadow Resolution", &env_shadows.radio, "Normal\0\0");
       }
 
-      int radio    = 0;
-      int last_sel = 0;
-    };
+      if (env_shadows.radio != env_shadows.last_sel) {
+        config.render.env_shadow_rescale    = env_shadows.radio;
+        env_shadows.last_sel                = env_shadows.radio;
+        tbf::RenderFix::need_reset.graphics = true;
+      }
 
-    static shadow_imp_s shadows     (config.render.shadow_rescale);
-    static shadow_imp_s env_shadows (config.render.env_shadow_rescale);
+      if (shadows.radio != shadows.last_sel) {
+        config.render.shadow_rescale        = -shadows.radio;
+        shadows.last_sel                    =  shadows.radio;
+        tbf::RenderFix::need_reset.graphics = true;
+      }
 
-    ImGui::Combo      ("Character Shadow Resolution",     &shadows.radio,     "Normal\0Enhanced\0High\0Ultra\0\0");
-    ImGui::Combo      ("Environmental Shadow Resolution", &env_shadows.radio, "Normal\0High\0Ultra\0\0");
-
-    if (env_shadows.radio != env_shadows.last_sel) {
-      config.render.env_shadow_rescale    = env_shadows.radio;
-      env_shadows.last_sel                = env_shadows.radio;
-      tbf::RenderFix::need_reset.graphics = true;
+      ImGui::TreePop ();
     }
-
-    if (shadows.radio != shadows.last_sel) {
-      config.render.shadow_rescale        = -shadows.radio;
-      shadows.last_sel                    =  shadows.radio;
-      tbf::RenderFix::need_reset.graphics = true;
-    }
-
-    ImGui::TreePop ();
   }
 
   if (ImGui::CollapsingHeader ("Input"))
@@ -1098,6 +1117,12 @@ TBFix_DrawConfigUI (void)
     ImGui::Checkbox ("Disable Smoke",   &config.fun_stuff.disable_smoke);
     if (ImGui::IsItemHovered ())
       ImGui::SetTooltip ("Does not disable all smoke... just the super obnoxious concentric ring (banding from hell) variety that makes you want to gouge your eyes out in dungeons.");
+
+    ImGui::SameLine ();
+
+    ImGui::Checkbox ("Disable Pause Screen Dimming", &config.fun_stuff.disable_pause_dim);
+    if (ImGui::IsItemHovered ())
+      ImGui::SetTooltip ("Potentially useful for texture modders who need stuff to stand still but do not want the screen dimmed -- use with the mod's Auto-Pause feature.");
 
     ImGui::TreePop  ();
   }

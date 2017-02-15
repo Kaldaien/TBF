@@ -113,6 +113,12 @@ namespace tbf
       bool                          active       = false;
       int                           num_draws    =     0;
     } extern tracked_vs, tracked_ps;
+
+    struct shader_disasm_s {
+      std::string header;
+      std::string code;
+      std::string footer;
+    };
   }
 }
 

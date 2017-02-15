@@ -107,6 +107,8 @@ struct tbf_config_t
     uint32_t hollow_eye_vs_crc32 =  0xf063a9f3;
     bool     disable_smoke       =  false;
     uint32_t smoke_ps_crc32      =  0x868bd533;
+    bool     disable_pause_dim   =  false;
+    uint32_t pause_dim_ps_crc32  =  0x975d2194;
   } fun_stuff;
 
   struct {

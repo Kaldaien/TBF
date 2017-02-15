@@ -1005,8 +1005,26 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
       uint32_t shift = config.render.env_shadow_rescale;
 
+      int unshift = 0;
       Width  <<= shift;
       Height <<= shift;
+
+      D3DCAPS9 caps;
+      This->GetDeviceCaps (&caps);
+
+      while (Height > caps.MaxTextureHeight) {
+        unshift++; Height >>= 1;
+      }
+
+      if (unshift > 0) {
+        Width >>= unshift;
+
+        while (Width > caps.MaxTextureWidth) {
+          unshift++; Width >>= 1;
+        }
+      }
+
+      config.render.env_shadow_rescale -= unshift;
 
       game_created = true;
     }
