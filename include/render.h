@@ -110,13 +110,14 @@ namespace tbf
 
     struct shader_tracking_s
     {
-      void clear (void) { active = false; num_draws = 0; textures.clear (); }
+      void clear (void) { active = false; num_draws = 0; used_textures.clear ();  for (int i = 0; i < 16; i++) current_textures [i] = 0x00; }
 
       uint32_t                      crc32        =  0x00;
       bool                          cancel_draws = false;
       bool                          active       = false;
       int                           num_draws    =     0;
-      std::unordered_set <uint32_t> textures;
+      std::unordered_set <uint32_t>    used_textures;
+                          uint32_t  current_textures [16];
     } extern tracked_vs, tracked_ps;
 
     struct shader_disasm_s {

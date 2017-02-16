@@ -38,7 +38,7 @@
 tbf::RenderFix::tbf_draw_states_s
   tbf::RenderFix::draw_state;
 
-extern uint32_t current_tex;
+extern uint32_t current_tex [256];
 
 struct smaa_constants_s
 {
@@ -469,7 +469,9 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
   if (tbf::RenderFix::tracked_rt.active)
     tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
 
-  if (vs_checksum == tbf::RenderFix::tracked_vs.crc32) tbf::RenderFix::tracked_vs.textures.emplace (current_tex);
+  if (vs_checksum == tbf::RenderFix::tracked_vs.crc32)
+    for (int i = 0; i < 16; i++)
+      tbf::RenderFix::tracked_vs.current_textures [i] = 0x0;
 
   return D3D9SetVertexShader_Original (This, pShader);
 }
@@ -543,7 +545,9 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
   if (tbf::RenderFix::tracked_rt.active)
     tbf::RenderFix::tracked_rt.pixel_shaders.insert (ps_checksum);
 
-  if (ps_checksum == tbf::RenderFix::tracked_ps.crc32) tbf::RenderFix::tracked_ps.textures.emplace (current_tex);
+  if (ps_checksum == tbf::RenderFix::tracked_ps.crc32)
+    for (int i = 0; i < 16; i++)
+      tbf::RenderFix::tracked_ps.current_textures [i] = 0x0;
 
   return D3D9SetPixelShader_Original (This, pShader);
 }
@@ -563,10 +567,26 @@ TBF_ShouldSkipRenderPass (void)
   const bool tracked_vs = ( vs_checksum == tbf::RenderFix::tracked_vs.crc32 );
   const bool tracked_ps = ( ps_checksum == tbf::RenderFix::tracked_ps.crc32 );
 
-  if (tracked_vs) tbf::RenderFix::tracked_vs.num_draws++;
-  if (tracked_ps) tbf::RenderFix::tracked_ps.num_draws++;
+  if (tracked_vs)
+  {
+    tbf::RenderFix::tracked_vs.num_draws++;
+
+    for (int i = 0; i < 16; i++)
+      if (tbf::RenderFix::tracked_vs.current_textures [i] != 0)
+        tbf::RenderFix::tracked_vs.used_textures.emplace (tbf::RenderFix::tracked_vs.current_textures [i]);
+  }
+
+  if (tracked_ps)
+  {
+    tbf::RenderFix::tracked_ps.num_draws++;
+
+    for (int i = 0; i < 16; i++)
+      if (tbf::RenderFix::tracked_ps.current_textures [i] != 0)
+        tbf::RenderFix::tracked_ps.used_textures.emplace (tbf::RenderFix::tracked_ps.current_textures [i]);
+  }
 
 
+  // Do these sparate so that we can accurately count used textures even on cancelled passes.
   if (tracked_vs && tbf::RenderFix::tracked_vs.cancel_draws)
     return true;
 
@@ -580,7 +600,7 @@ TBF_ShouldSkipRenderPass (void)
   if (config.fun_stuff.disable_pause_dim && ps_checksum == config.fun_stuff.pause_dim_ps_crc32)
     return true;
 
-  if (config.fun_stuff.disable_smoke   && ps_checksum == config.fun_stuff.smoke_ps_crc32 && current_tex == 0x16f618a8)
+  if (config.fun_stuff.disable_smoke   && ps_checksum == config.fun_stuff.smoke_ps_crc32 && current_tex [0] == 0x16f618a8)
     return true;
 
 

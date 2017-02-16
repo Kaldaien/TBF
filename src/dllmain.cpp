@@ -182,7 +182,6 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     }
   }
 
-
   if (TBF_Init_MinHook () == MH_OK) {
     extern void
     TBF_InitSDLOverride (void);

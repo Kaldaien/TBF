@@ -342,8 +342,8 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
 
   if (ImGui::IsMouseHoveringRect (list->last_min, list->last_max))
   {
-         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) list->sel--;
-    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) list->sel++;
+         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
   }
 
   ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
@@ -364,8 +364,8 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
     ImGui::BulletText   ("Press ] while the mouse is hovering this list to select the next shader");
     ImGui::EndTooltip   ();
 
-         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) list->sel--;
-    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) list->sel++;
+         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
   }
 
   if (shaders.size ())
@@ -432,20 +432,20 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
     ImGui::Checkbox ("Cancel Draws Using Selected Shader",  &tracker->cancel_draws);  ImGui::SameLine ();
 
     if (tracker->cancel_draws)
-      ImGui::TextDisabled ("%lu Skipped Draw%c Last Frame (%lu textures)", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->textures.size ());
+      ImGui::TextDisabled ("%lu Skipped Draw%c Last Frame (%lu textures)", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->used_textures.size () );
     else
-      ImGui::TextDisabled ("%lu Draw%c Last Frame         (%lu textures)", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->textures.size ());
+      ImGui::TextDisabled ("%lu Draw%c Last Frame         (%lu textures)", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->used_textures.size () );
 
-    if (ImGui::IsMouseHoveringRect (list->last_min, list->last_max) && tracker->textures.size ())
+    if (ImGui::IsMouseHoveringRect (list->last_min, list->last_max) && tracker->used_textures.size ())
     {
       ImGui::BeginTooltip ();
 
       D3DFORMAT fmt = D3DFMT_UNKNOWN;
 
-      for ( auto it : tracker->textures )
+      for ( auto it : tracker->used_textures )
       {
         ISKTextureD3D9* pTex = tbf::RenderFix::tex_mgr.getTexture (it)->d3d9_tex;
-
+        
         if (pTex && pTex->pTex)
         {
           D3DSURFACE_DESC desc;
@@ -457,13 +457,14 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
                                        ImVec2  (0,0),             ImVec2  (1,1),
                                        ImColor (255,255,255,255), ImColor (242,242,13,255) );
           }
-          ImGui::SameLine ();
-        }
 
-        ImGui::BeginGroup ();
-        ImGui::Text       ("Texture: %08lx", it);
-        ImGui::Text       ("Format:  %ws",   SK_D3D9_FormatToStr (fmt).c_str ());
-        ImGui::EndGroup   ();
+          ImGui::SameLine ();
+
+          ImGui::BeginGroup ();
+          ImGui::Text       ("Texture: %08lx", it);
+          ImGui::Text       ("Format:  %ws",   SK_D3D9_FormatToStr (fmt).c_str ());
+          ImGui::EndGroup   ();
+        }
       }
 
       ImGui::EndTooltip ();

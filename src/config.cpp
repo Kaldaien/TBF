@@ -74,6 +74,7 @@ struct {
 
   tbf::ParameterInt*     rescale_shadows;
   tbf::ParameterInt*     rescale_env_shadows;
+  tbf::ParameterBool*    half_precision_shadows;
 
   tbf::ParameterBool*    dump_shaders;
   tbf::ParameterBool*    fix_map_res;
@@ -95,6 +96,8 @@ struct {
     tbf::ParameterFloat* predication_strength;
     tbf::ParameterFloat* reprojection_weight;
   } smaa;
+
+  tbf::ParameterStringW* nvidia_sgssaa;
 } render;
 
 struct {
@@ -368,6 +371,16 @@ TBF_LoadConfig (std::wstring name)
       L"Shadow.Quality",
         L"RescaleEnvShadows" );
 
+  render.half_precision_shadows =
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Environmental Shadow Precision")
+      );
+  render.half_precision_shadows->register_to_ini (
+    render_ini,
+      L"Shadow.Quality",
+        L"HalfFloatPrecision" );
+
   render.fix_map_res =
     static_cast <tbf::ParameterBool *>
     (g_ParameterFactory.create_parameter <bool>(
@@ -566,6 +579,18 @@ TBF_LoadConfig (std::wstring name)
   );
 
 
+  render.nvidia_sgssaa =
+    static_cast <tbf::ParameterStringW *>
+    (g_ParameterFactory.create_parameter <std::wstring>(
+       L"NVAPI Anti-Aliasing Settings")
+    );
+  render.nvidia_sgssaa->register_to_ini (
+    render_ini,
+      L"AntiAliasing.NV",
+        L"SparseGridSuperSample"
+  );
+
+
 
   screenshots.hudless_keybind =
     static_cast <tbf::ParameterStringW *>
@@ -728,11 +753,12 @@ TBF_LoadConfig (std::wstring name)
   input.gamepad.texture_set->load         (config.input.gamepad.texture_set);
   input.gamepad.virtual_controllers->load (config.input.gamepad.virtual_controllers);
 
-  keyboard.swap_wasd->load         (config.keyboard.swap_wasd);
-  keyboard.swap_keys->load         (config.keyboard.swap_keys);
+  keyboard.swap_wasd->load            (config.keyboard.swap_wasd);
+  keyboard.swap_keys->load            (config.keyboard.swap_keys);
 
-  render.rescale_shadows->load     (config.render.shadow_rescale);
-  render.rescale_env_shadows->load (config.render.env_shadow_rescale);
+  render.rescale_shadows->load        (config.render.shadow_rescale);
+  render.rescale_env_shadows->load    (config.render.env_shadow_rescale);
+  render.half_precision_shadows->load (config.render.half_float_shadows);
 
   render.dump_shaders->load        (config.render.dump_shaders);
   render.fix_map_res->load         (config.render.fix_map_res);
@@ -753,6 +779,58 @@ TBF_LoadConfig (std::wstring name)
   render.smaa.predication_scale->load     (config.render.smaa.predication_scale);
   render.smaa.predication_strength->load  (config.render.smaa.predication_strength);
   render.smaa.reprojection_weight->load   (config.render.smaa.reprojection_weight);
+
+  std::wstring sgssaa;
+  render.nvidia_sgssaa->load (sgssaa);
+
+  if (sgssaa.length ())
+  {
+    ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppFriendlyName"))     ( L"Tales of Berseria" );
+    ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppName"))             ( L"Tales of Berseria.exe" );
+
+    if (sgssaa == L"2x")
+    {
+      wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+                            L"Method",            L"2xMSAA",
+                            L"ReplayMode",        L"2XSGSSAA",
+                            L"Override",          L"On",
+                            nullptr,              nullptr };
+      ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+      config.render.nv.sgssaa_mode = 1;
+    }
+
+    else if (sgssaa == L"4x")
+    {
+      wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+                            L"Method",            L"4xMSAA",
+                            L"ReplayMode",        L"4xSGSSAA",
+                            L"Override",          L"On",
+                            nullptr,              nullptr };
+      ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+      config.render.nv.sgssaa_mode = 2;
+    }
+
+    else if (sgssaa == L"8x")
+    {
+      wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+                            L"Method",            L"8xMSAA",
+                            L"ReplayMode",        L"8xSGSSAA",
+                            L"Override",          L"On",
+                            nullptr,              nullptr };
+      ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+      config.render.nv.sgssaa_mode = 4;
+    }
+
+    else if (sgssaa == L"off")
+    {
+      wchar_t* props [] = { L"Method",            L"0x00000000",
+                            L"ReplayMode",        L"0x00000000",
+                            L"Override",          L"No",
+                            nullptr,              nullptr };
+      ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+      config.render.nv.sgssaa_mode = 0;
+    }
+  }
 
   config.input.ui.scale = std::min (std::max (1.0f, config.input.ui.scale), 3.0f);
 
@@ -798,15 +876,16 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   render.dump_shaders->store        (config.render.dump_shaders);
 
-  render.rescale_shadows->store     (config.render.shadow_rescale);
-  render.rescale_env_shadows->store (config.render.env_shadow_rescale);
-  render.fix_map_res->store         (config.render.fix_map_res);
-  render.postproc_ratio->store      (config.render.postproc_ratio);
-  render.pause_on_ui->store         (config.input.ui.pause);
-  render.show_osd_disclaimer->store (config.render.osd_disclaimer);
-  render.auto_apply_changes->store  (config.render.auto_apply_changes);
-  render.never_show_eula->store     (config.input.ui.never_show_eula);
-  render.ui_scale->store            (config.input.ui.scale);
+  render.rescale_shadows->store        (config.render.shadow_rescale);
+  render.rescale_env_shadows->store    (config.render.env_shadow_rescale);
+  render.half_precision_shadows->store (config.render.half_float_shadows);
+  render.fix_map_res->store            (config.render.fix_map_res);
+  render.postproc_ratio->store         (config.render.postproc_ratio);
+  render.pause_on_ui->store            (config.input.ui.pause);
+  render.show_osd_disclaimer->store    (config.render.osd_disclaimer);
+  render.auto_apply_changes->store     (config.render.auto_apply_changes);
+  render.never_show_eula->store        (config.input.ui.never_show_eula);
+  render.ui_scale->store               (config.input.ui.scale);
 
   render.smaa.preset->store                (config.render.smaa.quality_preset);
   render.smaa.override_game->store         (config.render.smaa.override_game);
@@ -818,6 +897,10 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.smaa.predication_scale->store     (config.render.smaa.predication_scale);
   render.smaa.predication_strength->store  (config.render.smaa.predication_strength);
   render.smaa.reprojection_weight->store   (config.render.smaa.reprojection_weight);
+
+  render.nvidia_sgssaa->store ( config.render.nv.sgssaa_mode == 0 ? L"off" :
+                                config.render.nv.sgssaa_mode == 1 ? L"2x"  :
+                                config.render.nv.sgssaa_mode == 2 ? L"4x"  : L"8x" );
 
   textures.remaster->store          (config.textures.remaster);
   textures.uncompressed->store      (config.textures.uncompressed);

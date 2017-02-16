@@ -80,6 +80,7 @@ struct tbf_config_t
     bool      clear_blackbars    = false;
     int32_t   shadow_rescale     = -2;
     int32_t   env_shadow_rescale =  1;
+    bool      half_float_shadows = false;
     bool      dump_shaders       = false;
     bool      fix_map_res        = false;
     bool      osd_disclaimer     = true;
@@ -106,6 +107,10 @@ struct tbf_config_t
      uint32_t smaa_ps1_crc32        = 0x031ff454;
 
     } smaa;
+
+    struct {
+      uint32_t sgssaa_mode          = 0;
+    } nv;
   } render;
 
   struct {

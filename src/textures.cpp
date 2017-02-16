@@ -759,14 +759,14 @@ tbf::RenderFix::TextureManager::isRenderTarget (IDirect3DBaseTexture9* pTex)
 void
 tbf::RenderFix::TextureManager::trackRenderTarget (IDirect3DBaseTexture9* pTex)
 {
-  known.render_targets.insert (pTex);
+  known.render_targets.emplace (pTex);
 }
 
 void
 tbf::RenderFix::TextureManager::applyTexture (IDirect3DBaseTexture9* pTex)
 {
   if (known.render_targets.count (pTex) != 0)
-    used.render_targets.insert (pTex);
+    used.render_targets.emplace (pTex);
 }
 
 bool
@@ -827,7 +827,7 @@ D3D9SetDepthStencilSurface_Detour (
 
 
 uint32_t debug_tex_id = 0UL;
-uint32_t current_tex  = 0ui32;
+uint32_t current_tex [256] = { 0ui32 };
 
 COM_DECLSPEC_NOTHROW
 HRESULT
@@ -888,11 +888,10 @@ D3D9SetTexture_Detour (
     ISKTextureD3D9* pSKTex =
       (ISKTextureD3D9 *)pTexture;
 
-    current_tex = pSKTex->tex_crc32;
+    current_tex [std::min (255UL, Sampler)] = pSKTex->tex_crc32;
 
-    // TODO: Should we record on which sampler the texture is attached?
-    if (vs_checksum == tbf::RenderFix::tracked_vs.crc32)  tbf::RenderFix::tracked_vs.textures.emplace (pSKTex->tex_crc32);
-    if (ps_checksum == tbf::RenderFix::tracked_ps.crc32)  tbf::RenderFix::tracked_ps.textures.emplace (pSKTex->tex_crc32);
+    if (vs_checksum == tbf::RenderFix::tracked_vs.crc32)  tbf::RenderFix::tracked_vs.current_textures [std::min (15UL, Sampler)] = pSKTex->tex_crc32;
+    if (ps_checksum == tbf::RenderFix::tracked_ps.crc32)  tbf::RenderFix::tracked_ps.current_textures [std::min (15UL, Sampler)] = pSKTex->tex_crc32;
 
     textures_used.emplace (pSKTex->tex_crc32);
 
@@ -968,28 +967,13 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
                                             Pool, ppTexture, pSharedHandle );
   }
 
-#if 0
-  if (Usage == D3DUSAGE_RENDERTARGET)
-  dll_log->Log (L" [!] IDirect3DDevice9::CreateTexture (%lu, %lu, %lu, %lu, "
-                                                   L"%lu, %lu, %08Xh, %08Xh)",
-                  Width, Height, Levels, Usage, Format, Pool, ppTexture,
-                  pSharedHandle);
-
-  tex_log->Log ( L"[Load Trace] >> Creating Texture: "
-                L"(%d x %d), Format: %s, Usage: [%s], Pool: %s",
-                  Width, Height,
-                    SK_D3D9_FormatToStr (Format),
-                    SK_D3D9_UsageToStr  (Usage).c_str (),
-                    SK_D3D9_PoolToStr   (Pool) );
-#endif
-
-  bool game_created = false;
-
   //
   // Model Shadows
   //
-  if (Width == Height && (Width == 64 || Width == 128 || Width == 256) &&
-                          (Usage == D3DUSAGE_RENDERTARGET)) {
+  if ( ( Width == Height                                             ) &&
+       ( Width == 64 || Width == 128 || Width == 256                 ) &&
+       ( Usage == D3DUSAGE_RENDERTARGET && Format == D3DFMT_A8R8G8B8 ) )
+  {
     //tex_log->Log (L"[Shadow Mgr] (Model Resolution: (%lu x %lu)", Width, Height);
     // Assert (Levels == 1)
     //
@@ -1000,49 +984,55 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
 
     Width  <<= shift;
     Height <<= shift;
-
-    game_created = true;
   }
 
-  else if (Width == Height && (Format == D3DFMT_R32F && Height == 512 || Height == 1024 || Height == 2048) &&
-                          (Usage == D3DUSAGE_RENDERTARGET || Usage == D3DUSAGE_DEPTHSTENCIL)) {
-      //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
-      uint32_t shift = config.render.env_shadow_rescale;
+  //
+  // Environmental Shadows
+  //
+  else if ( ( Width  == Height                                   ) &&
+            ( Height == 512         || Height == 1024 ||
+              Height == 2048                                     ) &&
+            ( Usage  == D3DUSAGE_RENDERTARGET         ||
+              Usage  == D3DUSAGE_DEPTHSTENCIL                    ) )
+  {
+    //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
+    uint32_t shift = config.render.env_shadow_rescale;
 
-      int unshift = 0;
-      Width  <<= shift;
-      Height <<= shift;
+    int unshift = 0;
+    Width  <<= shift;
+    Height <<= shift;
 
-      D3DCAPS9 caps;
-      This->GetDeviceCaps (&caps);
+    D3DCAPS9 caps;
+    This->GetDeviceCaps (&caps);
 
-      while (Height > caps.MaxTextureHeight) {
-        unshift++; Height >>= 1;
-      }
-
-      if (unshift > 0) {
-        Width >>= unshift;
-
-        while (Width > caps.MaxTextureWidth) {
-          unshift++; Width >>= 1;
-        }
-      }
-
-      config.render.env_shadow_rescale -= unshift;
-
-      game_created = true;
+    // Don't let users select a resolution higher than their GPU will support...
+    while (Height > caps.MaxTextureHeight) {
+      unshift++; Height >>= 1;
     }
+
+    if (unshift > 0)
+    {
+      Width >>= unshift;
+
+      while (Width > caps.MaxTextureWidth) {
+        unshift++; Width >>= 1;
+      }
+    }
+
+    config.render.env_shadow_rescale -= unshift;
+  }
 
   //
   // Post-Processing (2048x1024) - FIXME damnit!
   //
-  else if ( ( ( Width  == 2048 &&
-                Height == 1024 ) ||
-              ( Width  == 1024 &&
-                Height == 512 )  ||
-              ( Width  == 512  &&
-                Height == 256 ) ) && Usage == D3DUSAGE_RENDERTARGET ) {
-    if (config.render.postproc_ratio > 0.0f) {
+  else if ( (     Usage  == D3DUSAGE_RENDERTARGET && Format == D3DFMT_A8R8G8B8 ) &&
+              ( ( Width  == 2048 &&
+                  Height == 1024 ) || ( Width  == 1024 &&
+                                        Height == 512 )  || ( Width  == 512  &&
+                                                              Height == 256 ) ) )
+  {
+    if (config.render.postproc_ratio > 0.0f)
+    {
       Width  = (UINT)(tbf::RenderFix::width  * config.render.postproc_ratio);
       Height = (UINT)(tbf::RenderFix::height * config.render.postproc_ratio);
 
@@ -1050,7 +1040,8 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     }
   }
 
-  else if ((Usage == D3DUSAGE_RENDERTARGET || Usage == D3DUSAGE_DEPTHSTENCIL) && config.render.fix_map_res)
+  else if (   config.render.fix_map_res    && Format == D3DFMT_A8R8G8B8 && 
+          ( Usage == D3DUSAGE_RENDERTARGET || Usage  == D3DUSAGE_DEPTHSTENCIL ) )
   {
     if (Width == tbf::RenderFix::width / 11 && Height == tbf::RenderFix::height / 11) {
       Width *= 2; Height *= 2;
@@ -1092,13 +1083,43 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
 
   int levels = Levels;
 
+#if 0
+  if (Width == 66 && Height == 33) {
+    Width  = tbf::RenderFix::width;
+    Height = tbf::RenderFix::height;
+  }
+#endif
+
+  if ( config.render.half_float_shadows &&
+       (Usage & D3DUSAGE_RENDERTARGET ) &&
+       Format == D3DFMT_R32F )
+  {
+    Format = D3DFMT_R16F;
+  }
+
   HRESULT result = 
     D3D9CreateTexture (This, Width, Height, levels, Usage,
                                 Format, Pool, ppTexture, pSharedHandle);
 
-  if ( ( Usage & D3DUSAGE_RENDERTARGET ) || 
-       ( Usage & D3DUSAGE_DEPTHSTENCIL ) )
+  if ( SUCCEEDED (result) &&
+       ( ( Usage & D3DUSAGE_RENDERTARGET ) || 
+         ( Usage & D3DUSAGE_DEPTHSTENCIL ) ||
+         ( Usage & D3DUSAGE_DYNAMIC      ) ) )
+  {
+    dll_log->Log (L" [!] IDirect3DDevice9::CreateTexture (%lu, %lu, %lu, %lu, "
+                                                     L"%lu, %lu, %08Xh, %08Xh)",
+                    Width, Height, Levels, Usage, Format, Pool, ppTexture,
+                    pSharedHandle);
+
+    tex_log->Log ( L"[Load Trace] >> Creating Texture: "
+                  L"(%d x %d), Format: %s, Usage: [%s], Pool: %s",
+                    Width, Height,
+                      SK_D3D9_FormatToStr (Format).c_str (),
+                      SK_D3D9_UsageToStr  (Usage).c_str  (),
+                      SK_D3D9_PoolToStr   (Pool) );
+
     tbf::RenderFix::tex_mgr.trackRenderTarget (*ppTexture);
+  }
 
   return result;
 }
@@ -2481,7 +2502,6 @@ TBFix_ReloadPadButtons (void)
           resample_pool->postJob (load_op);
         }
 
-        current_tex = pSKTex->tex_crc32;
         LeaveCriticalSection (&cs_tex_stream);
       }
     }

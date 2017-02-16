@@ -304,6 +304,78 @@ IMGUI_API
 void
 ImGui_ImplDX9_NewFrame (void);
 
+void
+TBFix_GPUPerfMonWidget (void)
+{
+  extern HMODULE hInjectorDLL;
+
+ typedef uint32_t (__stdcall *SK_GPU_GetClockRateInkHz_pfn)    (int gpu);
+ typedef uint32_t (__stdcall *SK_GPU_GetMemClockRateInkHz_pfn) (int gpu);
+ typedef uint64_t (__stdcall *SK_GPU_GetMemoryBandwidth_pfn)   (int gpu);
+ typedef float    (__stdcall *SK_GPU_GetMemoryLoad_pfn)        (int gpu);
+ typedef float    (__stdcall *SK_GPU_GetGPULoad_pfn)           (int gpu);   
+ typedef float    (__stdcall *SK_GPU_GetTempInC_pfn)           (int gpu);   
+ typedef uint32_t (__stdcall *SK_GPU_GetFanSpeedRPM_pfn)       (int gpu);
+ typedef uint64_t (__stdcall *SK_GPU_GetVRAMUsed_pfn)          (int gpu);  
+ typedef uint64_t (__stdcall *SK_GPU_GetVRAMShared_pfn)        (int gpu);
+ typedef uint64_t (__stdcall *SK_GPU_GetVRAMBudget_pfn)        (int gpu);
+
+ static SK_GPU_GetClockRateInkHz_pfn   SK_GPU_GetClockRateInkHz =
+   (SK_GPU_GetClockRateInkHz_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetClockRateInkHz");
+ static SK_GPU_GetMemClockRateInkHz_pfn SK_GPU_GetMemClockRateInkHz =
+   (SK_GPU_GetMemClockRateInkHz_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetMemClockRateInkHz");
+ static SK_GPU_GetMemoryBandwidth_pfn   SK_GPU_GetMemoryBandwidth  =
+   (SK_GPU_GetMemoryBandwidth_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetMemoryBandwidth");
+ static SK_GPU_GetMemoryLoad_pfn        SK_GPU_GetMemoryLoad       =
+   (SK_GPU_GetMemoryLoad_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetMemoryLoad");
+ static SK_GPU_GetGPULoad_pfn           SK_GPU_GetGPULoad          =
+   (SK_GPU_GetGPULoad_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetGPULoad");
+ static SK_GPU_GetTempInC_pfn           SK_GPU_GetTempInC          =
+   (SK_GPU_GetTempInC_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetTempInC");
+ static SK_GPU_GetFanSpeedRPM_pfn       SK_GPU_GetFanSpeedRPM      =
+   (SK_GPU_GetFanSpeedRPM_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetFanSpeedRPM");
+ static SK_GPU_GetVRAMUsed_pfn          SK_GPU_GetVRAMUsed         =
+   (SK_GPU_GetVRAMUsed_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetVRAMUsed");
+ static SK_GPU_GetVRAMShared_pfn        SK_GPU_GetVRAMShared       =
+   (SK_GPU_GetVRAMShared_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetVRAMShared");
+ static SK_GPU_GetVRAMBudget_pfn        SK_GPU_GetVRAMBudget       =
+   (SK_GPU_GetVRAMBudget_pfn)
+     GetProcAddress (hInjectorDLL, "SK_GPU_GetVRAMBudget");
+
+  struct {
+    int   current_idx = 0;
+    float percent [120];
+  } static gpu_load;
+
+  gpu_load.percent [gpu_load.current_idx] = SK_GPU_GetGPULoad (0);
+  gpu_load.current_idx = (gpu_load.current_idx + 1) % IM_ARRAYSIZE (gpu_load.percent);
+  
+  if (ImGui::CollapsingHeader ("Peformance Monitor"))
+  {
+    ImGui::BeginGroup ();
+    
+    ImGui::PlotLines ( "",
+                        gpu_load.percent,
+                          IM_ARRAYSIZE (gpu_load.percent),
+                            gpu_load.current_idx,
+                              "",
+                                   0.0f,
+                                   100.0f,
+                                    ImVec2 (ImGui::GetContentRegionAvailWidth (), 80) );
+    
+    ImGui::EndGroup ();
+  }
+}
+
 
 bool
 TBFix_DrawConfigUI (void)
@@ -527,6 +599,8 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePop ();
   }
 
+  //TBFix_GPUPerfMonWidget ();
+
   if (ImGui::CollapsingHeader ("Textures", ImGuiTreeNodeFlags_CollapsingHeader | ImGuiTreeNodeFlags_DefaultOpen))
   {
     ImGui::TreePush ("");
@@ -744,10 +818,91 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePop ();
   }
 
-  if (ImGui::CollapsingHeader ("Anti-Aliasing"))
-  {
-    ImGui::TreePush ("");
+  static bool nv_hardware =
+    ((BOOL (__stdcall *)(void))GetProcAddress (hInjectorDLL, "SK_NvAPI_IsInit"))();
 
+  if (nv_hardware)
+  {
+    if (ImGui::CollapsingHeader ("Anti-Aliasing"))
+    {
+      ImGui::TreePush ("");
+    
+      if (ImGui::CollapsingHeader ("Sparse Grid Super Sampling (NVIDIA)"))
+      {
+        bool sel_change =
+          ImGui::Combo ("Mode", (int *)&config.render.nv.sgssaa_mode, " Off\0"
+                                                                      " 2x (Slow)\0"
+                                                                      " 4x (Very Slow)\0"
+                                                                      " 8x (Masochist!)\0\0", 4 );
+
+        if (ImGui::IsItemHovered ())
+        {
+          ImGui::BeginTooltip ();
+          ImGui::TextColored (ImColor (0.95f, 0.75f, 0.25f, 1.0f), "High Quality Supersampling");
+          ImGui::SameLine     ();
+          ImGui::Text         (" (driver feature for NVIDIA systems)");
+          ImGui::Separator    ();
+          ImGui::BulletText   ("Do NOT combine this with in-game anti-aliasing (broken) or DSR.");
+          ImGui::BulletText   ("Prefer this over DSR because this produces higher quality with fewer compatibility problems.");
+          ImGui::BulletText   ("The first time you enable this, the game will re-launch with admin privileges to setup a driver profile.");
+          ImGui::EndTooltip   ();
+        }
+
+        if (sel_change)
+        {
+          ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppFriendlyName"))     ( L"Tales of Berseria" );
+          ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppName"))             ( L"Tales of Berseria.exe" );
+
+#if 0
+          if (config.render.nv.sgssaa_mode == 1)
+          {
+            wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+                                  L"Method",            L"2xMSAA",
+                                  L"ReplayMode",        L"2XSGSSAA",
+                                  L"Override",          L"On",
+                                  nullptr,              nullptr };
+            ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+          }
+
+          else if (config.render.nv.sgssaa_mode == 2)
+          {
+            wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+                                  L"Method",            L"4xMSAA",
+                                  L"ReplayMode",        L"4xSGSSAA",
+                                  L"Override",          L"On",
+                                  nullptr,              nullptr };
+            ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+          }
+
+          else if (config.render.nv.sgssaa_mode == 3)
+          {
+            wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+                                  L"Method",            L"8xMSAA",
+                                  L"ReplayMode",        L"8xSGSSAA",
+                                  L"Override",          L"On",
+                                  nullptr,              nullptr };
+            ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+          }
+
+          else
+          {
+            wchar_t* props [] = { L"CompatibilityBits", L"0x00000000",
+                                  L"Method",            L"0x00000000",
+                                  L"ReplayMode",        L"0x00000000",
+                                  L"Override",          L"No",
+                                  nullptr,              nullptr };
+            ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+          }
+#endif
+
+          need_restart = true;
+        }
+      }
+
+      ImGui::TreePop ();
+    }
+
+#if 0
     if (ImGui::CollapsingHeader ("SMAA Tuning Knobs"))
     {
       ImGui::Checkbox    ("Override Game's Tuning Fish", &config.render.smaa.override_game);
@@ -829,8 +984,7 @@ TBFix_DrawConfigUI (void)
         ImGui::TreePop ();
       }
     }
-
-    ImGui::TreePop ();
+#endif
   }
 
   if (ImGui::CollapsingHeader ("Post-Processing"))
@@ -950,6 +1104,33 @@ TBFix_DrawConfigUI (void)
         config.render.shadow_rescale        = -shadows.radio;
         shadows.last_sel                    =  shadows.radio;
         tbf::RenderFix::need_reset.graphics = true;
+      }
+
+      int quality = config.render.half_float_shadows ? 0 : 1;
+
+      if ( ImGui::Combo ( "Shadow Map Precision", &quality,
+                                                "Low  (16-bit half-float)\0"
+                                                "High (32-bit single-float)\0\0", 2 ) )
+      {
+        config.render.half_float_shadows    = quality == 0 ? true :
+                                                             false;
+        tbf::RenderFix::need_reset.textures = true;
+      }
+
+      if (ImGui::IsItemHovered ())
+        ImGui::SetTooltip ( "Game's default is 32-bit, but that burns through GPU memory bandwidth outdoors.\n\n"
+                            "  The difference in quality between 16-bit and 32-bit is minor; performance wise the difference is massive." );
+
+      if (config.render.env_shadow_rescale > 1 && (! config.render.half_float_shadows))
+      {
+        ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 0.4f, 0.15f, 1.0f));
+        ImGui::BulletText     ("WARNING: ");
+        ImGui::SameLine       ();
+        ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 1.0f, 0.05f, 1.0f));
+        ImGui::TextWrapped    ("Ultra Quality Environmental Shadows are VERY taxing outdoors and can destabilize framerate even on high-end hardware.");
+        ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.666f, 0.666f, 0.666f, 1.0f));
+        ImGui::Text           ("      (Consider changing the precision from High to Low if performance suffers.)");
+        ImGui::PopStyleColor  (3);
       }
 
       ImGui::TreePop ();
