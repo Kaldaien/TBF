@@ -1,5 +1,24 @@
-// ImGui - standalone example application for DirectX 9
-// If you are new to ImGui, see examples/README.txt and documentation at the top of imgui.cpp.
+/**
+ * This file is part of Tales of Berseria "Fix".
+ *
+ * Tales of Berseria "Fix" is free software : you can redistribute it
+ * and/or modify it under the terms of the GNU General Public License
+ * as published by The Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Tales of Berseria "Fix" is distributed in the hope that it will be
+ * useful,
+ *
+ * But WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Tales of Berseria "Fix".
+ *
+ *   If not, see <http://www.gnu.org/licenses/>.
+ *
+**/
 
 #define _CRT_SECURE_NO_WARNINGS
 
@@ -827,23 +846,23 @@ TBFix_DrawConfigUI (void)
     {
       ImGui::TreePush ("");
     
-      if (ImGui::CollapsingHeader ("Sparse Grid Super Sampling (NVIDIA)"))
+      if (ImGui::CollapsingHeader ("Sparse Grid Super-Sampling (NVIDIA)"))
       {
         bool sel_change =
-          ImGui::Combo ("Mode", (int *)&config.render.nv.sgssaa_mode, " Off\0"
-                                                                      " 2x (Slow)\0"
-                                                                      " 4x (Very Slow)\0"
-                                                                      " 8x (Masochist!)\0\0", 4 );
+          ImGui::Combo ("Mode (requires application restart)", (int *)&config.render.nv.sgssaa_mode, " Off\0"
+                                                                                                     " 2x (Good Quality, Good Performance)\0"
+                                                                                                     " 4x (Great Quality,  OK Performance)\0"
+                                                                                                     " 8x (Are You Insane?!)\0\0", 4 );
 
         if (ImGui::IsItemHovered ())
         {
           ImGui::BeginTooltip ();
-          ImGui::TextColored (ImColor (0.95f, 0.75f, 0.25f, 1.0f), "High Quality Supersampling");
+          ImGui::TextColored (ImColor (0.95f, 0.75f, 0.25f, 1.0f), "Ultra High Quality Supersampling");
           ImGui::SameLine     ();
           ImGui::Text         (" (driver feature for NVIDIA systems)");
           ImGui::Separator    ();
           ImGui::BulletText   ("Do NOT combine this with in-game anti-aliasing (broken) or DSR.");
-          ImGui::BulletText   ("Prefer this over DSR because this produces higher quality with fewer compatibility problems.");
+          ImGui::BulletText   ("Prefer this over DSR because this produces higher image quality with fewer compatibility problems.");
           ImGui::BulletText   ("The first time you enable this, the game will re-launch with admin privileges to setup a driver profile.");
           ImGui::EndTooltip   ();
         }
@@ -853,50 +872,45 @@ TBFix_DrawConfigUI (void)
           ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppFriendlyName"))     ( L"Tales of Berseria" );
           ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppName"))             ( L"Tales of Berseria.exe" );
 
-#if 0
-          if (config.render.nv.sgssaa_mode == 1)
-          {
-            wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
-                                  L"Method",            L"2xMSAA",
-                                  L"ReplayMode",        L"2XSGSSAA",
-                                  L"Override",          L"On",
-                                  nullptr,              nullptr };
-            ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
-          }
-
-          else if (config.render.nv.sgssaa_mode == 2)
-          {
-            wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
-                                  L"Method",            L"4xMSAA",
-                                  L"ReplayMode",        L"4xSGSSAA",
-                                  L"Override",          L"On",
-                                  nullptr,              nullptr };
-            ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
-          }
-
-          else if (config.render.nv.sgssaa_mode == 3)
-          {
-            wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
-                                  L"Method",            L"8xMSAA",
-                                  L"ReplayMode",        L"8xSGSSAA",
-                                  L"Override",          L"On",
-                                  nullptr,              nullptr };
-            ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
-          }
-
-          else
-          {
-            wchar_t* props [] = { L"CompatibilityBits", L"0x00000000",
-                                  L"Method",            L"0x00000000",
-                                  L"ReplayMode",        L"0x00000000",
-                                  L"Override",          L"No",
-                                  nullptr,              nullptr };
-            ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
-          }
-#endif
-
           need_restart = true;
         }
+
+        ImGui::TreePush ("");
+
+        if (ImGui::CollapsingHeader ("SGSSAA Best Practices"))
+        {
+          ImGui::TreePush ("");
+          ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 16.0f);
+          ImGui::BeginChild     ("SGSSAA Best Practices", ImVec2 (font_size * 75.0f, font_size_multiline * 5.5f), true);
+          ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (1.0f, 1.0f, 1.0f, 1.0f));
+          ImGui::Text           ( "Supersampling is unlike other forms of anti-aliasing and will anti-alias textures and lighting rather than blur them into oblivion!\n");
+          ImGui::Separator      ();
+
+          ImGui::Spacing     ();
+          ImGui::Spacing     ();
+
+          ImGui::TreePush    ("");
+          ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.6f, 0.9f, 0.3f, 1.0f));
+          ImGui::Text           ( "There are a few things you should know about supersampling for best results.\n");
+
+          ImGui::Spacing     ();
+
+          ImGui::TreePush    ("");
+          ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.75, 0.75f, 0.75f, 1.0f));
+          ImGui::BulletText ("It puts a lot of compute AND memory load on GPUs, you will want to tweak Environmental Shadow settings to balance things out.");
+          ImGui::Spacing     ();
+          ImGui::BulletText ("Post-processing effects like blur may be strengthened; working around this involves increasing Post-Processing Resolution.");
+          ImGui::Spacing     ();
+          ImGui::BulletText ("A negative Mipmap LOD Bias is suggested for best image quality, it will not create shimmer when supersampling.");
+
+          ImGui::PopStyleColor (3);
+          ImGui::TreePop       ();
+          ImGui::TreePop       ();
+          ImGui::EndChild      ();
+          ImGui::PopStyleVar   ();
+          ImGui::TreePop       ();
+        }
+        ImGui::TreePop ();
       }
 
       ImGui::TreePop ();

@@ -20,12 +20,14 @@
  *
 **/
 
+#define _CRT_SECURE_NO_WARNINGS
 #define NOMINMAX
 
 #include "config.h"
 #include "parameter.h"
 #include "ini.h"
 #include "log.h"
+#include "render.h"
 
 #include "DLL_VERSION.H"
 
@@ -785,51 +787,19 @@ TBF_LoadConfig (std::wstring name)
 
   if (sgssaa.length ())
   {
-    ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppFriendlyName"))     ( L"Tales of Berseria" );
-    ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppName"))             ( L"Tales of Berseria.exe" );
-
     if (sgssaa == L"2x")
-    {
-      wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
-                            L"Method",            L"2xMSAA",
-                            L"ReplayMode",        L"2XSGSSAA",
-                            L"Override",          L"On",
-                            nullptr,              nullptr };
-      ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
       config.render.nv.sgssaa_mode = 1;
-    }
 
     else if (sgssaa == L"4x")
-    {
-      wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
-                            L"Method",            L"4xMSAA",
-                            L"ReplayMode",        L"4xSGSSAA",
-                            L"Override",          L"On",
-                            nullptr,              nullptr };
-      ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
       config.render.nv.sgssaa_mode = 2;
-    }
 
     else if (sgssaa == L"8x")
-    {
-      wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
-                            L"Method",            L"8xMSAA",
-                            L"ReplayMode",        L"8xSGSSAA",
-                            L"Override",          L"On",
-                            nullptr,              nullptr };
-      ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
-      config.render.nv.sgssaa_mode = 4;
-    }
+      config.render.nv.sgssaa_mode = 3;
 
     else if (sgssaa == L"off")
-    {
-      wchar_t* props [] = { L"Method",            L"0x00000000",
-                            L"ReplayMode",        L"0x00000000",
-                            L"Override",          L"No",
-                            nullptr,              nullptr };
-      ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
       config.render.nv.sgssaa_mode = 0;
-    }
+
+    tbf::RenderFix::InstallSGSSAA ();
   }
 
   config.input.ui.scale = std::min (std::max (1.0f, config.input.ui.scale), 3.0f);

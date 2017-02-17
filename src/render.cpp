@@ -100,7 +100,6 @@ enum reset_stage_s {
 } trigger_reset;
 
 bool needs_aspect     = false;
-int TEST_VS = 107874419;
 
 uint32_t
 TBF_MakeShadowBitShift (uint32_t dim)
@@ -172,37 +171,17 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
   //dll_log->Log ( L" [!] IDirect3DDevice9::SetSamplerState (%lu, %lu, %lu)",
                    //Sampler, Type, Value );
 
-  // Pending removal - these are not configurable tweaks and not particularly useful
-  if ( Type == D3DSAMP_MIPFILTER ||
-       Type == D3DSAMP_MINFILTER ||
-       Type == D3DSAMP_MAGFILTER ||
-       Type == D3DSAMP_MIPMAPLODBIAS )
+  if ( Type == D3DSAMP_MIPMAPLODBIAS )
   {
     //dll_log->Log (L" [!] IDirect3DDevice9::SetSamplerState (...)");
 
-    if (Type <= 8)
+    if (Type == D3DSAMP_MIPMAPLODBIAS)
     {
-      //dll_log->Log (L" %s Filter: %x", Type == D3DSAMP_MIPFILTER ? L"Mip" : Type == D3DSAMP_MINFILTER ? L"Min" : L"Mag", Value);
-      if (Type == D3DSAMP_MIPFILTER && Value != D3DTEXF_NONE) {
-        Value = D3DTEXF_LINEAR;
-      }
+      float fMax = config.textures.lod_bias;
 
-      if ( Type == D3DSAMP_MAGFILTER ||
-           Type == D3DSAMP_MINFILTER )
-        if ( Value != D3DTEXF_POINT )
-          Value = D3DTEXF_ANISOTROPIC;
-
-      if (Type == D3DSAMP_MIPMAPLODBIAS)
-      {
-        float fMax = config.textures.lod_bias;
-
-        Value = *reinterpret_cast <DWORD *> (&fMax);
-      }
+      Value = *reinterpret_cast <DWORD *> (&fMax);
     }
   }
-
-  //if (Type == D3DSAMP_MAXMIPLEVEL)
-    //Value = 0;
 
   return D3D9SetSamplerState_Original (This, Sampler, Type, Value);
 }
@@ -1793,8 +1772,6 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
   command.AddVariable ("PostProcessRatio",      postproc_ratio);
   command.AddVariable ("ClearBlackbars",        clear_blackbars);
 
-  command.AddVariable ("TestVS", TBF_CreateVar (SK_IVariable::Int, &TEST_VS));
-
 #if 0
    uint8_t signature [] = { 0x39, 0x8E, 0xE3, 0x3F,
                             0xDB, 0x0F, 0x49, 0x3F };
@@ -1872,6 +1849,56 @@ void
 tbf::RenderFix::TriggerReset (void)
 {
   trigger_reset = reset_stage_s::Initiate;
+}
+
+extern HMODULE hInjectorDLL;
+
+bool
+tbf::RenderFix::InstallSGSSAA (void)
+{
+  ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppFriendlyName"))     ( L"Tales of Berseria" );
+  ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppName"))             ( L"Tales of Berseria.exe" );
+  
+  if (config.render.nv.sgssaa_mode == 1)
+  {
+    wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+                          L"Method",            L"2xMSAA",
+                          L"ReplayMode",        L"2xSGSSAA",
+                          L"Override",          L"On",
+                          nullptr,              nullptr };
+    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+  }
+  
+  else if (config.render.nv.sgssaa_mode == 2)
+  {
+    wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+                          L"Method",            L"4xMSAA",
+                          L"ReplayMode",        L"4xSGSSAA",
+                          L"Override",          L"On",
+                          nullptr,              nullptr };
+    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+  }
+  
+  else if (config.render.nv.sgssaa_mode == 3)
+  {
+    wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+                          L"Method",            L"8xMSAA",
+                          L"ReplayMode",        L"8xSGSSAA",
+                          L"Override",          L"On",
+                          nullptr,              nullptr };
+    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+  }
+  
+  else
+  {
+    wchar_t* props [] = { L"Method",            L"0x00000000",
+                          L"ReplayMode",        L"0x00000000",
+                          L"Override",          L"No",
+                          nullptr,              nullptr };
+    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+  }
+
+  return FALSE;
 }
 
 

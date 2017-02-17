@@ -178,6 +178,9 @@
     <ClCompile Include="src\tls.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="download.cpp">
+      <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\command.h">

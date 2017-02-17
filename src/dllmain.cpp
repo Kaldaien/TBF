@@ -66,12 +66,18 @@ SKPlugIn_Shutdown (LPVOID* lpReserved)
 
   if (dll_log != nullptr)
   {
+    // Do this so that fullscreen exclusive mode does not mess with a prompt that might come up when SGSSAA is setup
+    ShowWindow (tbf::RenderFix::hWndDevice, SW_FORCEMINIMIZE | SW_HIDE);
+
     tbf::SoundFix::Shutdown      ();
     //tbf::FileIO::Shutdown      ();
     //tbf::SteamFix::Shutdown    ();
     tbf::FrameRateFix::Shutdown  ();
-    tbf::RenderFix::Shutdown     ();
-    //tbf::KeyboardFix::Shutdown ();
+
+    // Weird thing to do at shutdown, right? :P This avoids any error popups while the game is in fullscreen exclusive.
+    tbf::RenderFix::InstallSGSSAA ();
+    tbf::RenderFix::Shutdown      ();
+    //tbf::KeyboardFix::Shutdown  ();
   
     TBF_SaveConfig     ();
     TBF_UnInit_MinHook ();

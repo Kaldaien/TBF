@@ -153,6 +153,7 @@
     <ClInclude Include="include\textures.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="download.cpp" />
     <ClCompile Include="src\command.cpp" />
     <ClCompile Include="src\config.cpp" />
     <ClCompile Include="src\dllmain.cpp">

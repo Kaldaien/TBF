@@ -45,6 +45,8 @@ namespace tbf
 
     void TriggerReset (void);
 
+    bool InstallSGSSAA (void);
+
     // Indicates whether setting changes need a device reset
     struct reset_state_s {
       bool textures = false;
