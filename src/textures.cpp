@@ -967,6 +967,8 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
                                             Pool, ppTexture, pSharedHandle );
   }
 
+  bool env_shadow = false;
+
   //
   // Model Shadows
   //
@@ -995,6 +997,8 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
             ( Usage  == D3DUSAGE_RENDERTARGET         ||
               Usage  == D3DUSAGE_DEPTHSTENCIL                    ) )
   {
+    env_shadow = true;
+
     //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
     uint32_t shift = config.render.env_shadow_rescale;
 
