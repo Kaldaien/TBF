@@ -429,15 +429,20 @@ TBFix_DrawConfigUI (void)
   ImGuiIO& io =
     ImGui::GetIO ();
 
-  // Dimensions of the game window on the last frame
-  static long last_width  = -1;
-  static long last_height = -1;
+  static int frame = 0;
 
-  if (last_width != tbf::RenderFix::width || last_height != tbf::RenderFix::height)
+  if (frame++ < 10)
+    ImGui::SetNextWindowPosCenter (ImGuiSetCond_Always);
+
+  if (io.DisplaySize.x != tbf::RenderFix::width ||
+      io.DisplaySize.y != tbf::RenderFix::height)
   {
-    last_width  = tbf::RenderFix::width;
-    last_height = tbf::RenderFix::height;
-    ImGui::SetNextWindowPosCenter     (ImGuiSetCond_Always);
+    frame = 0;
+
+    io.DisplaySize.x = tbf::RenderFix::width;
+    io.DisplaySize.y = tbf::RenderFix::height;
+
+    ImGui::SetNextWindowPosCenter (ImGuiSetCond_Always);;
   }
 
   ImGui::SetNextWindowSizeConstraints (ImVec2 (665, 50), ImVec2 ( ImGui::GetIO ().DisplaySize.x * 0.95f,
@@ -624,7 +629,8 @@ TBFix_DrawConfigUI (void)
   {
     ImGui::TreePush ("");
 
-    if (ImGui::CollapsingHeader ("Experimental")) {
+    if (ImGui::CollapsingHeader ("UI Fixes"))
+    {
       ImGui::TreePush ("");
 
       tbf::RenderFix::need_reset.graphics |=
@@ -635,9 +641,6 @@ TBFix_DrawConfigUI (void)
         ImGui::BeginTooltip ();
         ImGui::Text       ( "This feature is experimental and only works at 16:9 resolutions, I am not positive that it"
                             " will not break something unrelated." );
-        ImGui::Separator  ();
-        ImGui::Bullet     (); ImGui::SameLine ();
-        ImGui::Text       ("That is where you come in, my faithful guinea pig >:)" );
         ImGui::EndTooltip ();
       }
 
@@ -647,6 +650,10 @@ TBFix_DrawConfigUI (void)
       {
         ImGui::SetTooltip ("Fixes blurring and black line artifacts on key UI elements, but may break third-party overlays...");
       }
+
+      ImGui::Checkbox ("Clamp Skit Texture Coordinates",  &config.textures.clamp_skit_coords);
+      ImGui::Checkbox ("Clamp Map Texture Coordinates",   &config.textures.clamp_map_coords);
+      ImGui::Checkbox ("Clamp Text Texture Coordinates",  &config.textures.clamp_text_coords);
 
       ImGui::TreePop      ();
     }

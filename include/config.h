@@ -126,6 +126,9 @@ struct tbf_config_t
     bool     show_loading_text   =  false;
     bool     quick_load          =  false;
     bool     clamp_npot_coords   =  true;
+    bool     clamp_skit_coords   =  true;
+    bool     clamp_map_coords    =  false;
+    bool     clamp_text_coords   =  false;
     bool     highlight_debug_tex =  true;
   } textures;
 

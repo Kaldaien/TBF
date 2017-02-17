@@ -157,6 +157,7 @@ namespace RenderFix {
   class TextureManager {
   public:
     void Init     (void);
+    void Hook     (void);
     void Shutdown (void);
 
     void                     removeTexture   (ISKTextureD3D9* pTexD3D9);

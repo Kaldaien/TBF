@@ -86,7 +86,6 @@ static D3DXSaveTextureToFile_pfn               D3DXSaveTextureToFile            
 static D3DXCreateTextureFromFileInMemoryEx_pfn D3DXCreateTextureFromFileInMemoryEx_Original = nullptr;
 
 static BeginScene_pfn                          D3D9BeginScene                               = nullptr;
-static EndScene_pfn                            D3D9EndScene                                 = nullptr;
        SetRenderState_pfn                      D3D9SetRenderState                           = nullptr;
 
 static StretchRect_pfn                         D3D9StretchRect                              = nullptr;
@@ -880,6 +879,7 @@ D3D9SetTexture_Detour (
     }
   }
 
+  uint32_t tex_crc32 = 0x0;
 
   void* dontcare;
   if ( pTexture != nullptr &&
@@ -896,6 +896,8 @@ D3D9SetTexture_Detour (
     textures_used.emplace (pSKTex->tex_crc32);
 
     QueryPerformanceCounter (&pSKTex->last_used);
+
+    tex_crc32 = pSKTex->tex_crc32;
 
     //
     // This is how blocking is implemented -- only do it when a texture that needs
@@ -935,6 +937,24 @@ D3D9SetTexture_Detour (
   if (pTexture != nullptr) tsf::RenderFix::active_samplers.insert (Sampler);
   else                     tsf::RenderFix::active_samplers.erase  (Sampler);
 #endif
+  }
+
+  bool clamp = false;
+
+  if (ps_checksum == tbf::RenderFix::tracked_ps.crc32 && tbf::RenderFix::tracked_ps.clamp_coords)
+    clamp = true;
+
+  if (vs_checksum == tbf::RenderFix::tracked_vs.crc32 && tbf::RenderFix::tracked_vs.clamp_coords)
+    clamp = true;
+
+  if (                                                              clamp ||
+       ( config.textures.clamp_skit_coords && ps_checksum == 0x872e7c85 ) ||
+       ( config.textures.clamp_map_coords  && ps_checksum == 0xc954a649 ) ||
+       ( config.textures.clamp_text_coords && tex_crc32   == 0x00d92b2f ) )
+  {
+    This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
+    This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
+    This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP );
   }
 
   if (pTexture == nullptr)
@@ -1044,7 +1064,7 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     }
   }
 
-  else if (   config.render.fix_map_res    && Format == D3DFMT_A8R8G8B8 && 
+  else if (   config.render.fix_map_res &&
           ( Usage == D3DUSAGE_RENDERTARGET || Usage  == D3DUSAGE_DEPTHSTENCIL ) )
   {
     if (Width == tbf::RenderFix::width / 11 && Height == tbf::RenderFix::height / 11) {
@@ -1110,6 +1130,7 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
          ( Usage & D3DUSAGE_DEPTHSTENCIL ) ||
          ( Usage & D3DUSAGE_DYNAMIC      ) ) )
   {
+#if 0
     dll_log->Log (L" [!] IDirect3DDevice9::CreateTexture (%lu, %lu, %lu, %lu, "
                                                      L"%lu, %lu, %08Xh, %08Xh)",
                     Width, Height, Levels, Usage, Format, Pool, ppTexture,
@@ -1121,8 +1142,20 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
                       SK_D3D9_FormatToStr (Format).c_str (),
                       SK_D3D9_UsageToStr  (Usage).c_str  (),
                       SK_D3D9_PoolToStr   (Pool) );
+#endif
 
     tbf::RenderFix::tex_mgr.trackRenderTarget (*ppTexture);
+  }
+
+  else if (FAILED (result))
+  {
+    tex_log->Log ( L"[Load Trace] >> FAILURE (%x) << Creating Texture: "
+                   L"(%d x %d), Format: %s, Usage: [%s], Pool: %s",
+                     result,
+                       Width, Height,
+                         SK_D3D9_FormatToStr (Format).c_str (),
+                         SK_D3D9_UsageToStr  (Usage).c_str  (),
+                         SK_D3D9_PoolToStr   (Pool) );
   }
 
   return result;
@@ -2228,7 +2261,7 @@ TBFix_LoadQueuedTextures (void)
 
     QueryPerformanceCounter (&load->end);
 
-    if (true)
+    if (log_level > 0)
     {
       tex_log->Log ( L"[%s] Finished %s texture %08x (%5.2f MiB in %9.4f ms)",
                        (load->type == tbf_tex_load_s::Stream) ? L"Inject Tex" :
@@ -2329,7 +2362,7 @@ TBFix_LoadQueuedTextures (void)
 
     QueryPerformanceCounter (&load->end);
 
-    if (true)
+    if (log_level > 0)
     {
       tex_log->Log ( L"[%s] Finished %s texture %08x (%5.2f MiB in %9.4f ms)",
                        (load->type == tbf_tex_load_s::Stream) ? L"Inject Tex" :
@@ -2666,8 +2699,10 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
             injectable_textures.find (checksum) !=
                      injectable_textures.end () )
   {
-    tex_log->LogEx ( true, L"[Inject Tex] Injectable texture for checksum (%08x)... ",
-                       checksum );
+    if (log_level > 0) {
+      tex_log->LogEx ( true, L"[Inject Tex] Injectable texture for checksum (%08x)... ",
+                         checksum );
+    }
 
     tbf_tex_record_s record = injectable_textures [checksum];
 
@@ -2700,17 +2735,20 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
     wcscpy (load_op->wszFilename, wszInjectFileName);
 
-    if (load_op->type == tbf_tex_load_s::Stream)
+    if (log_level > 0)
     {
-      if ((! remap_stream))
-        tex_log->LogEx ( false, L"streaming\n" );
+      if (load_op->type == tbf_tex_load_s::Stream)
+      {
+        if ((! remap_stream))
+          tex_log->LogEx ( false, L"streaming\n" );
+        else
+          tex_log->LogEx ( false, L"in-flight already\n" );
+      }
+      
       else
-        tex_log->LogEx ( false, L"in-flight already\n" );
-    }
-
-    else
-    {
-      tex_log->LogEx ( false, L"blocking (deferred)\n" );
+      {
+        tex_log->LogEx ( false, L"blocking (deferred)\n" );
+      }
     }
   }
 
@@ -3130,9 +3168,9 @@ tbf::RenderFix::TextureManager::removeTexture (ISKTextureD3D9* pTexD3D9)
 
   remove_textures.push_back (pTexD3D9);
 
-  updateOSD ();
-
   LeaveCriticalSection (&cs_cache);
+
+  updateOSD ();
 }
 
 void
@@ -3147,9 +3185,9 @@ tbf::RenderFix::TextureManager::addTexture (uint32_t checksum, tbf::RenderFix::T
     textures [checksum] = pTex;
   }
 
-  updateOSD ();
-
   LeaveCriticalSection (&cs_cache);
+
+  updateOSD ();
 }
 
 void
@@ -3238,8 +3276,20 @@ D3D9SetRenderTarget_Detour (
 void
 tbf::RenderFix::TextureManager::Init (void)
 {
+  textures.reserve                  (4096);
+  textures_used.reserve             (2048);
+  textures_last_frame.reserve       (1024);
+  non_power_of_two_textures.reserve (512);
+  tracked_ps.used_textures.reserve  (256);
+  tracked_vs.used_textures.reserve  (256);
+  known.render_targets.reserve      (64);
+  used.render_targets.reserve       (64);
+  textures_in_flight.reserve        (32);
+  tracked_rt.pixel_shaders.reserve  (32);
+  tracked_rt.vertex_shaders.reserve (32);
+
   InitializeCriticalSectionAndSpinCount (&cs_cache, 16384UL);
-  InitializeCriticalSectionAndSpinCount (&osd_cs,   2UL);
+  InitializeCriticalSectionAndSpinCount (&osd_cs,   64UL);
 
   // Create the directory to store dumped textures
   if (config.textures.dump)
@@ -3305,6 +3355,54 @@ tbf::RenderFix::TextureManager::Init (void)
                        files, (double)liSize.QuadPart / (1024.0 * 1024.0) );
   }
 
+  InterlockedExchange64 (&bytes_saved, 0LL);
+
+  time_saved  = 0.0f;
+
+#ifdef NO_TLS
+  InitializeCriticalSectionAndSpinCount (&cs_tex_inject,   10000000);
+#endif
+  InitializeCriticalSectionAndSpinCount (&cs_tex_resample, 100000);
+  InitializeCriticalSectionAndSpinCount (&cs_tex_stream,   100000);
+
+  decomp_semaphore = 
+    CreateSemaphore ( nullptr,
+                        config.textures.worker_threads,
+                          config.textures.worker_threads,
+                            nullptr );
+
+  resample_pool       = new SK_TextureThreadPool ();
+
+  stream_pool.lrg_tex = new SK_TextureThreadPool ();
+  stream_pool.sm_tex  = new SK_TextureThreadPool ();
+
+  SK_ICommandProcessor& command =
+    *SK_GetCommandProcessor ();
+
+  command.AddVariable (
+    "Textures.Remap",
+      TBF_CreateVar (SK_IVariable::Boolean, &__remap_textures) );
+
+  command.AddVariable (
+    "Textures.Purge",
+      TBF_CreateVar (SK_IVariable::Boolean, &__need_purge) );
+
+  command.AddVariable (
+    "Textures.Trace",
+      TBF_CreateVar (SK_IVariable::Boolean, &__log_used) );
+
+  command.AddVariable (
+    "Textures.ShowCache",
+      TBF_CreateVar (SK_IVariable::Boolean, &__show_cache) );
+
+  command.AddVariable (
+    "Textures.MaxCacheSize",
+      TBF_CreateVar (SK_IVariable::Int,     &config.textures.max_cache_in_mib) );
+}
+
+void
+tbf::RenderFix::TextureManager::Hook (void)
+{
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9SetRenderState_Override",
                         D3D9SetRenderState_Detour,
@@ -3384,50 +3482,6 @@ tbf::RenderFix::TextureManager::Init (void)
     (D3DXGetImageInfoFromFile_pfn)
       GetProcAddress ( tbf::RenderFix::d3dx9_43_dll,
                          "D3DXGetImageInfoFromFileW" );
-
-  InterlockedExchange64 (&bytes_saved, 0LL);
-
-  time_saved  = 0.0f;
-
-#ifdef NO_TLS
-  InitializeCriticalSectionAndSpinCount (&cs_tex_inject,   10000000);
-#endif
-  InitializeCriticalSectionAndSpinCount (&cs_tex_resample, 100000);
-  InitializeCriticalSectionAndSpinCount (&cs_tex_stream,   100000);
-
-  decomp_semaphore = 
-    CreateSemaphore ( nullptr,
-                        config.textures.worker_threads,
-                          config.textures.worker_threads,
-                            nullptr );
-
-  resample_pool       = new SK_TextureThreadPool ();
-
-  stream_pool.lrg_tex = new SK_TextureThreadPool ();
-  stream_pool.sm_tex  = new SK_TextureThreadPool ();
-
-  SK_ICommandProcessor& command =
-    *SK_GetCommandProcessor ();
-
-  command.AddVariable (
-    "Textures.Remap",
-      TBF_CreateVar (SK_IVariable::Boolean, &__remap_textures) );
-
-  command.AddVariable (
-    "Textures.Purge",
-      TBF_CreateVar (SK_IVariable::Boolean, &__need_purge) );
-
-  command.AddVariable (
-    "Textures.Trace",
-      TBF_CreateVar (SK_IVariable::Boolean, &__log_used) );
-
-  command.AddVariable (
-    "Textures.ShowCache",
-      TBF_CreateVar (SK_IVariable::Boolean, &__show_cache) );
-
-  command.AddVariable (
-    "Textures.MaxCacheSize",
-      TBF_CreateVar (SK_IVariable::Int,     &config.textures.max_cache_in_mib) );
 }
 
 // Skip the purge step on shutdown

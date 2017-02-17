@@ -1501,7 +1501,7 @@ tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
   ULONG count = InterlockedIncrement (&reset_count);
 
   if (count == 1UL) {
-    tex_mgr.Init         ();
+    tex_mgr.Hook         ();
     TBF_ApplyQueuedHooks ();
   }
 
@@ -1636,6 +1636,13 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
 void
 tbf::RenderFix::Init (void)
 {
+  last_frame.vertex_shaders.reserve (256);
+  last_frame.pixel_shaders.reserve  (256);
+  ps_disassembly.reserve            (512);
+  vs_disassembly.reserve            (512);
+  vs_checksums.reserve              (8192);
+  ps_checksums.reserve              (8192);
+
   trigger_reset = reset_stage_s::Clear;
 
   d3dx9_43_dll = LoadLibrary (L"D3DX9_43.DLL");
@@ -1728,6 +1735,8 @@ tbf::RenderFix::Init (void)
                          "D3DXDisassembleShader" );
 
   CommandProcessor* comm_proc = CommandProcessor::getInstance ();
+
+  tex_mgr.Init ();
 }
 
 void

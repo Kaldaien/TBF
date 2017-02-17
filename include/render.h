@@ -116,6 +116,7 @@ namespace tbf
 
       uint32_t                      crc32        =  0x00;
       bool                          cancel_draws = false;
+      bool                          clamp_coords = false;
       bool                          active       = false;
       int                           num_draws    =     0;
       std::unordered_set <uint32_t>    used_textures;

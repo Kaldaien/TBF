@@ -492,6 +492,8 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
       ImGui::EndTooltip ();
     }
 
+    ImGui::Checkbox ("Clamp Texture Coordinates For Selected Shader", &tracker->clamp_coords);
+
     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.80f, 0.80f, 1.0f, 1.0f));
     ImGui::TextWrapped    (disassembly [tracker->crc32].header.c_str ());
 
