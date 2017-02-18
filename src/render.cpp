@@ -291,6 +291,11 @@ DECLARE_INTERFACE_(ID3DXBuffer, IUnknown)
     STDMETHOD_ (DWORD,  GetBufferSize)    (THIS) PURE;
 };
 
+typedef HRESULT (WINAPI *D3DXGetShaderConstantTable_pfn)(
+  _In_  const DWORD                *pFunction,
+  _Out_       LPD3DXCONSTANTTABLE *ppConstantTable
+);
+
 typedef HRESULT (WINAPI *D3DXDisassembleShader_pfn)(
   _In_  const DWORD         *pShader,
   _In_        BOOL            EnableColorCode,
@@ -447,14 +452,21 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
   vs_checksum = vs_checksums [pShader];
   g_pVS       = pShader;
 
-  tbf::RenderFix::last_frame.vertex_shaders.insert (vs_checksum);
-
-  if (tbf::RenderFix::tracked_rt.active)
-    tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
-
-  if (vs_checksum == tbf::RenderFix::tracked_vs.crc32)
-    for (int i = 0; i < 16; i++)
-      tbf::RenderFix::tracked_vs.current_textures [i] = 0x0;
+  if (vs_checksum != 0x00)
+  {
+    tbf::RenderFix::last_frame.vertex_shaders.insert (vs_checksum);
+    
+    if (tbf::RenderFix::tracked_rt.active)
+      tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
+    
+    if (vs_checksum == tbf::RenderFix::tracked_vs.crc32)
+    {
+      tbf::RenderFix::tracked_vs.use (pShader);
+    
+      for (int i = 0; i < 16; i++)
+        tbf::RenderFix::tracked_vs.current_textures [i] = 0x0;
+    }
+  }
 
   return D3D9SetVertexShader_Original (This, pShader);
 }
@@ -523,14 +535,21 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
   ps_checksum = ps_checksums [pShader];
   g_pPS       = pShader;
 
-  tbf::RenderFix::last_frame.pixel_shaders.insert (ps_checksum);
-
-  if (tbf::RenderFix::tracked_rt.active)
-    tbf::RenderFix::tracked_rt.pixel_shaders.insert (ps_checksum);
-
-  if (ps_checksum == tbf::RenderFix::tracked_ps.crc32)
-    for (int i = 0; i < 16; i++)
-      tbf::RenderFix::tracked_ps.current_textures [i] = 0x0;
+  if (ps_checksum != 0x00)
+  {
+    tbf::RenderFix::last_frame.pixel_shaders.insert (ps_checksum);
+    
+    if (tbf::RenderFix::tracked_rt.active)
+      tbf::RenderFix::tracked_rt.pixel_shaders.insert (ps_checksum);
+    
+    if (ps_checksum == tbf::RenderFix::tracked_ps.crc32)
+    {
+      tbf::RenderFix::tracked_ps.use (pShader);
+    
+      for (int i = 0; i < 16; i++)
+        tbf::RenderFix::tracked_ps.current_textures [i] = 0x0;
+    }
+  }
 
   return D3D9SetPixelShader_Original (This, pShader);
 }
@@ -558,6 +577,22 @@ TBF_ShouldSkipRenderPass (void)
     for (int i = 0; i < 16; i++)
       if (tbf::RenderFix::tracked_vs.current_textures [i] != 0)
         tbf::RenderFix::tracked_vs.used_textures.emplace (tbf::RenderFix::tracked_vs.current_textures [i]);
+
+
+    //
+    // TODO: Make generic and move into class -- must pass shader type to function
+    //
+    for ( auto&& it : tbf::RenderFix::tracked_vs.constants )
+    {
+      for ( auto&& it2 : it.struct_members )
+      {
+        if ( it2.Override ) 
+          tbf::RenderFix::pDevice->SetVertexShaderConstantF ( it2.RegisterIndex, it2.Data, 1 );
+      }
+
+      if ( it.Override ) 
+        tbf::RenderFix::pDevice->SetVertexShaderConstantF ( it.RegisterIndex, it.Data, 1 );
+    }
   }
 
   if (tracked_ps)
@@ -567,6 +602,21 @@ TBF_ShouldSkipRenderPass (void)
     for (int i = 0; i < 16; i++)
       if (tbf::RenderFix::tracked_ps.current_textures [i] != 0)
         tbf::RenderFix::tracked_ps.used_textures.emplace (tbf::RenderFix::tracked_ps.current_textures [i]);
+
+    //
+    // TODO: Make generic and move into class -- must pass shader type to function
+    //
+    for ( auto&& it : tbf::RenderFix::tracked_ps.constants )
+    {
+      for ( auto&& it2 : it.struct_members )
+      {
+        if ( it2.Override ) 
+          tbf::RenderFix::pDevice->SetPixelShaderConstantF ( it2.RegisterIndex, it2.Data, 1 );
+      }
+
+      if ( it.Override ) 
+        tbf::RenderFix::pDevice->SetPixelShaderConstantF ( it.RegisterIndex, it.Data, 1 );
+    }
   }
 
 
@@ -2065,3 +2115,101 @@ tbf::RenderFix::shader_tracking_s
 
 tbf::RenderFix::vertex_buffer_tracking_s
                    tbf::RenderFix::tracked_vb;
+
+void
+EnumConstant ( tbf::RenderFix::shader_tracking_s* pShader,
+               ID3DXConstantTable*                pConstantTable,
+               D3DXHANDLE                         hConstant,
+               tbf::RenderFix::shader_tracking_s::
+                               shader_constant_s& constant,
+               std::vector <
+                 tbf::RenderFix::shader_tracking_s::
+                             shader_constant_s >& list )
+{
+  UINT one = 1;
+  
+  D3DXCONSTANT_DESC constant_desc;
+  if (SUCCEEDED (pConstantTable->GetConstantDesc (hConstant, &constant_desc, &one)))
+  {
+    strncpy (constant.Name, constant_desc.Name, 128);
+    constant.Class         = constant_desc.Class;
+    constant.Type          = constant_desc.Type;
+    constant.RegisterSet   = constant_desc.RegisterSet;
+    constant.RegisterIndex = constant_desc.RegisterIndex;
+    constant.RegisterCount = constant_desc.RegisterCount;
+    constant.Rows          = constant_desc.Rows;
+    constant.Columns       = constant_desc.Columns;
+    //constant.Elements      = constant_desc.Elements;
+
+    //if (constant_desc.DefaultValue != nullptr)
+      //memcpy (constant.Data, constant_desc.DefaultValue, std::min ((size_t)constant_desc.Bytes, sizeof (float) * 4UL));
+
+    for ( UINT j = 0; j < constant_desc.StructMembers; j++ )
+    {
+      D3DXHANDLE hConstantStruct =
+        pConstantTable->GetConstant (hConstant, j);
+  
+      tbf::RenderFix::shader_tracking_s::shader_constant_s struct_constant = { };
+  
+      EnumConstant (pShader, pConstantTable, hConstantStruct, struct_constant, constant.struct_members );
+    }
+  
+    list.push_back (constant);
+  }
+};
+
+
+
+void
+tbf::RenderFix::shader_tracking_s::use (IUnknown *pShader)
+{
+  if (shader_obj != pShader)
+  {
+    constants.clear ();
+
+    shader_obj = pShader;
+
+    static D3DXGetShaderConstantTable_pfn D3DXGetShaderConstantTable =
+      (D3DXGetShaderConstantTable_pfn)
+        GetProcAddress (d3dx9_43_dll, "D3DXGetShaderConstantTable");
+
+    UINT len;
+    if (SUCCEEDED (((IDirect3DVertexShader9 *)pShader)->GetFunction (nullptr, &len)))
+    {
+      void* pbFunc = malloc (len);
+      
+      if (pbFunc != nullptr)
+      {
+        if ( SUCCEEDED ( ((IDirect3DVertexShader9 *)pShader)->GetFunction ( pbFunc,
+                                                                              &len )
+                       )
+           )
+        {
+          CComPtr <ID3DXConstantTable> pConstantTable = nullptr;
+
+          if (SUCCEEDED (D3DXGetShaderConstantTable ((DWORD *)pbFunc, &pConstantTable)))
+          {
+            D3DXCONSTANTTABLE_DESC ct_desc;
+
+            if (SUCCEEDED (pConstantTable->GetDesc (&ct_desc)))
+            {
+              UINT constant_count = ct_desc.Constants;
+
+              for (UINT i = 0; i < constant_count; i++)
+              {
+                D3DXHANDLE hConstant =
+                  pConstantTable->GetConstant (nullptr, i);
+
+                shader_constant_s constant = { };
+
+                EnumConstant (this, pConstantTable, hConstant, constant, constants);
+              }
+            }
+          }
+        }
+      
+        free (pbFunc);
+      }
+    }
+  }
+}

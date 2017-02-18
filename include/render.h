@@ -33,6 +33,310 @@
 
 #include <unordered_set>
 
+//---------------------------------------------------------------------------
+// D3DXTX_VERSION:
+// --------------
+// Version token used to create a procedural texture filler in effects
+// Used by D3DXFill[]TX functions
+//---------------------------------------------------------------------------
+#define D3DXTX_VERSION(_Major,_Minor) (('T' << 24) | ('X' << 16) | ((_Major) << 8) | (_Minor))
+
+
+
+//----------------------------------------------------------------------------
+// D3DXSHADER flags:
+// -----------------
+// D3DXSHADER_DEBUG
+//   Insert debug file/line/type/symbol information.
+//
+// D3DXSHADER_SKIPVALIDATION
+//   Do not validate the generated code against known capabilities and
+//   constraints.  This option is only recommended when compiling shaders
+//   you KNOW will work.  (ie. have compiled before without this option.)
+//   Shaders are always validated by D3D before they are set to the device.
+//
+// D3DXSHADER_SKIPOPTIMIZATION 
+//   Instructs the compiler to skip optimization steps during code generation.
+//   Unless you are trying to isolate a problem in your code using this option 
+//   is not recommended.
+//
+// D3DXSHADER_PACKMATRIX_ROWMAJOR
+//   Unless explicitly specified, matrices will be packed in row-major order
+//   on input and output from the shader.
+//
+// D3DXSHADER_PACKMATRIX_COLUMNMAJOR
+//   Unless explicitly specified, matrices will be packed in column-major 
+//   order on input and output from the shader.  This is generally more 
+//   efficient, since it allows vector-matrix multiplication to be performed
+//   using a series of dot-products.
+//
+// D3DXSHADER_PARTIALPRECISION
+//   Force all computations in resulting shader to occur at partial precision.
+//   This may result in faster evaluation of shaders on some hardware.
+//
+// D3DXSHADER_FORCE_VS_SOFTWARE_NOOPT
+//   Force compiler to compile against the next highest available software
+//   target for vertex shaders.  This flag also turns optimizations off, 
+//   and debugging on.  
+//
+// D3DXSHADER_FORCE_PS_SOFTWARE_NOOPT
+//   Force compiler to compile against the next highest available software
+//   target for pixel shaders.  This flag also turns optimizations off, 
+//   and debugging on.
+//
+// D3DXSHADER_NO_PRESHADER
+//   Disables Preshaders. Using this flag will cause the compiler to not 
+//   pull out static expression for evaluation on the host cpu
+//
+// D3DXSHADER_AVOID_FLOW_CONTROL
+//   Hint compiler to avoid flow-control constructs where possible.
+//
+// D3DXSHADER_PREFER_FLOW_CONTROL
+//   Hint compiler to prefer flow-control constructs where possible.
+//
+//----------------------------------------------------------------------------
+
+#define D3DXSHADER_DEBUG                          (1 << 0)
+#define D3DXSHADER_SKIPVALIDATION                 (1 << 1)
+#define D3DXSHADER_SKIPOPTIMIZATION               (1 << 2)
+#define D3DXSHADER_PACKMATRIX_ROWMAJOR            (1 << 3)
+#define D3DXSHADER_PACKMATRIX_COLUMNMAJOR         (1 << 4)
+#define D3DXSHADER_PARTIALPRECISION               (1 << 5)
+#define D3DXSHADER_FORCE_VS_SOFTWARE_NOOPT        (1 << 6)
+#define D3DXSHADER_FORCE_PS_SOFTWARE_NOOPT        (1 << 7)
+#define D3DXSHADER_NO_PRESHADER                   (1 << 8)
+#define D3DXSHADER_AVOID_FLOW_CONTROL             (1 << 9)
+#define D3DXSHADER_PREFER_FLOW_CONTROL            (1 << 10)
+#define D3DXSHADER_ENABLE_BACKWARDS_COMPATIBILITY (1 << 12)
+#define D3DXSHADER_IEEE_STRICTNESS                (1 << 13)
+#define D3DXSHADER_USE_LEGACY_D3DX9_31_DLL        (1 << 16)
+
+
+// optimization level flags
+#define D3DXSHADER_OPTIMIZATION_LEVEL0            (1 << 14)
+#define D3DXSHADER_OPTIMIZATION_LEVEL1            0
+#define D3DXSHADER_OPTIMIZATION_LEVEL2            ((1 << 14) | (1 << 15))
+#define D3DXSHADER_OPTIMIZATION_LEVEL3            (1 << 15)
+
+
+
+//----------------------------------------------------------------------------
+// D3DXCONSTTABLE flags:
+// -------------------
+
+#define D3DXCONSTTABLE_LARGEADDRESSAWARE          (1 << 17)
+
+
+
+//----------------------------------------------------------------------------
+// D3DXHANDLE:
+// -----------
+// Handle values used to efficiently reference shader and effect parameters.
+// Strings can be used as handles.  However, handles are not always strings.
+//----------------------------------------------------------------------------
+
+#ifndef D3DXFX_LARGEADDRESS_HANDLE
+typedef LPCSTR D3DXHANDLE;
+#else
+typedef UINT_PTR D3DXHANDLE;
+#endif
+typedef D3DXHANDLE *LPD3DXHANDLE;
+
+
+//----------------------------------------------------------------------------
+// D3DXMACRO:
+// ----------
+// Preprocessor macro definition.  The application pass in a NULL-terminated
+// array of this structure to various D3DX APIs.  This enables the application
+// to #define tokens at runtime, before the file is parsed.
+//----------------------------------------------------------------------------
+
+typedef struct _D3DXMACRO
+{
+    LPCSTR Name;
+    LPCSTR Definition;
+
+} D3DXMACRO, *LPD3DXMACRO;
+
+
+//----------------------------------------------------------------------------
+// D3DXSEMANTIC:
+//----------------------------------------------------------------------------
+
+typedef struct _D3DXSEMANTIC
+{
+    UINT Usage;
+    UINT UsageIndex;
+
+} D3DXSEMANTIC, *LPD3DXSEMANTIC;
+
+
+
+//----------------------------------------------------------------------------
+// D3DXREGISTER_SET:
+//----------------------------------------------------------------------------
+
+typedef enum _D3DXREGISTER_SET
+{
+    D3DXRS_BOOL,
+    D3DXRS_INT4,
+    D3DXRS_FLOAT4,
+    D3DXRS_SAMPLER,
+
+    // force 32-bit size enum
+    D3DXRS_FORCE_DWORD = 0x7fffffff
+
+} D3DXREGISTER_SET, *LPD3DXREGISTER_SET;
+
+
+//----------------------------------------------------------------------------
+// D3DXPARAMETER_CLASS:
+//----------------------------------------------------------------------------
+
+typedef enum _D3DXPARAMETER_CLASS
+{
+    D3DXPC_SCALAR,
+    D3DXPC_VECTOR,
+    D3DXPC_MATRIX_ROWS,
+    D3DXPC_MATRIX_COLUMNS,
+    D3DXPC_OBJECT,
+    D3DXPC_STRUCT,
+
+    // force 32-bit size enum
+    D3DXPC_FORCE_DWORD = 0x7fffffff
+
+} D3DXPARAMETER_CLASS, *LPD3DXPARAMETER_CLASS;
+
+
+//----------------------------------------------------------------------------
+// D3DXPARAMETER_TYPE:
+//----------------------------------------------------------------------------
+
+typedef enum _D3DXPARAMETER_TYPE
+{
+    D3DXPT_VOID,
+    D3DXPT_BOOL,
+    D3DXPT_INT,
+    D3DXPT_FLOAT,
+    D3DXPT_STRING,
+    D3DXPT_TEXTURE,
+    D3DXPT_TEXTURE1D,
+    D3DXPT_TEXTURE2D,
+    D3DXPT_TEXTURE3D,
+    D3DXPT_TEXTURECUBE,
+    D3DXPT_SAMPLER,
+    D3DXPT_SAMPLER1D,
+    D3DXPT_SAMPLER2D,
+    D3DXPT_SAMPLER3D,
+    D3DXPT_SAMPLERCUBE,
+    D3DXPT_PIXELSHADER,
+    D3DXPT_VERTEXSHADER,
+    D3DXPT_PIXELFRAGMENT,
+    D3DXPT_VERTEXFRAGMENT,
+    D3DXPT_UNSUPPORTED,
+
+    // force 32-bit size enum
+    D3DXPT_FORCE_DWORD = 0x7fffffff
+
+} D3DXPARAMETER_TYPE, *LPD3DXPARAMETER_TYPE;
+
+
+//----------------------------------------------------------------------------
+// D3DXCONSTANTTABLE_DESC:
+//----------------------------------------------------------------------------
+
+typedef struct _D3DXCONSTANTTABLE_DESC
+{
+    LPCSTR Creator;                     // Creator string
+    DWORD Version;                      // Shader version
+    UINT Constants;                     // Number of constants
+
+} D3DXCONSTANTTABLE_DESC, *LPD3DXCONSTANTTABLE_DESC;
+
+
+//----------------------------------------------------------------------------
+// D3DXCONSTANT_DESC:
+//----------------------------------------------------------------------------
+
+typedef struct _D3DXCONSTANT_DESC
+{
+    LPCSTR Name;                        // Constant name
+
+    D3DXREGISTER_SET RegisterSet;       // Register set
+    UINT RegisterIndex;                 // Register index
+    UINT RegisterCount;                 // Number of registers occupied
+
+    D3DXPARAMETER_CLASS Class;          // Class
+    D3DXPARAMETER_TYPE Type;            // Component type
+
+    UINT Rows;                          // Number of rows
+    UINT Columns;                       // Number of columns
+    UINT Elements;                      // Number of array elements
+    UINT StructMembers;                 // Number of structure member sub-parameters
+
+    UINT Bytes;                         // Data size, in bytes
+    LPCVOID DefaultValue;               // Pointer to default value
+
+} D3DXCONSTANT_DESC, *LPD3DXCONSTANT_DESC;
+
+
+
+//----------------------------------------------------------------------------
+// ID3DXConstantTable:
+//----------------------------------------------------------------------------
+
+typedef interface ID3DXConstantTable ID3DXConstantTable;
+typedef interface ID3DXConstantTable *LPD3DXCONSTANTTABLE;
+
+// {AB3C758F-093E-4356-B762-4DB18F1B3A01}
+DEFINE_GUID(IID_ID3DXConstantTable, 
+0xab3c758f, 0x93e, 0x4356, 0xb7, 0x62, 0x4d, 0xb1, 0x8f, 0x1b, 0x3a, 0x1);
+
+
+#undef INTERFACE
+#define INTERFACE ID3DXConstantTable
+
+DECLARE_INTERFACE_(ID3DXConstantTable, IUnknown)
+{
+    // IUnknown
+    STDMETHOD(QueryInterface)(THIS_ REFIID iid, LPVOID *ppv) PURE;
+    STDMETHOD_(ULONG, AddRef)(THIS) PURE;
+    STDMETHOD_(ULONG, Release)(THIS) PURE;
+
+    // Buffer
+    STDMETHOD_(LPVOID, GetBufferPointer)(THIS) PURE;
+    STDMETHOD_(DWORD, GetBufferSize)(THIS) PURE;
+
+    // Descs
+    STDMETHOD(GetDesc)(THIS_ D3DXCONSTANTTABLE_DESC *pDesc) PURE;
+    STDMETHOD(GetConstantDesc)(THIS_ D3DXHANDLE hConstant, D3DXCONSTANT_DESC *pConstantDesc, UINT *pCount) PURE;
+    STDMETHOD_(UINT, GetSamplerIndex)(THIS_ D3DXHANDLE hConstant) PURE;
+
+    // Handle operation
+    STDMETHOD_(D3DXHANDLE, GetConstant)(THIS_ D3DXHANDLE hConstant, UINT Index) PURE;
+    STDMETHOD_(D3DXHANDLE, GetConstantByName)(THIS_ D3DXHANDLE hConstant, LPCSTR pName) PURE;
+    STDMETHOD_(D3DXHANDLE, GetConstantElement)(THIS_ D3DXHANDLE hConstant, UINT Index) PURE;
+
+    // Set Constants
+    STDMETHOD(SetDefaults)(THIS_ LPDIRECT3DDEVICE9 pDevice) PURE;
+    STDMETHOD(SetValue)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, LPCVOID pData, UINT Bytes) PURE;
+    STDMETHOD(SetBool)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, BOOL b) PURE;
+    STDMETHOD(SetBoolArray)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST BOOL* pb, UINT Count) PURE;
+    STDMETHOD(SetInt)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, INT n) PURE;
+    STDMETHOD(SetIntArray)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST INT* pn, UINT Count) PURE;
+    STDMETHOD(SetFloat)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, FLOAT f) PURE;
+    STDMETHOD(SetFloatArray)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST FLOAT* pf, UINT Count) PURE;
+    STDMETHOD(SetVector)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST LPVOID pVector) PURE;
+    STDMETHOD(SetVectorArray)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST LPVOID pVector, UINT Count) PURE;
+    STDMETHOD(SetMatrix)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST LPVOID pMatrix) PURE;
+    STDMETHOD(SetMatrixArray)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST LPVOID pMatrix, UINT Count) PURE;
+    STDMETHOD(SetMatrixPointerArray)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST LPVOID* ppMatrix, UINT Count) PURE;
+    STDMETHOD(SetMatrixTranspose)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST LPVOID pMatrix) PURE;
+    STDMETHOD(SetMatrixTransposeArray)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST LPVOID pMatrix, UINT Count) PURE;
+    STDMETHOD(SetMatrixTransposePointerArray)(THIS_ LPDIRECT3DDEVICE9 pDevice, D3DXHANDLE hConstant, CONST LPVOID* ppMatrix, UINT Count) PURE;
+};
+
+
 namespace tbf
 {
   namespace RenderFix
@@ -113,7 +417,16 @@ namespace tbf
 
     struct shader_tracking_s
     {
-      void clear (void) { active = false; num_draws = 0; used_textures.clear ();  for (int i = 0; i < 16; i++) current_textures [i] = 0x00; }
+      void clear (void) {
+        active    = false;
+        num_draws = 0;
+        used_textures.clear ();
+
+        for (int i = 0; i < 16; i++)
+          current_textures [i] = 0x00;
+      }
+
+      void use (IUnknown* pShader);
 
       uint32_t                      crc32        =  0x00;
       bool                          cancel_draws = false;
@@ -122,6 +435,30 @@ namespace tbf
       int                           num_draws    =     0;
       std::unordered_set <uint32_t>    used_textures;
                           uint32_t  current_textures [16];
+
+      //std::vector <IDirect3DBaseTexture9 *> samplers;
+
+      IUnknown*                     shader_obj  = nullptr;
+      ID3DXConstantTable*           ctable      = nullptr;
+
+      struct shader_constant_s
+      {
+        char                Name [128];
+        D3DXREGISTER_SET    RegisterSet;
+        UINT                RegisterIndex;
+        UINT                RegisterCount;
+        D3DXPARAMETER_CLASS Class;
+        D3DXPARAMETER_TYPE  Type;
+        UINT                Rows;
+        UINT                Columns;
+        UINT                Elements;
+        std::vector <shader_constant_s>
+                            struct_members;
+        bool                Override;
+        float               Data [4]; // TEMP HACK
+      };
+
+      std::vector <shader_constant_s> constants;
     } extern tracked_vs, tracked_ps;
 
     struct vertex_buffer_tracking_s

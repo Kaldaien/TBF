@@ -497,13 +497,48 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.80f, 0.80f, 1.0f, 1.0f));
     ImGui::TextWrapped    (disassembly [tracker->crc32].header.c_str ());
 
+    ImGui::TreePush ("");
+    ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.8f, 0.8f, 0.8f, 1.0f));
+
+    for ( auto&& it : tracker->constants )
+    {
+      if (it.struct_members.size ())
+      {
+        ImGui::Text (it.Name);
+
+        ImGui::TreePush ("");
+
+        for ( auto&& it2 : it.struct_members )
+        {
+          if (it2.Type == D3DXPT_FLOAT && it2.Class == D3DXPC_VECTOR) {
+            ImGui::Checkbox    (it2.Name, &it2.Override); ImGui::SameLine ();
+            ImGui::InputFloat4 (it2.Name, it2.Data);
+          }
+          else
+            ImGui::Text (it2.Name);
+        }
+
+        ImGui::TreePop ();
+      }
+
+      else
+      {
+        if (it.Type == D3DXPT_FLOAT && it.Class == D3DXPC_VECTOR) {
+          ImGui::Checkbox    (it.Name, &it.Override); ImGui::SameLine ();
+          ImGui::InputFloat4 (it.Name, it.Data);
+        } else
+          ImGui::Text (it.Name);
+      }
+    }
+    ImGui::TreePop ();
+
     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.99f, 0.99f, 0.01f, 1.0f));
     ImGui::TextWrapped    (disassembly [tracker->crc32].code.c_str ());
 
     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.5f, 0.95f, 0.5f, 1.0f));
     ImGui::TextWrapped    (disassembly [tracker->crc32].footer.c_str ());
 
-    ImGui::PopStyleColor (3);
+    ImGui::PopStyleColor (4);
   }
   else
     tracker->cancel_draws = false;
@@ -531,7 +566,7 @@ TBF_LiveVertexStreamView (bool& can_scroll)
   {
     std::vector <std::string> contents;
     bool                      dirty      = true;
-    uint32_t                  last_sel   =    0;
+    uintptr_t                 last_sel   =    0;
     int                            sel   =   -1;
     float                     last_ht    = 256.0f;
     ImVec2                    last_min   = ImVec2 (0.0f, 0.0f);
@@ -573,7 +608,7 @@ TBF_LiveVertexStreamView (bool& can_scroll)
 
       list->contents.emplace_back (szDesc);
 
-      if ((uint32_t)it == list->last_sel)
+      if ((uintptr_t)it == list->last_sel)
       {
         list->sel = idx;
         //tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
@@ -639,8 +674,8 @@ TBF_LiveVertexStreamView (bool& can_scroll)
           ImGui::SetScrollHere (0.5f);
 
           sel_changed            = false;
-          list->last_sel         = (uint32_t)buffers [list->sel];
-          tracker->vertex_buffer =           buffers [list->sel];
+          list->last_sel         = (uintptr_t)buffers [list->sel];
+          tracker->vertex_buffer =            buffers [list->sel];
         }
       }
 
@@ -652,8 +687,8 @@ TBF_LiveVertexStreamView (bool& can_scroll)
         {
           sel_changed            = true;
           list->sel              =  line;
-          list->last_sel         = (uint32_t)buffers [list->sel];
-          tracker->vertex_buffer =           buffers [list->sel];
+          list->last_sel         = (uintptr_t)buffers [list->sel];
+          tracker->vertex_buffer =            buffers [list->sel];
         }
       }
     }
@@ -1332,7 +1367,7 @@ TBFix_TextureModDlg (void)
   ImGui::PopItemWidth ();
 
   if (can_scroll)
-    ImGui::SetScrollY (ImGui::GetScrollY () + 5.0 * ImGui::GetFont ()->FontSize * -ImGui::GetIO ().MouseWheel);
+    ImGui::SetScrollY (ImGui::GetScrollY () + 5.0f * ImGui::GetFont ()->FontSize * -ImGui::GetIO ().MouseWheel);
 
   ImGui::End          ();
 
