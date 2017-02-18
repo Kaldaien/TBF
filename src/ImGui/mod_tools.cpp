@@ -451,14 +451,24 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
 
   if (tracker->crc32 != 0x00)
   {
-    ImGui::Checkbox ("Cancel Draws Using Selected Shader",  &tracker->cancel_draws);  ImGui::SameLine ();
+    ImGui::BeginGroup ();
+    ImGui::Checkbox ( shader_type == tbf_shader_class::Pixel ? "Cancel Draws Using Selected Pixel Shader" :
+                                                               "Cancel Draws Using Selected Vertex Shader", 
+                        &tracker->cancel_draws );  ImGui::SameLine ();
 
     if (tracker->cancel_draws)
       ImGui::TextDisabled ("%lu Skipped Draw%c Last Frame (%lu textures)", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->used_textures.size () );
     else
       ImGui::TextDisabled ("%lu Draw%c Last Frame         (%lu textures)", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->used_textures.size () );
 
-    if (ImGui::IsMouseHoveringRect (list->last_min, list->last_max) && tracker->used_textures.size ())
+    ImGui::Checkbox ( shader_type == tbf_shader_class::Pixel ? "Clamp Texture Coordinates For Selected Pixel Shader" :
+                                                               "Clamp Texture Coordinates For Selected Vertex Shader",
+                        &tracker->clamp_coords );
+
+    ImGui::Separator      ();
+    ImGui::EndGroup       ();
+
+    if (ImGui::IsItemHoveredRect () && tracker->used_textures.size ())
     {
       ImGui::BeginTooltip ();
 
@@ -492,48 +502,83 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
       ImGui::EndTooltip ();
     }
 
-    ImGui::Checkbox ("Clamp Texture Coordinates For Selected Shader", &tracker->clamp_coords);
-
     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.80f, 0.80f, 1.0f, 1.0f));
     ImGui::TextWrapped    (disassembly [tracker->crc32].header.c_str ());
 
-    ImGui::TreePush ("");
-    ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.8f, 0.8f, 0.8f, 1.0f));
+    ImGui::SameLine       ();
+    ImGui::BeginGroup     ();
+    ImGui::TreePush       ("");
+    ImGui::Spacing        (); ImGui::Spacing ();
+    ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.666f, 0.666f, 0.666f, 1.0f));
+
+    char szName    [192] = { '\0' };
+    char szOrdinal [64 ] = { '\0' };
+    char szOrdEl   [ 96] = { '\0' };
+
+    int  el = 0;
+
+    ImGui::PushItemWidth (font_size * 25);
 
     for ( auto&& it : tracker->constants )
     {
       if (it.struct_members.size ())
       {
-        ImGui::Text (it.Name);
-
-        ImGui::TreePush ("");
+        ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.9f, 0.1f, 0.7f, 1.0f));
+        ImGui::Text           (it.Name);
+        ImGui::PopStyleColor  ();
 
         for ( auto&& it2 : it.struct_members )
         {
-          if (it2.Type == D3DXPT_FLOAT && it2.Class == D3DXPC_VECTOR) {
-            ImGui::Checkbox    (it2.Name, &it2.Override); ImGui::SameLine ();
-            ImGui::InputFloat4 (it2.Name, it2.Data);
+          snprintf ( szOrdinal, 64, " (%c%-3lu) ",
+                        it2.RegisterSet != D3DXRS_SAMPLER ? 'c' : 's',
+                          it2.RegisterIndex );
+          snprintf ( szOrdEl,  96,  "%s::%lu", // Uniquely identify parameters that share registers
+                       szOrdinal, el++ );
+          snprintf ( szName, 192, "%-24s :%s",
+                       it2.Name, szOrdinal );
+
+          if (it2.Type == D3DXPT_FLOAT && it2.Class == D3DXPC_VECTOR)
+          {
+            ImGui::Checkbox    (szName,  &it2.Override); ImGui::SameLine ();
+            ImGui::InputFloat4 (szOrdEl,  it2.Data);
           }
-          else
-            ImGui::Text (it2.Name);
+          else {
+            ImGui::TreePush (""); ImGui::TextColored (ImVec4 (0.45f, 0.75f, 0.45f, 1.0f), szName); ImGui::TreePop ();
+          }
         }
 
-        ImGui::TreePop ();
+        ImGui::Separator ();
       }
 
       else
       {
-        if (it.Type == D3DXPT_FLOAT && it.Class == D3DXPC_VECTOR) {
-          ImGui::Checkbox    (it.Name, &it.Override); ImGui::SameLine ();
-          ImGui::InputFloat4 (it.Name, it.Data);
-        } else
-          ImGui::Text (it.Name);
+        snprintf ( szOrdinal, 64, " (%c%-3lu) ",
+                     it.RegisterSet != D3DXRS_SAMPLER ? 'c' : 's',
+                        it.RegisterIndex );
+        snprintf ( szOrdEl,  96,  "%s::%lu", // Uniquely identify parameters that share registers
+                       szOrdinal, el++ );
+        snprintf ( szName, 192, "%-24s :%s",
+                     it.Name, szOrdinal );
+
+        if (it.Type == D3DXPT_FLOAT && it.Class == D3DXPC_VECTOR)
+        {
+          ImGui::Checkbox    (szName,  &it.Override); ImGui::SameLine ();
+          ImGui::InputFloat4 (szOrdEl,  it.Data);
+        } else {
+          ImGui::TreePush (""); ImGui::TextColored (ImVec4 (0.45f, 0.75f, 0.45f, 1.0f), szName); ImGui::TreePop ();
+        }
       }
     }
-    ImGui::TreePop ();
+    ImGui::PopItemWidth ();
+    ImGui::TreePop      ();
+    ImGui::EndGroup     ();
+
+    ImGui::Separator      ();
 
     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.99f, 0.99f, 0.01f, 1.0f));
     ImGui::TextWrapped    (disassembly [tracker->crc32].code.c_str ());
+
+    ImGui::Separator      ();
 
     ImGui::PushStyleColor (ImGuiCol_Text, ImVec4 (0.5f, 0.95f, 0.5f, 1.0f));
     ImGui::TextWrapped    (disassembly [tracker->crc32].footer.c_str ());

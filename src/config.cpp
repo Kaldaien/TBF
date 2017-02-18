@@ -100,6 +100,7 @@ struct {
   } smaa;
 
   tbf::ParameterStringW* nvidia_sgssaa;
+  tbf::ParameterStringW* nvidia_aa_compat_bits;
 } render;
 
 struct {
@@ -636,6 +637,17 @@ TBF_LoadConfig (std::wstring name)
         L"SparseGridSuperSample"
   );
 
+  render.nvidia_aa_compat_bits =
+    static_cast <tbf::ParameterStringW *>
+    (g_ParameterFactory.create_parameter <std::wstring> (
+       L"NVAPI Anti-Aliasing Settings")
+    );
+  render.nvidia_aa_compat_bits->register_to_ini (
+    render_ini,
+      L"AntiAliasing.NV",
+        L"CompatibilityBits"
+  );
+
 
 
   screenshots.hudless_keybind =
@@ -827,7 +839,10 @@ TBF_LoadConfig (std::wstring name)
   render.smaa.reprojection_weight->load   (config.render.smaa.reprojection_weight);
 
   std::wstring sgssaa;
-  render.nvidia_sgssaa->load (sgssaa);
+
+  render.nvidia_sgssaa->load         (sgssaa);
+  render.nvidia_aa_compat_bits->load (config.render.nv.compat_bits
+);
 
   if (sgssaa.length ())
   {
@@ -919,6 +934,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.nvidia_sgssaa->store ( config.render.nv.sgssaa_mode == 0 ? L"off" :
                                 config.render.nv.sgssaa_mode == 1 ? L"2x"  :
                                 config.render.nv.sgssaa_mode == 2 ? L"4x"  : L"8x" );
+  render.nvidia_aa_compat_bits->store (config.render.nv.compat_bits);
 
   textures.remaster->store          (config.textures.remaster);
   textures.uncompressed->store      (config.textures.uncompressed);

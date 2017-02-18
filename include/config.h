@@ -109,7 +109,8 @@ struct tbf_config_t
     } smaa;
 
     struct {
-      uint32_t sgssaa_mode          = 0;
+      uint32_t     sgssaa_mode      = 0;
+      std::wstring compat_bits      = L"0x084012C5";
     } nv;
   } render;
 

@@ -862,6 +862,7 @@ TBFix_DrawConfigUI (void)
     
       if (ImGui::CollapsingHeader ("Sparse Grid Super-Sampling (NVIDIA)"))
       {
+        ImGui::PushItemWidth (ImGui::GetWindowWidth () * 0.333f);
         bool sel_change =
           ImGui::Combo ("Mode (requires application restart)", (int *)&config.render.nv.sgssaa_mode, " Off\0"
                                                                                                      " 2x (Good Quality, Good Performance)\0"
@@ -880,6 +881,31 @@ TBFix_DrawConfigUI (void)
           ImGui::BulletText   ("The first time you enable this, the game will re-launch with admin privileges to setup a driver profile.");
           ImGui::EndTooltip   ();
         }
+
+        ImGui::SameLine   ();
+        ImGui::BeginGroup ();
+
+        if (ImGui::TreeNode ("Advanced Settings"))
+        {
+          int bits = wcstoul (config.render.nv.compat_bits.c_str (), nullptr, 16);
+
+          ImGui::PushItemWidth (ImGui::GetWindowWidth () * 0.1666f);
+
+          if (ImGui::InputInt ("Compatibility Bits", &bits, 1, 1, ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_CharsUppercase))
+          {
+             wchar_t wszBits [16] = { L'\0' };
+
+             _snwprintf (wszBits, 10, L"0x%08x", bits);
+
+             config.render.nv.compat_bits = wszBits;
+             need_restart                 = true;
+          }
+
+          ImGui::PopItemWidth ();
+          ImGui::TreePop      ();
+        }
+
+        ImGui::EndGroup ();
 
         if (sel_change)
         {
@@ -927,7 +953,8 @@ TBFix_DrawConfigUI (void)
         ImGui::TreePop ();
       }
 
-      ImGui::TreePop ();
+      ImGui::PopItemWidth ();
+      ImGui::TreePop      ();
     }
 
 #if 0

@@ -73,13 +73,14 @@ SKPlugIn_Shutdown (LPVOID* lpReserved)
     //tbf::FileIO::Shutdown      ();
     //tbf::SteamFix::Shutdown    ();
     tbf::FrameRateFix::Shutdown  ();
+  
+    TBF_SaveConfig     ();
 
     // Weird thing to do at shutdown, right? :P This avoids any error popups while the game is in fullscreen exclusive.
     tbf::RenderFix::InstallSGSSAA ();
     tbf::RenderFix::Shutdown      ();
     //tbf::KeyboardFix::Shutdown  ();
-  
-    TBF_SaveConfig     ();
+
     TBF_UnInit_MinHook ();
   
   

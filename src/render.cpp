@@ -857,6 +857,7 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
   tbf::RenderFix::tracked_rt.clear ();
   tbf::RenderFix::tracked_vs.clear ();
   tbf::RenderFix::tracked_ps.clear ();
+  tbf::RenderFix::tracked_vb.clear ();
 
   //if (config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
@@ -2032,51 +2033,55 @@ tbf::RenderFix::InstallSGSSAA (void)
 {
   ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppFriendlyName"))     ( L"Tales of Berseria" );
   ((void (__stdcall *)(const wchar_t * ))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAppName"))             ( L"Tales of Berseria.exe" );
+
+  wchar_t wszBits [16] = { L'\0' };
+
+  wcsncpy (wszBits, config.render.nv.compat_bits.c_str (), 16);
   
   if (config.render.nv.sgssaa_mode == 1)
   {
-    wchar_t* props [] = { L"CompatibilityBits", L"0x004112C5",
-                          L"Method",            L"2xMSAA",
-                          L"ReplayMode",        L"2xSGSSAA",
-                          L"AntiAliasFix",      L"Off",
-                          L"AutoBiasAdjust",    L"Off",
-                          L"Override",          L"On",
-                          nullptr,              nullptr };
-    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+    const wchar_t* props [] = { L"CompatibilityBits", wszBits,
+                                L"Method",            L"2xMSAA",
+                                L"ReplayMode",        L"2xSGSSAA",
+                                L"AntiAliasFix",      L"Off",
+                                L"AutoBiasAdjust",    L"Off",
+                                L"Override",          L"On",
+                                nullptr,              nullptr };
+    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( props );
   }
   
   else if (config.render.nv.sgssaa_mode == 2)
   {
-    wchar_t* props [] = { L"CompatibilityBits", L"0x004112C5",
-                          L"Method",            L"4xMSAA",
-                          L"ReplayMode",        L"4xSGSSAA",
-                          L"AntiAliasFix",      L"Off",
-                          L"AutoBiasAdjust",    L"Off",
-                          L"Override",          L"On",
-                          nullptr,              nullptr };
-    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+    const wchar_t* props [] = { L"CompatibilityBits", wszBits,
+                                L"Method",            L"4xMSAA",
+                                L"ReplayMode",        L"4xSGSSAA",
+                                L"AntiAliasFix",      L"Off",
+                                L"AutoBiasAdjust",    L"Off",
+                                L"Override",          L"On",
+                                nullptr,              nullptr };
+    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( props );
   }
   
   else if (config.render.nv.sgssaa_mode == 3)
   {
-    wchar_t* props [] = { L"CompatibilityBits", L"0x004112C5",
-                          L"Method",            L"8xMSAA",
-                          L"ReplayMode",        L"8xSGSSAA",
-                          L"AntiAliasFix",      L"Off",
-                          L"AutoBiasAdjust",    L"Off",
-                          L"Override",          L"On",
-                          nullptr,              nullptr };
-    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+    const wchar_t* props [] = { L"CompatibilityBits", wszBits,
+                                L"Method",            L"8xMSAA",
+                                L"ReplayMode",        L"8xSGSSAA",
+                                L"AntiAliasFix",      L"Off",
+                                L"AutoBiasAdjust",    L"Off",
+                                L"Override",          L"On",
+                                nullptr,              nullptr };
+    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( props );
   }
   
   else
   {
-    wchar_t* props [] = { L"Method",            L"0x00000000",
-                          L"ReplayMode",        L"0x00000000",
-                          L"AutoBiasAdjust",    L"On",
-                          L"Override",          L"No",
-                          nullptr,              nullptr };
-    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
+    const wchar_t* props [] = { L"Method",            L"0x00000000",
+                                L"ReplayMode",        L"0x00000000",
+                                L"AutoBiasAdjust",    L"On",
+                                L"Override",          L"No",
+                                nullptr,              nullptr };
+    return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( props );
   }
 
   return FALSE;
