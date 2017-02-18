@@ -124,6 +124,7 @@ struct {
   tbf::ParameterBool*    clamp_skit_coords;
   tbf::ParameterBool*    clamp_map_coords;
   tbf::ParameterBool*    clamp_text_coords;
+  tbf::ParameterBool*    sharpen_ui;
 } textures;
 
 
@@ -373,6 +374,16 @@ TBF_LoadConfig (std::wstring name)
     render_ini,
       L"Texture.System",
         L"ClampTextCoords" );
+
+  textures.sharpen_ui = 
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Keep UI Textures Sharp")
+      );
+  textures.sharpen_ui->register_to_ini (
+    render_ini,
+      L"Texture.System",
+        L"SharpenUI" );
 
 
   render.dump_shaders = 
@@ -861,6 +872,7 @@ TBF_LoadConfig (std::wstring name)
   textures.clamp_skit_coords->load (config.textures.clamp_skit_coords);
   textures.clamp_map_coords->load  (config.textures.clamp_map_coords);
   textures.clamp_text_coords->load (config.textures.clamp_text_coords);
+  textures.sharpen_ui->load        (config.textures.keep_ui_sharp);
 
   if (empty)
     return false;
@@ -922,6 +934,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   textures.clamp_skit_coords->store (config.textures.clamp_skit_coords);
   textures.clamp_map_coords->store  (config.textures.clamp_map_coords);
   textures.clamp_text_coords->store (config.textures.clamp_text_coords);
+  textures.sharpen_ui->store        (config.textures.keep_ui_sharp);
 
   input.gamepad.texture_set->store         (config.input.gamepad.texture_set);
   input.gamepad.virtual_controllers->store (config.input.gamepad.virtual_controllers);

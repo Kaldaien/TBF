@@ -129,6 +129,7 @@ struct tbf_config_t
     bool     clamp_skit_coords   =  true;
     bool     clamp_map_coords    =  false;
     bool     clamp_text_coords   =  false;
+    bool     keep_ui_sharp       =  true;
     bool     highlight_debug_tex =  true;
   } textures;
 
@@ -139,6 +140,7 @@ struct tbf_config_t
     uint32_t smoke_ps_crc32      =  0x868bd533;
     bool     disable_pause_dim   =  false;
     uint32_t pause_dim_ps_crc32  =  0x975d2194;
+    bool     plastic_mode        =  false;
   } fun_stuff;
 
   struct {

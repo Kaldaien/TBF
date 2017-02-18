@@ -828,6 +828,14 @@ D3D9SetDepthStencilSurface_Detour (
 uint32_t debug_tex_id = 0UL;
 uint32_t current_tex [256] = { 0ui32 };
 
+typedef HRESULT (STDMETHODCALLTYPE *SetSamplerState_pfn)
+(IDirect3DDevice9*   This,
+  DWORD               Sampler,
+  D3DSAMPLERSTATETYPE Type,
+  DWORD               Value);
+
+extern SetSamplerState_pfn D3D9SetSamplerState_Original;
+
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -926,9 +934,9 @@ D3D9SetTexture_Detour (
       {
         if (non_power_of_two_textures.count (pSKTex->tex_crc32))
         {
-          This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
-          This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
-          This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP );
+          D3D9SetSamplerState_Original (This, Sampler, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
+          D3D9SetSamplerState_Original (This, Sampler, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
+          D3D9SetSamplerState_Original (This, Sampler, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP );
         }
       }
     }
@@ -952,9 +960,12 @@ D3D9SetTexture_Detour (
        ( config.textures.clamp_map_coords  && ps_checksum == 0xc954a649 ) ||
        ( config.textures.clamp_text_coords && tex_crc32   == 0x00d92b2f ) )
   {
-    This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
-    This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
-    This->SetSamplerState ( Sampler, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP );
+    float fMin = -3.0f;
+
+    D3D9SetSamplerState_Original (This, Sampler, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
+    D3D9SetSamplerState_Original (This, Sampler, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
+    D3D9SetSamplerState_Original (This, Sampler, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP );
+    D3D9SetSamplerState_Original (This, Sampler, D3DSAMP_MIPMAPLODBIAS, *reinterpret_cast <DWORD *>(&fMin) );
   }
 
   if (pTexture == nullptr)

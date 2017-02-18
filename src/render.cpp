@@ -86,6 +86,7 @@ DrawPrimitive_pfn                       D3D9DrawPrimitive_Original              
 DrawIndexedPrimitive_pfn                D3D9DrawIndexedPrimitive_Original            = nullptr;
 DrawPrimitiveUP_pfn                     D3D9DrawPrimitiveUP_Original                 = nullptr;
 DrawIndexedPrimitiveUP_pfn              D3D9DrawIndexedPrimitiveUP_Original          = nullptr;
+SetStreamSource_pfn                     D3D9SetStreamSource_Original                 = nullptr;
 SK_SetPresentParamsD3D9_pfn             SK_SetPresentParamsD3D9_Original             = nullptr;
 
 
@@ -177,7 +178,7 @@ D3D9SetSamplerState_Detour (IDirect3DDevice9*   This,
 
     if (Type == D3DSAMP_MIPMAPLODBIAS)
     {
-      float fMax = config.textures.lod_bias;
+      float fMax = config.fun_stuff.plastic_mode ? 20.0f : config.textures.lod_bias;
 
       Value = *reinterpret_cast <DWORD *> (&fMax);
     }
@@ -250,6 +251,9 @@ crc32(uint32_t crc, const void *buf, size_t size)
 }
 
 #include <map>
+
+// For now, let's just focus on stream0 and pretend nothing else exists...
+IDirect3DVertexBuffer9* vb_stream0 = nullptr;
 
 std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> vs_disassembly;
 std::unordered_map <uint32_t, tbf::RenderFix::shader_disasm_s> ps_disassembly;
@@ -543,8 +547,9 @@ const uint32_t VS_CHECKSUM_UI    =  657093040UL;
 bool
 TBF_ShouldSkipRenderPass (void)
 {
-  const bool tracked_vs = ( vs_checksum == tbf::RenderFix::tracked_vs.crc32 );
-  const bool tracked_ps = ( ps_checksum == tbf::RenderFix::tracked_ps.crc32 );
+  const bool tracked_vs = ( vs_checksum == tbf::RenderFix::tracked_vs.crc32         );
+  const bool tracked_ps = ( ps_checksum == tbf::RenderFix::tracked_ps.crc32         );
+  const bool tracked_vb = { vb_stream0  == tbf::RenderFix::tracked_vb.vertex_buffer };
 
   if (tracked_vs)
   {
@@ -563,6 +568,55 @@ TBF_ShouldSkipRenderPass (void)
       if (tbf::RenderFix::tracked_ps.current_textures [i] != 0)
         tbf::RenderFix::tracked_ps.used_textures.emplace (tbf::RenderFix::tracked_ps.current_textures [i]);
   }
+
+
+  bool clamp   = false;
+  bool sharpen = false;
+
+  if (ps_checksum == tbf::RenderFix::tracked_ps.crc32 && tbf::RenderFix::tracked_ps.clamp_coords)
+    clamp = true;
+
+  if (vs_checksum == tbf::RenderFix::tracked_vs.crc32 && tbf::RenderFix::tracked_vs.clamp_coords)
+    clamp = true;
+
+  if (config.textures.keep_ui_sharp && ps_checksum == 0x17c397fb) sharpen = true;
+
+  if (                                                              clamp ||
+       ( config.textures.clamp_skit_coords && ps_checksum == 0x872e7c85 ) ||
+       ( config.textures.clamp_map_coords  && ps_checksum == 0xc954a649 ) )
+  {
+    sharpen = true;
+
+    D3D9SetSamplerState_Original (tbf::RenderFix::pDevice, 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
+    D3D9SetSamplerState_Original (tbf::RenderFix::pDevice, 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
+    D3D9SetSamplerState_Original (tbf::RenderFix::pDevice, 0, D3DSAMP_ADDRESSW, D3DTADDRESS_CLAMP );
+  }
+
+  if (sharpen)
+  {
+    float fMin = -3.0f;
+    D3D9SetSamplerState_Original (tbf::RenderFix::pDevice, 0, D3DSAMP_MIPMAPLODBIAS, *reinterpret_cast <DWORD *>(&fMin) );
+  }
+
+
+
+
+  if (tracked_vb)
+  {
+    tbf::RenderFix::tracked_vb.num_draws++;
+
+    if (tbf::RenderFix::tracked_vb.wireframe)
+      tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_WIREFRAME);
+  }
+
+  else
+  {
+    if (tbf::RenderFix::tracked_vb.wireframe)
+      tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
+  }
+
+  if (tracked_vb && tbf::RenderFix::tracked_vb.cancel_draws)
+    return true;
 
 
   // Do these sparate so that we can accurately count used textures even on cancelled passes.
@@ -1576,6 +1630,62 @@ D3D9TestCooperativeLevel_Detour ( IDirect3DDevice9 *This )
   return D3D9TestCooperativeLevel_Original (This);
 }
 
+#if 0
+COM_DECLSPEC_NOTHROW
+HRESULT
+STDMETHODCALLTYPE
+D3D9CreateVertexBuffer_Detour (
+  _In_  IDirect3DDevice9        *This,
+  _In_  UINT                     Length,
+  _In_  DWORD                    Usage,
+  _In_  DWORD                    FVF,
+  _In_  D3DPOOL                  Pool,
+  _Out_ IDirect3DVertexBuffer9 **ppVertexBuffer,
+  _In_  HANDLE                  *pSharedHandle )
+{
+
+}
+#endif
+
+COM_DECLSPEC_NOTHROW
+HRESULT
+STDMETHODCALLTYPE
+D3D9SetStreamSource_Detour
+(
+  IDirect3DDevice9       *This,
+  UINT                    StreamNumber,
+  IDirect3DVertexBuffer9 *pStreamData,
+  UINT                    OffsetInBytes,
+  UINT                    Stride )
+{
+  // Ignore anything that's not the primary render device.
+  if (This != tbf::RenderFix::pDevice) {
+    return
+      D3D9SetStreamSource_Original ( This,
+                                       StreamNumber,
+                                         pStreamData,
+                                           OffsetInBytes,
+                                             Stride );
+  }
+
+  HRESULT hr =
+      D3D9SetStreamSource_Original ( This,
+                                       StreamNumber,
+                                         pStreamData,
+                                           OffsetInBytes,
+                                             Stride );
+
+  if (SUCCEEDED (hr))
+  {
+    tbf::RenderFix::last_frame.vertex_buffers.emplace (pStreamData);
+
+    if (StreamNumber == 0)
+      vb_stream0 = pStreamData;
+  }
+
+  return hr;
+}
+
 __declspec (noinline)
 D3DPRESENT_PARAMETERS*
 __stdcall
@@ -1624,8 +1734,8 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
   // Reset will fail without this
   if (pparams != nullptr && pparams->Windowed)
   {
-    //BringWindowToTop (tbf::RenderFix::hWndDevice);
-    //SetActiveWindow  (tbf::RenderFix::hWndDevice);
+    BringWindowToTop (tbf::RenderFix::hWndDevice);
+    SetActiveWindow  (tbf::RenderFix::hWndDevice);
     pparams->FullScreen_RefreshRateInHz = 0;
   }
 
@@ -1708,6 +1818,11 @@ tbf::RenderFix::Init (void)
                        "D3D9TestCooperativeLevel_Override",
                         D3D9TestCooperativeLevel_Detour,
              (LPVOID *)&D3D9TestCooperativeLevel_Original );
+
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
+                       "D3D9SetStreamSource_Override",
+                        D3D9SetStreamSource_Detour,
+             (LPVOID *)&D3D9SetStreamSource_Original );
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9DrawPrimitive_Override",
@@ -1870,9 +1985,11 @@ tbf::RenderFix::InstallSGSSAA (void)
   
   if (config.render.nv.sgssaa_mode == 1)
   {
-    wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+    wchar_t* props [] = { L"CompatibilityBits", L"0x004112C5",
                           L"Method",            L"2xMSAA",
                           L"ReplayMode",        L"2xSGSSAA",
+                          L"AntiAliasFix",      L"Off",
+                          L"AutoBiasAdjust",    L"Off",
                           L"Override",          L"On",
                           nullptr,              nullptr };
     return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
@@ -1880,9 +1997,11 @@ tbf::RenderFix::InstallSGSSAA (void)
   
   else if (config.render.nv.sgssaa_mode == 2)
   {
-    wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+    wchar_t* props [] = { L"CompatibilityBits", L"0x004112C5",
                           L"Method",            L"4xMSAA",
                           L"ReplayMode",        L"4xSGSSAA",
+                          L"AntiAliasFix",      L"Off",
+                          L"AutoBiasAdjust",    L"Off",
                           L"Override",          L"On",
                           nullptr,              nullptr };
     return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
@@ -1890,9 +2009,11 @@ tbf::RenderFix::InstallSGSSAA (void)
   
   else if (config.render.nv.sgssaa_mode == 3)
   {
-    wchar_t* props [] = { L"CompatibilityBits", L"0x084012C5",
+    wchar_t* props [] = { L"CompatibilityBits", L"0x004112C5",
                           L"Method",            L"8xMSAA",
                           L"ReplayMode",        L"8xSGSSAA",
+                          L"AntiAliasFix",      L"Off",
+                          L"AutoBiasAdjust",    L"Off",
                           L"Override",          L"On",
                           nullptr,              nullptr };
     return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
@@ -1902,6 +2023,7 @@ tbf::RenderFix::InstallSGSSAA (void)
   {
     wchar_t* props [] = { L"Method",            L"0x00000000",
                           L"ReplayMode",        L"0x00000000",
+                          L"AutoBiasAdjust",    L"On",
                           L"Override",          L"No",
                           nullptr,              nullptr };
     return ((BOOL (__stdcall *)(const wchar_t **))GetProcAddress (hInjectorDLL, "SK_NvAPI_SetAntiAliasingOverride"))( (const wchar_t **)props );
@@ -1940,3 +2062,6 @@ tbf::RenderFix::shader_tracking_s
 
 tbf::RenderFix::shader_tracking_s
                    tbf::RenderFix::tracked_ps;
+
+tbf::RenderFix::vertex_buffer_tracking_s
+                   tbf::RenderFix::tracked_vb;

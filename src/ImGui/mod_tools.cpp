@@ -506,7 +506,183 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
     ImGui::PopStyleColor (3);
   }
   else
-    tbf::RenderFix::tracked_ps.cancel_draws = false;
+    tracker->cancel_draws = false;
+
+  ImGui::EndGroup      ();
+
+  list->last_ht    = ImGui::GetItemRectSize ().y;
+
+  list->last_min   = ImGui::GetItemRectMin ();
+  list->last_max   = ImGui::GetItemRectMax ();
+
+  ImGui::PopStyleVar   ();
+  ImGui::EndGroup      ();
+}
+
+void
+TBF_LiveVertexStreamView (bool& can_scroll)
+{
+  ImGui::BeginGroup ();
+
+  static float last_width = 256.0f;
+  const  float font_size  = ImGui::GetFont ()->FontSize * ImGui::GetIO ().FontGlobalScale;
+
+  struct vertex_stream_s
+  {
+    std::vector <std::string> contents;
+    bool                      dirty      = true;
+    uint32_t                  last_sel   =    0;
+    int                            sel   =   -1;
+    float                     last_ht    = 256.0f;
+    ImVec2                    last_min   = ImVec2 (0.0f, 0.0f);
+    ImVec2                    last_max   = ImVec2 (0.0f, 0.0f);
+  };
+
+  struct {
+    vertex_stream_s stream0;
+  } static list_base;
+
+  vertex_stream_s*
+    list    = &list_base.stream0;
+
+  tbf::RenderFix::vertex_buffer_tracking_s*
+    tracker = &tbf::RenderFix::tracked_vb;
+
+  std::vector <IDirect3DVertexBuffer9 *>
+    buffers   ( tbf::RenderFix::last_frame.vertex_buffers.begin (),
+                tbf::RenderFix::last_frame.vertex_buffers.end   () );
+
+  if (list->dirty)
+  {
+        list->sel = -1;
+    int idx    =  0;
+        list->contents.clear ();
+
+    // The underlying list is unsorted for speed, but that's not at all
+    //   intuitive to humans, so sort the thing when we have the RT view open.
+    std::sort ( buffers.begin (),
+                buffers.end   () );
+
+
+
+    for ( auto it : buffers )
+    {
+      char szDesc [16] = { };
+
+      sprintf (szDesc, "%08llx", (uintptr_t)it);
+
+      list->contents.emplace_back (szDesc);
+
+      if ((uint32_t)it == list->last_sel)
+      {
+        list->sel = idx;
+        //tbf::RenderFix::tracked_rt.tracking_tex = render_textures [sel];
+      }
+
+      ++idx;
+    }
+  }
+
+  if (ImGui::IsMouseHoveringRect (list->last_min, list->last_max))
+  {
+         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+  }
+
+  ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
+  ImGui::PushStyleColor (ImGuiCol_Border, ImVec4 (0.9f, 0.7f, 0.5f, 1.0f));
+
+  ImGui::BeginChild ( "Stream 0",
+                      ImVec2 ( font_size * 7.0f, std::max (font_size * 15.0f, list->last_ht)),
+                        true, ImGuiWindowFlags_AlwaysAutoResize );
+
+  if (ImGui::IsWindowHovered ())
+  {
+    can_scroll = false;
+
+    ImGui::BeginTooltip ();
+    ImGui::TextColored  (ImVec4 (0.9f, 0.6f, 0.2f, 1.0f), "You can cancel all render passes using the selected vertex buffer to debug a model");
+    ImGui::Separator    ();
+    ImGui::BulletText   ("Press [ while the mouse is hovering this list to select the previous shader");
+    ImGui::BulletText   ("Press ] while the mouse is hovering this list to select the next shader");
+    ImGui::EndTooltip   ();
+
+         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+  }
+
+  if (buffers.size ())
+  {
+    struct {
+      int  last_sel    = 0;
+      bool sel_changed = false;
+    } static stream [3];
+
+    int&  last_sel    = stream [0].last_sel;
+    bool& sel_changed = stream [0].sel_changed;
+
+    if (list->sel != last_sel)
+      sel_changed = true;
+
+    last_sel = list->sel;
+
+    for ( int line = 0; line < buffers.size (); line++ )
+    {
+      if (line == list->sel)
+      {
+        bool selected    = true;
+
+        ImGui::Selectable (list->contents [line].c_str (), &selected);
+
+        if (sel_changed)
+        {
+          ImGui::SetScrollHere (0.5f);
+
+          sel_changed            = false;
+          list->last_sel         = (uint32_t)buffers [list->sel];
+          tracker->vertex_buffer =           buffers [list->sel];
+        }
+      }
+
+      else
+      {
+        bool selected    = false;
+
+        if (ImGui::Selectable (list->contents [line].c_str (), &selected))
+        {
+          sel_changed            = true;
+          list->sel              =  line;
+          list->last_sel         = (uint32_t)buffers [list->sel];
+          tracker->vertex_buffer =           buffers [list->sel];
+        }
+      }
+    }
+  }
+
+  ImGui::EndChild      ();
+  ImGui::PopStyleColor ();
+
+  ImGui::SameLine      ();
+  ImGui::BeginGroup    ();
+
+  if (ImGui::IsItemHoveredRect ()) {
+         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) list->sel--;
+    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) list->sel++;
+  }
+
+  if (tracker->vertex_buffer != nullptr)
+  {
+    ImGui::Checkbox ("Cancel Draws Using Selected Vertex Buffer",  &tracker->cancel_draws);  ImGui::SameLine ();
+
+    if (tracker->cancel_draws)
+      ImGui::TextDisabled ("%lu Skipped Draw%c Last Frame", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ');
+    else
+      ImGui::TextDisabled ("%lu Draw%c Last Frame        ", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ');
+
+    ImGui::Checkbox ("Draw Selected Vertex Buffer In Wireframe", &tracker->wireframe);
+  }
+  else
+    tracker->cancel_draws = false;
 
   ImGui::EndGroup      ();
 
@@ -1123,6 +1299,16 @@ TBFix_TextureModDlg (void)
 
     if (ImGui::CollapsingHeader ("Vertex Shaders"))
       TBF_LiveShaderClassView (tbf_shader_class::Vertex, can_scroll);
+
+    ImGui::TreePop ();
+  }
+
+  if (ImGui::CollapsingHeader ("Live Vertex Buffer View"))
+  {
+    ImGui::TreePush ("");
+
+    if (ImGui::CollapsingHeader ("Stream 0"))
+      TBF_LiveVertexStreamView (can_scroll);
 
     ImGui::TreePop ();
   }

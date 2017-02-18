@@ -92,10 +92,11 @@ namespace tbf
 
     struct frame_state_s
     {
-      void clear (void) { pixel_shaders.clear (); vertex_shaders.clear (); }
+      void clear (void) { pixel_shaders.clear (); vertex_shaders.clear (); vertex_buffers.clear (); }
     
-      std::unordered_set <uint32_t> pixel_shaders;
-      std::unordered_set <uint32_t> vertex_shaders;
+      std::unordered_set <uint32_t>                 pixel_shaders;
+      std::unordered_set <uint32_t>                 vertex_shaders;
+      std::unordered_set <IDirect3DVertexBuffer9 *> vertex_buffers; // TODO: Hash the data and assign a more useful identifier
     } extern last_frame;
 
     struct render_target_tracking_s
@@ -122,6 +123,18 @@ namespace tbf
       std::unordered_set <uint32_t>    used_textures;
                           uint32_t  current_textures [16];
     } extern tracked_vs, tracked_ps;
+
+    struct vertex_buffer_tracking_s
+    {
+      void clear (void) { active = false; num_draws = 0; }
+
+      IDirect3DVertexBuffer9*       vertex_buffer = nullptr;
+      //uint32_t                      crc32        =  0x00;
+      bool                          cancel_draws  = false;
+      bool                          wireframe     = false;
+      bool                          active        = false;
+      int                           num_draws     =     0;
+    } extern tracked_vb;
 
     struct shader_disasm_s {
       std::string header;
@@ -279,6 +292,15 @@ typedef HRESULT (STDMETHODCALLTYPE *DrawIndexedPrimitiveUP_pfn)
   D3DFORMAT         IndexDataFormat,
   const void       *pVertexStreamZeroData,
   UINT              VertexStreamZeroStride
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetStreamSource_pfn)
+(
+  IDirect3DDevice9       *This,
+  UINT                    StreamNumber,
+  IDirect3DVertexBuffer9 *pStreamData,
+  UINT                    OffsetInBytes,
+  UINT                    Stride
 );
 
 

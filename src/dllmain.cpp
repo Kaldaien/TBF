@@ -208,7 +208,7 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     //
     // Hacky way to force off options in Special K that are known not to work well with this game
     //
-    SK_GetCommandProcessor ()->ProcessCommandLine ("Window.Center false");
+    SK_GetCommandProcessor ()->ProcessCommandLine ("Window.Center     false");
 
     TBF_ApplyQueuedHooks ();
 

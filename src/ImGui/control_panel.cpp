@@ -651,9 +651,16 @@ TBFix_DrawConfigUI (void)
         ImGui::SetTooltip ("Fixes blurring and black line artifacts on key UI elements, but may break third-party overlays...");
       }
 
-      ImGui::Checkbox ("Clamp Skit Texture Coordinates",  &config.textures.clamp_skit_coords);
-      ImGui::Checkbox ("Clamp Map Texture Coordinates",   &config.textures.clamp_map_coords);
+      ImGui::Checkbox ("Clamp Skit Texture Coordinates",  &config.textures.clamp_skit_coords); ImGui::SameLine ();
+      ImGui::Checkbox ("Clamp Map Texture Coordinates", &config.textures.clamp_map_coords);    ImGui::SameLine ();
       ImGui::Checkbox ("Clamp Text Texture Coordinates",  &config.textures.clamp_text_coords);
+
+      ImGui::Checkbox ("Keep UI Textures Sharp", &config.textures.keep_ui_sharp);
+
+      if (ImGui::IsItemHovered ())
+      {
+        ImGui::SetTooltip ("Prevent errant drivers from blurring the UI while anti-aliasing.");
+      }
 
       ImGui::TreePop      ();
     }
@@ -1426,6 +1433,12 @@ TBFix_DrawConfigUI (void)
     ImGui::Checkbox ("Hollow Eye Mode", &config.fun_stuff.hollow_eye_mode);
     if (ImGui::IsItemHovered ())
       ImGui::SetTooltip ("The stuff nightmares are made from.");
+
+    ImGui::SameLine ();
+
+    ImGui::Checkbox ("Plastic Mode", &config.fun_stuff.plastic_mode);
+    if (ImGui::IsItemHovered ())
+      ImGui::SetTooltip ("It's fantastic.");
 
     ImGui::Checkbox ("Disable Smoke",   &config.fun_stuff.disable_smoke);
     if (ImGui::IsItemHovered ())
