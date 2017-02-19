@@ -478,6 +478,9 @@ namespace tbf
       std::string code;
       std::string footer;
     };
+
+    extern std::unordered_set <IDirect3DBaseTexture9 *> ui_map_rts;
+    extern bool                                         ui_map_active;
   }
 }
 

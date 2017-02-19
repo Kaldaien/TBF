@@ -70,21 +70,24 @@ struct tbf_config_t
   } steam;
 
   struct {
-    float     fovy               = 0.785398f;
-    float     aspect_ratio       = 1.777778f;
-    uintptr_t aspect_addr        = 0x00D56494ULL;//0x00D52398;
-    uintptr_t fovy_addr          = 0x00D56498ULL;//0x00D5239C;
-    bool      blackbar_videos    = false;  // OBSOLETE
-    bool      aspect_correction  = false;
-    float     postproc_ratio     =  0.5f;
-    bool      clear_blackbars    = false;
-    int32_t   shadow_rescale     = -2;
-    int32_t   env_shadow_rescale =  1;
-    bool      half_float_shadows = false;
-    bool      dump_shaders       = false;
-    bool      fix_map_res        = false;
-    bool      osd_disclaimer     = true;
-    bool      auto_apply_changes = false;
+    float     fovy                = 0.785398f;
+    float     aspect_ratio        = 1.777778f;
+    uintptr_t aspect_addr         = 0x00D56494ULL;//0x00D52398;
+    uintptr_t fovy_addr           = 0x00D56498ULL;//0x00D5239C;
+    bool      blackbar_videos     = false;  // OBSOLETE
+    bool      aspect_correction   = false;
+    float     postproc_ratio      =  0.5f;
+    bool      clear_blackbars     = false;
+    int32_t   shadow_rescale      = -2;
+    int32_t   env_shadow_rescale  =  1;
+    bool      half_float_shadows  = false;
+    bool      dump_shaders        = false;
+    bool      force_post_mips     = false; // Mipmap generation on post-processing
+    bool      fix_map_res         = true;
+    bool      high_res_reflection = false;
+    bool      high_res_bloom      = false;
+    bool      osd_disclaimer      = true;
+    bool      auto_apply_changes  = false;
 
     struct {
       int     quality_preset        =     3;

@@ -208,6 +208,8 @@ namespace RenderFix {
 
     std::vector <IDirect3DBaseTexture9 *>
                              getUsedRenderTargets (void);
+    uint32_t                 getRenderTargetCreationTime 
+                                                  (IDirect3DBaseTexture9* rt);
     void                     trackRenderTarget    (IDirect3DBaseTexture9* rt);
     bool                     isRenderTarget       (IDirect3DBaseTexture9* rt);
     bool                     isUsedRenderTarget   (IDirect3DBaseTexture9* rt);
@@ -236,11 +238,13 @@ namespace RenderFix {
 
   private:
     struct {
-      std::unordered_set <IDirect3DBaseTexture9*> render_targets;
+      // In lieu of actually wrapping render targets with a COM interface, just add the creation time
+      //   as the mapped parameter
+      std::unordered_map <IDirect3DBaseTexture9 *, uint32_t> render_targets;
     } known;
     
     struct {
-      std::unordered_set <IDirect3DBaseTexture9*> render_targets;
+      std::unordered_set <IDirect3DBaseTexture9 *> render_targets;
     } used;
 
     std::unordered_map <uint32_t, tbf::RenderFix::Texture*> textures;

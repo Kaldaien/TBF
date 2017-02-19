@@ -71,15 +71,18 @@ struct {
   tbf::ParameterFloat*   aspect_ratio;
   tbf::ParameterBool*    aspect_correct_vids;
   tbf::ParameterBool*    aspect_correction;
-  tbf::ParameterFloat*   postproc_ratio;
   tbf::ParameterBool*    clear_blackbars;
+
+  tbf::ParameterFloat*   postproc_ratio;
+  tbf::ParameterBool*    fix_map_res;
+  tbf::ParameterBool*    high_res_bloom;
+  tbf::ParameterBool*    high_res_reflection;
 
   tbf::ParameterInt*     rescale_shadows;
   tbf::ParameterInt*     rescale_env_shadows;
   tbf::ParameterBool*    half_precision_shadows;
 
   tbf::ParameterBool*    dump_shaders;
-  tbf::ParameterBool*    fix_map_res;
   tbf::ParameterBool*    pause_on_ui;
   tbf::ParameterBool*    show_osd_disclaimer;
   tbf::ParameterFloat*   ui_scale;
@@ -435,8 +438,28 @@ TBF_LoadConfig (std::wstring name)
     );
   render.fix_map_res->register_to_ini (
     render_ini,
-      L"Resolution.Experimental",
+      L"Resolution.PostProcess",
         L"FixMap" );
+
+  render.high_res_bloom =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool>(
+      L"Increase Resolution of Bloom Effects")
+    );
+  render.high_res_bloom->register_to_ini (
+    render_ini,
+      L"Resolution.PostProcess",
+        L"HighResBloom" );
+
+  render.high_res_reflection =
+    static_cast <tbf::ParameterBool *>
+    (g_ParameterFactory.create_parameter <bool>(
+      L"Increase Resolution of Reflections")
+    );
+  render.high_res_reflection->register_to_ini (
+    render_ini,
+      L"Resolution.PostProcess",
+        L"HighResReflection" );
 
   render.postproc_ratio =
     static_cast <tbf::ParameterFloat *>
@@ -445,8 +468,8 @@ TBF_LoadConfig (std::wstring name)
       );
   render.postproc_ratio->register_to_ini (
     render_ini,
-      L"Resolution.Experimental",
-        L"PostProcessRatio" );
+      L"Resolution.PostProcess",
+        L"DepthOfField" );
 
   render.pause_on_ui =
     static_cast <tbf::ParameterBool *>
@@ -820,6 +843,8 @@ TBF_LoadConfig (std::wstring name)
 
   render.dump_shaders->load        (config.render.dump_shaders);
   render.fix_map_res->load         (config.render.fix_map_res);
+  render.high_res_bloom->load      (config.render.high_res_bloom);
+  render.high_res_reflection->load (config.render.high_res_reflection);
   render.postproc_ratio->load      (config.render.postproc_ratio);
   render.pause_on_ui->load         (config.input.ui.pause);
   render.show_osd_disclaimer->load (config.render.osd_disclaimer);
@@ -840,6 +865,9 @@ TBF_LoadConfig (std::wstring name)
 
   std::wstring sgssaa;
 
+  int          original_sgssaa = config.render.nv.sgssaa_mode;
+  std::wstring original_bits   = config.render.nv.compat_bits;
+
   render.nvidia_sgssaa->load         (sgssaa);
   render.nvidia_aa_compat_bits->load (config.render.nv.compat_bits
 );
@@ -858,7 +886,11 @@ TBF_LoadConfig (std::wstring name)
     else if (sgssaa == L"off")
       config.render.nv.sgssaa_mode = 0;
 
-    tbf::RenderFix::InstallSGSSAA ();
+    // Only change the driver profile if settings change in-game or
+    //   if a non-off mode is selected.
+    if ( config.render.nv.sgssaa_mode != 0 ||
+         config.render.nv.sgssaa_mode != config.render.nv.sgssaa_mode )
+      tbf::RenderFix::InstallSGSSAA ();
   }
 
   config.input.ui.scale = std::min (std::max (1.0f, config.input.ui.scale), 3.0f);
@@ -913,6 +945,8 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.rescale_env_shadows->store    (config.render.env_shadow_rescale);
   render.half_precision_shadows->store (config.render.half_float_shadows);
   render.fix_map_res->store            (config.render.fix_map_res);
+  render.high_res_bloom->store         (config.render.high_res_bloom);
+  render.high_res_reflection->store    (config.render.high_res_reflection);
   render.postproc_ratio->store         (config.render.postproc_ratio);
   render.pause_on_ui->store            (config.input.ui.pause);
   render.show_osd_disclaimer->store    (config.render.osd_disclaimer);

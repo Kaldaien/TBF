@@ -633,17 +633,6 @@ TBFix_DrawConfigUI (void)
     {
       ImGui::TreePush ("");
 
-      tbf::RenderFix::need_reset.graphics |=
-        ImGui::Checkbox ("Enable map menu resolution fix", &config.render.fix_map_res);
-
-      if (ImGui::IsItemHovered ())
-      {
-        ImGui::BeginTooltip ();
-        ImGui::Text       ( "This feature is experimental and only works at 16:9 resolutions, I am not positive that it"
-                            " will not break something unrelated." );
-        ImGui::EndTooltip ();
-      }
-
       ImGui::Checkbox ("Clamp Non-Power-Of-Two Texture Coordinates", &config.textures.clamp_npot_coords);
 
       if (ImGui::IsItemHovered ())
@@ -652,8 +641,8 @@ TBFix_DrawConfigUI (void)
       }
 
       ImGui::Checkbox ("Clamp Skit Texture Coordinates",  &config.textures.clamp_skit_coords); ImGui::SameLine ();
-      ImGui::Checkbox ("Clamp Map Texture Coordinates", &config.textures.clamp_map_coords);    ImGui::SameLine ();
-      ImGui::Checkbox ("Clamp Text Texture Coordinates",  &config.textures.clamp_text_coords);
+      //ImGui::Checkbox ("Clamp Map Texture Coordinates",   &config.textures.clamp_map_coords);  ImGui::SameLine ();
+      //ImGui::Checkbox ("Clamp Text Texture Coordinates",  &config.textures.clamp_text_coords);
 
       ImGui::Checkbox ("Keep UI Textures Sharp", &config.textures.keep_ui_sharp);
 
@@ -1057,11 +1046,11 @@ TBFix_DrawConfigUI (void)
         sel = 3;
     }
 
-    if ( ImGui::Combo ( "Post-Processing Resolution", &sel,
-                        " Game Default -- Will cause shimmering\0"
-                        "  50% Screen Resolution\0"
-                        " 100% Screen Resolution\0"
-                        " 200% Screen Resolution\0\0", 4 ) )
+    if ( ImGui::Combo ( "Depth of Field", &sel,
+                        " Normal (Game Default: Variable) -- Will cause shimmering\0"
+                        " Low    ( 50% Screen Resolution)\0"
+                        " Medium (100% Screen Resolution)\0"
+                        " High   (200% Screen Resolution)\0\0", 4 ) )
     {
       switch (sel) {
         case 0:
@@ -1093,6 +1082,48 @@ TBFix_DrawConfigUI (void)
         ImGui::BulletText     ("Higher values will actually reduce the strength of post-processing effects such as atmospheric bloom");
         ImGui::PopStyleColor  (2);
         ImGui::EndTooltip     ();
+    }
+
+    sel = config.render.high_res_bloom ? 1 : 0;
+
+    if ( ImGui::Combo ( "Bloom", &sel,
+                        " Normal ( 25% Screen Resolution) -- May Flicker\0"
+                        " High   ( 50% Screen Resolution)\0\0", 2 ) )
+    {
+      config.render.high_res_bloom = (sel == 1);
+      tbf::RenderFix::need_reset.textures = true;
+    }
+
+    sel = config.render.high_res_reflection ? 1 : 0;
+
+    if ( ImGui::Combo ( "Reflection", &sel,
+                        " Normal ( 50% Screen Resolution)\0"
+                        " High   (100% Screen Resolution)\0\0", 2 ) )
+    {
+      config.render.high_res_reflection = (sel == 1);
+      tbf::RenderFix::need_reset.textures = true;
+    }
+
+    tbf::RenderFix::need_reset.graphics |=
+      ImGui::Checkbox ("Fix Blocky Map Menu", &config.render.fix_map_res);
+
+    if (ImGui::IsItemHovered ())
+    {
+      ImGui::BeginTooltip ();
+      ImGui::Text         ("This feature is a work-in-progress and generally only works at 16:9 resolutions.");
+      ImGui::EndTooltip   ();
+    }
+
+    tbf::RenderFix::need_reset.graphics |=
+      ImGui::Checkbox ("Force Mipmap Filtering on Post-Processed Render Passes", &config.render.force_post_mips);
+
+    if (ImGui::IsItemHovered ())
+    {
+      ImGui::BeginTooltip ();
+      ImGui::Text         ("Reduce Aliasing AND Increase Performance on Post-Processing");
+      ImGui::BulletText   ("Slight performance gain assuming drivers / third-party software / untested render passes do not explode.");
+      ImGui::BulletText   ("Still extremely experimental; not saved in config file.");
+      ImGui::EndTooltip   ();
     }
 
     ImGui::TreePop ();

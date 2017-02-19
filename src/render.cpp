@@ -454,10 +454,10 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
 
   if (vs_checksum != 0x00)
   {
-    tbf::RenderFix::last_frame.vertex_shaders.insert (vs_checksum);
+    tbf::RenderFix::last_frame.vertex_shaders.emplace (vs_checksum);
     
     if (tbf::RenderFix::tracked_rt.active)
-      tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
+      tbf::RenderFix::tracked_rt.vertex_shaders.emplace (vs_checksum);
     
     if (vs_checksum == tbf::RenderFix::tracked_vs.crc32)
     {
@@ -537,10 +537,10 @@ D3D9SetPixelShader_Detour (IDirect3DDevice9*      This,
 
   if (ps_checksum != 0x00)
   {
-    tbf::RenderFix::last_frame.pixel_shaders.insert (ps_checksum);
+    tbf::RenderFix::last_frame.pixel_shaders.emplace (ps_checksum);
     
     if (tbf::RenderFix::tracked_rt.active)
-      tbf::RenderFix::tracked_rt.pixel_shaders.insert (ps_checksum);
+      tbf::RenderFix::tracked_rt.pixel_shaders.emplace (ps_checksum);
     
     if (ps_checksum == tbf::RenderFix::tracked_ps.crc32)
     {
@@ -997,13 +997,63 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   if (This != tbf::RenderFix::pDevice)
     return D3D9SetViewport_Original (This, pViewport);
 
+  auto PostProcessMipmaps = [](void) ->
+    void {
+      if (config.render.force_post_mips)
+      {
+        CComPtr <IDirect3DBaseTexture9> pBaseTex0 = nullptr;
+        CComPtr <IDirect3DBaseTexture9> pBaseTex1 = nullptr;
+        
+        tbf::RenderFix::pDevice->GetTexture (0, &pBaseTex0); if (pBaseTex0) pBaseTex0->GenerateMipSubLevels ();
+        tbf::RenderFix::pDevice->GetTexture (1, &pBaseTex1); if (pBaseTex1) pBaseTex1->GenerateMipSubLevels ();
+        
+        tbf::RenderFix::pDevice->SetSamplerState (0, D3DSAMP_MAGFILTER, D3DTEXF_ANISOTROPIC);
+        tbf::RenderFix::pDevice->SetSamplerState (0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+        tbf::RenderFix::pDevice->SetSamplerState (0, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+        
+        tbf::RenderFix::pDevice->SetSamplerState (1, D3DSAMP_MAGFILTER, D3DTEXF_ANISOTROPIC);
+        tbf::RenderFix::pDevice->SetSamplerState (1, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+        tbf::RenderFix::pDevice->SetSamplerState (1, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+      }
+    };
+
+  // Bloom (only?)
+  //
+  //
+  if ( config.render.high_res_reflection && (
+       ( pViewport->Width == tbf::RenderFix::width/2  && pViewport->Height == tbf::RenderFix::height/2  ) ) )
+  {
+    D3DVIEWPORT9 rescaled_map = *pViewport;
+
+    rescaled_map.Width  *= 2;
+    rescaled_map.Height *= 2;
+
+    PostProcessMipmaps ();
+
+    return D3D9SetViewport_Original (This, &rescaled_map);
+  }
+
+  // Bloom (only?)
+  //
+  //
+  if ( config.render.high_res_bloom && (
+       ( pViewport->Width == tbf::RenderFix::width/4  && pViewport->Height == tbf::RenderFix::height/4  ) ) )
+  {
+    D3DVIEWPORT9 rescaled_map = *pViewport;
+
+    rescaled_map.Width  *= 2;
+    rescaled_map.Height *= 2;
+
+    PostProcessMipmaps ();
+
+    return D3D9SetViewport_Original (This, &rescaled_map);
+  }
+
   // In-Game Map
   //
   //
   if ( config.render.fix_map_res && (
-       ( pViewport->Width == tbf::RenderFix::width/2  && pViewport->Height == tbf::RenderFix::height/2  ) ||
-       ( pViewport->Width == tbf::RenderFix::width/3  && pViewport->Height == tbf::RenderFix::height/3  ) || 
-       ( pViewport->Width == tbf::RenderFix::width/4  && pViewport->Height == tbf::RenderFix::height/4  ) ||
+       ( pViewport->Width == tbf::RenderFix::width/3  && pViewport->Height == tbf::RenderFix::height/3  ) ||
        ( pViewport->Width == tbf::RenderFix::width/5  && pViewport->Height == tbf::RenderFix::height/5  ) ||
        ( pViewport->Width == tbf::RenderFix::width/6  && pViewport->Height == tbf::RenderFix::height/6  ) || 
        ( pViewport->Width == tbf::RenderFix::width/7  && pViewport->Height == tbf::RenderFix::height/7  ) ||
@@ -1013,8 +1063,9 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   {
     D3DVIEWPORT9 rescaled_map = *pViewport;
 
-    rescaled_map.Width  *= 2;//tbf::RenderFix::width;
-    rescaled_map.Height *= 2;//tbf::RenderFix::height;
+    rescaled_map.Width = tbf::RenderFix::width; rescaled_map.Height = tbf::RenderFix::height;
+
+    PostProcessMipmaps ();
 
     return D3D9SetViewport_Original (This, &rescaled_map);
   }
@@ -1053,7 +1104,7 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   }
 
   //
-  // Adjust Post-Processing
+  // Adjust Post-Processing (Depth of Field)
   //
   else if ( ( ( pViewport->Width  == 2048 &&
                 pViewport->Height == 1024 ) ||
@@ -1073,6 +1124,8 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
     rescaled_post_proc.Height = (DWORD)(tbf::RenderFix::height * config.render.postproc_ratio * scale_y);
     rescaled_post_proc.X     += (DWORD)x_off;
     rescaled_post_proc.Y     += (DWORD)y_off;
+
+    PostProcessMipmaps ();
 
     return D3D9SetViewport_Original (This, &rescaled_post_proc);
   }

@@ -144,11 +144,11 @@ public:
     DeleteCriticalSection (&cs_);
   }
 
-  void insert (_T item)
+  void emplace (_T item)
   {
     TBF_AutoCritSection auto_crit (&cs_);
 
-    container_.insert (item);
+    container_.emplace (item);
   }
 
   void erase (_T item)
@@ -758,7 +758,8 @@ tbf::RenderFix::TextureManager::isRenderTarget (IDirect3DBaseTexture9* pTex)
 void
 tbf::RenderFix::TextureManager::trackRenderTarget (IDirect3DBaseTexture9* pTex)
 {
-  known.render_targets.emplace (pTex);
+  if (! known.render_targets.count (pTex))
+    known.render_targets.try_emplace (pTex, (uint32_t)known.render_targets.size ());
 }
 
 void
@@ -784,6 +785,15 @@ std::vector <IDirect3DBaseTexture9 *>
 tbf::RenderFix::TextureManager::getUsedRenderTargets (void)
 {
   return std::vector <IDirect3DBaseTexture9 *> (used.render_targets.begin (), used.render_targets.end ());
+}
+
+uint32_t
+tbf::RenderFix::TextureManager::getRenderTargetCreationTime (IDirect3DBaseTexture9* pTex)
+{
+  if (known.render_targets.count (pTex))
+    return known.render_targets [pTex];
+
+  return 0xFFFFFFFFUL;
 }
 
 COM_DECLSPEC_NOTHROW
@@ -860,8 +870,8 @@ D3D9SetTexture_Detour (
 
   if (tbf::RenderFix::tracked_rt.active)
   {
-    tbf::RenderFix::tracked_rt.vertex_shaders.insert (vs_checksum);
-    tbf::RenderFix::tracked_rt.pixel_shaders.insert  (ps_checksum);
+    tbf::RenderFix::tracked_rt.vertex_shaders.emplace (vs_checksum);
+    tbf::RenderFix::tracked_rt.pixel_shaders.emplace  (ps_checksum);
   }
 
 
@@ -1071,59 +1081,60 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       Width  = (UINT)(tbf::RenderFix::width  * config.render.postproc_ratio);
       Height = (UINT)(tbf::RenderFix::height * config.render.postproc_ratio);
 
+      if (config.render.force_post_mips)
+        Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
+
       tex_log->Log (L"[ PostProc ] (Post-Resolution: (%lu x %lu)", Width, Height);
     }
   }
 
-  else if (   config.render.fix_map_res &&
+  else if (   ( config.render.fix_map_res    ||
+                config.render.high_res_bloom ||
+                config.render.high_res_reflection ) &&
           ( Usage == D3DUSAGE_RENDERTARGET || Usage  == D3DUSAGE_DEPTHSTENCIL ) )
   {
-    if (Width == tbf::RenderFix::width / 11 && Height == tbf::RenderFix::height / 11) {
-      Width *= 2; Height *= 2;
-    }
-    else if (Width == tbf::RenderFix::width / 10 && Height == tbf::RenderFix::height / 10) {
-      Width *= 2; Height *= 2;
-    }
-    else if (Width == tbf::RenderFix::width / 9  && Height == tbf::RenderFix::height / 9) {
-      Width *= 2; Height *= 2;
-    }
-    else if (Width == tbf::RenderFix::width / 8  && Height == tbf::RenderFix::height / 8) {
-      Width *= 2; Height *= 2;
-    }
-    else if (Width == tbf::RenderFix::width / 7  && Height == tbf::RenderFix::height / 7) {
-      Width *= 2; Height *= 2;
-    }
-    else if (Width == tbf::RenderFix::width / 6  && Height == tbf::RenderFix::height / 6) {
-      Width *= 2; Height *= 2;
-    }
-    else if (Width == tbf::RenderFix::width / 5  && Height == tbf::RenderFix::height / 5) {
-      Width *= 2; Height *= 2;
-    }
-    else if (Width == tbf::RenderFix::width / 4  && Height == tbf::RenderFix::height / 4) {
-      Width *= 2; Height *= 2;
-    }
-    else if (Width == tbf::RenderFix::width / 3  && Height == tbf::RenderFix::height / 3) {
-      Width *= 2; Height *= 2;
-    }
-    else if (Width == tbf::RenderFix::width / 2  && Height == tbf::RenderFix::height / 2)
+    UINT Original_Width  = Width;
+    UINT Original_Height = Height;
+
+    if (config.render.high_res_reflection)
     {
-      Width *= 2; Height *= 2;
+      if ( Original_Width  == tbf::RenderFix::width  / 2 &&
+           Original_Height == tbf::RenderFix::height / 2 ) {
+        Width *= 2; Height *= 2;
+
+        if (config.render.force_post_mips)
+          Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
+      }
     }
 
-    int levels = Levels;
+    if (config.render.high_res_bloom)
+    {
+      if ( Original_Width  == tbf::RenderFix::width  / 4 &&
+           Original_Height == tbf::RenderFix::height / 4 ) {
+        Width *= 2; Height *= 2;
 
-    // ASSERT: Levels == 1
+        if (config.render.force_post_mips)
+          Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
+      }
+    }
+
+    if (config.render.fix_map_res)
+    {
+      if ( (Original_Width  <  tbf::RenderFix::width  / 4 &&
+            Original_Height <  tbf::RenderFix::height / 4)  ||
+           (Original_Width  == tbf::RenderFix::width  / 3 &&
+            Original_Height == tbf::RenderFix::height / 3) )
+      {
+        Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
+
+        if (config.render.force_post_mips)
+          Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
+      }
+    }
   }
 
 
   int levels = Levels;
-
-#if 0
-  if (Width == 66 && Height == 33) {
-    Width  = tbf::RenderFix::width;
-    Height = tbf::RenderFix::height;
-  }
-#endif
 
   if ( config.render.half_float_shadows &&
        (Usage & D3DUSAGE_RENDERTARGET ) &&
@@ -2544,8 +2555,7 @@ TBFix_ReloadPadButtons (void)
 
         else
         {
-          textures_in_flight.insert ( std::make_pair ( load_op->checksum,
-                                       load_op ) );
+          textures_in_flight.try_emplace ( load_op->checksum, load_op );
 
           resample_pool->postJob (load_op);
         }
@@ -2612,8 +2622,8 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   if (resample_blacklist_init == false)
   {
     // Do Not Resample Logos
-    resample_blacklist.insert (0xfa3d03df);
-    resample_blacklist.insert (0x545908bb);
+    resample_blacklist.emplace (0xfa3d03df);
+    resample_blacklist.emplace (0x545908bb);
 
     resample_blacklist_init = true;
   }
@@ -2671,7 +2681,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
   // Textures that would be incorrectly filtered if resampled
   if (power_of_two_in_one_way)
-    non_power_of_two_textures.insert (checksum);
+    non_power_of_two_textures.emplace (checksum);
 
 
   // Generate complete mipmap chains for best image quality
@@ -2839,7 +2849,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
         rec.method  =  Blocking;
 
         if (! injectable_textures.count (checksum))
-          injectable_textures.insert (std::make_pair (checksum, rec));
+          injectable_textures.try_emplace ( checksum, rec );
         else {
           injectable_textures [checksum] = rec;
         }
@@ -2898,8 +2908,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
       }
 
       else {
-        textures_in_flight.insert ( std::make_pair ( load_op->checksum,
-                                     load_op ) );
+        textures_in_flight.try_emplace ( load_op->checksum, load_op );
 
         stream_pool.postJob (load_op);
         //resample_pool->postJob (load_op);
@@ -3119,7 +3128,7 @@ TBF_DumpTexture (D3DFORMAT fmt, uint32_t checksum, IDirect3DTexture9* pTex)
     HRESULT hr = D3DXSaveTextureToFile (wszFileName, D3DXIFF_DDS, pTex, NULL);
 
     if (SUCCEEDED (hr))
-      dumped_textures.insert (checksum);
+      dumped_textures.emplace (checksum);
 
     return hr;
   }
@@ -3350,7 +3359,7 @@ tbf::RenderFix::TextureManager::Init (void)
 
                 liSize.QuadPart += fsize.QuadPart;
 
-                dumped_textures.insert (checksum);
+                dumped_textures.emplace (checksum);
               }
             } while (FindNextFileW (hSubFind, &fd_sub) != 0);
 
@@ -4014,7 +4023,7 @@ SK_TextureWorkerThread::ThreadProc (LPVOID user)
           else {
             tex_log->Log ( L"[ Tex. Mgr ] Texture Resample Failure (hr=%x) for texture %x, blacklisting from future resamples...",
                              hr, pStream->checksum );
-            resample_blacklist.insert (pStream->checksum);
+            resample_blacklist.emplace (pStream->checksum);
 
             pStream->pDest->Release ();
             pStream->pSrc = pStream->pDest;
@@ -4265,7 +4274,7 @@ TBF_RefreshDataSources (void)
             rec.archive = std::numeric_limits <unsigned int>::max ();
             rec.method  = Blocking;
 
-            injectable_textures.insert (std::make_pair (checksum, rec));
+            injectable_textures.try_emplace ( checksum, rec );
           }
         }
       } while (FindNextFileW (hFind, &fd) != 0);
@@ -4300,7 +4309,7 @@ TBF_RefreshDataSources (void)
             rec.archive = std::numeric_limits <unsigned int>::max ();
             rec.method  = Streaming;
 
-            injectable_textures.insert (std::make_pair (checksum, rec));
+            injectable_textures.try_emplace (checksum, rec);
           }
         }
       } while (FindNextFileW (hFind, &fd) != 0);
@@ -4335,8 +4344,7 @@ TBF_RefreshDataSources (void)
             rec.archive = std::numeric_limits <unsigned int>::max ();
             rec.method  = DontCare;
 
-            if (! injectable_textures.count (checksum))
-              injectable_textures.insert (std::make_pair (checksum, rec));
+            injectable_textures.try_emplace (checksum, rec);
           }
         }
       } while (FindNextFileW (hFind, &fd) != 0);
@@ -4444,7 +4452,7 @@ TBF_RefreshDataSources (void)
                   rec.fileno  = i;
                   rec.method  = method;
 
-                  injectable_textures.insert (std::make_pair (checksum, rec));
+                  injectable_textures.try_emplace (checksum, rec);
 
                   ++tex_count;
                   ++files;
@@ -4581,8 +4589,7 @@ tbf::RenderFix::TextureManager::reloadTexture (uint32_t checksum)
 
   else
   {
-    textures_in_flight.insert ( std::make_pair ( load_op->checksum,
-                                 load_op ) );
+    textures_in_flight.try_emplace ( load_op->checksum, load_op );
 
     stream_pool.postJob (load_op);
   }
@@ -4692,7 +4699,7 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
                    )
        )
     {
-      outstanding_screenshots.insert (pSurfScreenshot);
+      outstanding_screenshots.emplace (pSurfScreenshot);
 
       struct screenshot_params_s {
         D3DSURFACE_DESC    desc;
@@ -4739,7 +4746,7 @@ tbf::RenderFix::TextureManager::takeScreenshot (IDirect3DSurface9* pSurf)
                         )
              )
           {
-            outstanding_screenshots.insert (pSurfThumb);
+            outstanding_screenshots.emplace (pSurfThumb);
 
             // Slightly higher quality filtering than if we just used StretchRect with a linear filter,+
             //   (200 x ...) pixels still sucks, but we can make it suck just a little bit less.
