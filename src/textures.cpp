@@ -924,6 +924,7 @@ D3D9SetTexture_Detour (
     while ( __remap_textures && pSKTex->must_block &&
                                 pSKTex->pTexOverride == nullptr )
     {
+      tex_log->Log (L"[ Tex Mgr. ] Waiting for blocking load to complete...");
       TBFix_LoadQueuedTextures ();
     }
 
@@ -978,11 +979,12 @@ D3D9SetTexture_Detour (
     D3D9SetSamplerState_Original (This, Sampler, D3DSAMP_MIPMAPLODBIAS, *reinterpret_cast <DWORD *>(&fMin) );
   }
 
-  if (pTexture == nullptr)
-    return S_OK;
+  //if (pTexture == nullptr)
+    //return S_OK;
 
-  else
-    return D3D9SetTexture(This, Sampler, pTexture);
+  //else {
+    return D3D9SetTexture (This, Sampler, pTexture);
+  //}
 }
 
 D3DXSaveSurfaceToFile_pfn D3DXSaveSurfaceToFileW = nullptr;
@@ -3327,8 +3329,8 @@ tbf::RenderFix::TextureManager::Init (void)
   tracked_rt.pixel_shaders.reserve  (32);
   tracked_rt.vertex_shaders.reserve (32);
 
-  InitializeCriticalSectionAndSpinCount (&cs_cache, 16384UL);
-  InitializeCriticalSectionAndSpinCount (&osd_cs,   64UL);
+  InitializeCriticalSectionAndSpinCount (&cs_cache, 8192UL);
+  InitializeCriticalSectionAndSpinCount (&osd_cs,   32UL);
 
   // Create the directory to store dumped textures
   if (config.textures.dump)
@@ -3401,7 +3403,7 @@ tbf::RenderFix::TextureManager::Init (void)
 #ifdef NO_TLS
   InitializeCriticalSectionAndSpinCount (&cs_tex_inject,   10000000);
 #endif
-  InitializeCriticalSectionAndSpinCount (&cs_tex_resample, 100000);
+  InitializeCriticalSectionAndSpinCount (&cs_tex_resample, 10000);
   InitializeCriticalSectionAndSpinCount (&cs_tex_stream,   100000);
 
   decomp_semaphore = 

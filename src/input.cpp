@@ -127,8 +127,9 @@ SK_TBF_PluginKeyPress ( BOOL Control,
 
   switch (uiMaskedKeyCode)
   {
-    case TBF_ControlShiftKey (VK_DELETE):
-      config.render.osd_disclaimer = (! config.render.osd_disclaimer);
+    // Turn the OSD disclaimer off once the user figures out what the words OSD and toggle mean ;)
+    case TBF_ControlShiftKey ('O'):
+      config.render.osd_disclaimer = false;
       break;
 
 

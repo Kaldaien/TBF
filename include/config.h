@@ -89,6 +89,8 @@ struct tbf_config_t
     bool      osd_disclaimer      = true;
     bool      auto_apply_changes  = false;
 
+    bool      validation          = false;
+
     struct {
       int     quality_preset        =     3;
       bool    override_game         = false;

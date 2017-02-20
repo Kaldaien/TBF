@@ -1126,15 +1126,11 @@ TBFix_DrawConfigUI (void)
       ImGui::EndTooltip   ();
     }
 
+    tbf::RenderFix::need_reset.graphics |=
+      ImGui::Checkbox ("Enable Debug Validation Layer", &config.render.validation);
+
     ImGui::TreePop ();
   }
-
-#if 0
-  if (ImGui::CollapsingHeader ("Shader Options"))
-  {It
-    ImGui::Checkbox ("Dump Shaders", &config.render.dump_shaders);
-  }
-#endif
 
   D3DCAPS9 caps;
   if (SUCCEEDED (tbf::RenderFix::pDevice->GetDeviceCaps (&caps)))

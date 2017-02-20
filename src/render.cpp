@@ -687,6 +687,19 @@ TBF_ShouldSkipRenderPass (void)
     return true;
 
 
+
+  if (config.render.validation) {
+    DWORD dwPasses = 0;
+    HRESULT hr = tbf::RenderFix::pDevice->ValidateDevice (&dwPasses);
+    
+    if (hr != S_OK) {
+      dll_log->Log (L"[D3D9Valid] D3D9 Validation Failure: %x", hr);
+      dll_log->Log (L"[D3D9Valid]  Current vs: %x, Current ps: %x",
+                      vs_checksum, ps_checksum );
+    }
+  }
+
+
   return false;
 }
 
@@ -746,18 +759,12 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
     =
     (SKX_DrawExternalOSD_pfn)GetProcAddress (hMod, "SKX_DrawExternalOSD");
 
-  static DWORD dwFirstTime     = timeGetTime ();
-  static bool  show_disclaimer = config.render.osd_disclaimer;
-
-  if (show_disclaimer)
+  if (config.render.osd_disclaimer)
   {
-    if (timeGetTime () > dwFirstTime + 10000UL)
-      show_disclaimer = false;
-
     SKX_DrawExternalOSD ("ToBFix", "\n"
                                    "  Press Ctrl + Shift + O         to toggle In-Game OSD\n"
                                    "  Press Ctrl + Shift + Backspace to access In-Game Config Menu\n\n"
-                                   "  Press Ctrl + Shift + Delete if you know how to read and do not want to read this message again.");
+                                   "   * This message will go away the first time you actually read it and successfully toggle the OSD.");
   }
 
   else
@@ -997,7 +1004,7 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   if (This != tbf::RenderFix::pDevice)
     return D3D9SetViewport_Original (This, pViewport);
 
-  auto PostProcessMipmaps = [](void) ->
+  auto PostProcessMipmaps = [pViewport](void) ->
     void {
       if (config.render.force_post_mips)
       {
@@ -1137,7 +1144,9 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
     return D3D9SetViewport_Original (This, &rescaled_post_proc);
   }
 
-  return D3D9SetViewport_Original (This, pViewport);
+  HRESULT hr = D3D9SetViewport_Original (This, pViewport);
+
+  return hr;
 }
 
 void

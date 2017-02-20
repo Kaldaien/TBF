@@ -293,7 +293,6 @@ public:
         return S_OK;
       }
 
-#if 1
       if ( IsEqualGUID (riid, IID_IUnknown)              ||
            IsEqualGUID (riid, IID_IDirect3DTexture9)     ||
            IsEqualGUID (riid, IID_IDirect3DBaseTexture9)    )
@@ -303,10 +302,15 @@ public:
         return S_OK;
       }
 
-      return E_FAIL;
-#else
-      return pTex->QueryInterface (riid, ppvObj);
-#endif
+      tex_log->Log ( L"[COM Iface] Queried Unexpected COM Interface (riid=%p)",
+                       riid );
+
+      HRESULT hr = pTex->QueryInterface (riid, ppvObj);
+
+      if (SUCCEEDED (hr))
+        AddRef ();
+
+      return hr;
     }
     STDMETHOD_(ULONG,AddRef)(THIS) {
       ULONG ret = InterlockedIncrement (&refs);
