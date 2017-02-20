@@ -586,4 +586,10 @@ TBF_GetInjectableTexture (uint32_t checksum);
 void
 TBF_RefreshDataSources (void);
 
+__forceinline uint32_t
+TBF_NextPowerOfTwo (uint32_t n)
+{
+  n--; n |= n >> 1; n |= n >> 2; n |= n >> 4; n |= n >> 8; n |= n >> 16; return ++n;
+}
+
 #endif /* __TBFIX__TEXTURES_H__ */

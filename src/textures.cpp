@@ -1008,15 +1008,19 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
                                             Pool, ppTexture, pSharedHandle );
   }
 
-  bool env_shadow = false;
+  tbf::RenderFix::render_target_class_s rt_classify;
 
   //
-  // Model Shadows
+  // Character Shadows
   //
   if ( ( Width == Height                                             ) &&
-       ( Width == 64 || Width == 128 || Width == 256                 ) &&
+       ( Width == rt_classify.shadow.Character.Low ||
+         Width == rt_classify.shadow.Character.Med ||
+         Width == rt_classify.shadow.Character.High                  ) &&
        ( Usage == D3DUSAGE_RENDERTARGET && Format == D3DFMT_A8R8G8B8 ) )
   {
+    rt_classify.shadow.type = &rt_classify.shadow.Character;
+
     //tex_log->Log (L"[Shadow Mgr] (Model Resolution: (%lu x %lu)", Width, Height);
     // Assert (Levels == 1)
     //
@@ -1027,18 +1031,22 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
 
     Width  <<= shift;
     Height <<= shift;
+
+    if (config.render.force_post_mips)
+      Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
   }
 
   //
   // Environmental Shadows
   //
   else if ( ( Width  == Height                                   ) &&
-            ( Height == 512         || Height == 1024 ||
-              Height == 2048                                     ) &&
+            ( Height == rt_classify.shadow.Environment.Low ||
+              Height == rt_classify.shadow.Environment.Med ||
+              Height == rt_classify.shadow.Environment.High      ) &&
             ( Usage  == D3DUSAGE_RENDERTARGET         ||
               Usage  == D3DUSAGE_DEPTHSTENCIL                    ) )
   {
-    env_shadow = true;
+    rt_classify.shadow.type = &rt_classify.shadow.Environment;
 
     //tex_log->Log (L"[Shadow Mgr] (Env. Resolution: (%lu x %lu) -- CREATE", Width, Height);
     uint32_t shift = config.render.env_shadow_rescale;
@@ -1065,17 +1073,20 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     }
 
     config.render.env_shadow_rescale -= unshift;
+
+    if (config.render.force_post_mips)
+      Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
   }
 
   //
-  // Post-Processing (2048x1024) - FIXME damnit!
+  // Post-Processing ( NextPowerOfTwo (w/2) x NextPowerOfTwo (w/2) / 2 ) - FIXME damnit!
   //
-  else if ( (     Usage  == D3DUSAGE_RENDERTARGET && Format == D3DFMT_A8R8G8B8 ) &&
-              ( ( Width  == 2048 &&
-                  Height == 1024 ) || ( Width  == 1024 &&
-                                        Height == 512 )  || ( Width  == 512  &&
-                                                              Height == 256 ) ) )
+  else if ( (   Usage  == D3DUSAGE_RENDERTARGET && Format == D3DFMT_A8R8G8B8 ) &&
+              ( Width  == TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) &&
+                Height == TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) / 2 )  )
   {
+    rt_classify.postproc.type = rt_classify.postproc.DepthOfField;
+
     if (config.render.postproc_ratio > 0.0f)
     {
       Width  = (UINT)(tbf::RenderFix::width  * config.render.postproc_ratio);
@@ -1096,10 +1107,13 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     UINT Original_Width  = Width;
     UINT Original_Height = Height;
 
-    if (config.render.high_res_reflection)
+    if ( Original_Width  == tbf::RenderFix::width  / 2 &&
+         Original_Height == tbf::RenderFix::height / 2 )
     {
-      if ( Original_Width  == tbf::RenderFix::width  / 2 &&
-           Original_Height == tbf::RenderFix::height / 2 ) {
+      rt_classify.postproc.type = rt_classify.postproc.Reflection;
+
+      if (config.render.high_res_reflection)
+      {
         Width *= 2; Height *= 2;
 
         if (config.render.force_post_mips)
@@ -1107,10 +1121,13 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       }
     }
 
-    if (config.render.high_res_bloom)
+    if ( Original_Width  == tbf::RenderFix::width  / 4 &&
+         Original_Height == tbf::RenderFix::height / 4 )
     {
-      if ( Original_Width  == tbf::RenderFix::width  / 4 &&
-           Original_Height == tbf::RenderFix::height / 4 ) {
+      rt_classify.postproc.type = rt_classify.postproc.Bloom;
+
+      if (config.render.high_res_bloom)
+      {
         Width *= 2; Height *= 2;
 
         if (config.render.force_post_mips)
@@ -1118,12 +1135,15 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       }
     }
 
-    if (config.render.fix_map_res)
+    if ( Original_Width != Original_Height && (Original_Width / Original_Height == tbf::RenderFix::width / tbf::RenderFix::height) &&
+         (Original_Width  <  tbf::RenderFix::width  / 4 &&
+          Original_Height <  tbf::RenderFix::height / 4)  ||
+         (Original_Width  == tbf::RenderFix::width  / 3 &&
+          Original_Height == tbf::RenderFix::height / 3) )
     {
-      if ( (Original_Width  <  tbf::RenderFix::width  / 4 &&
-            Original_Height <  tbf::RenderFix::height / 4)  ||
-           (Original_Width  == tbf::RenderFix::width  / 3 &&
-            Original_Height == tbf::RenderFix::height / 3) )
+      rt_classify.postproc.type = rt_classify.postproc.Map;
+
+      if (config.render.fix_map_res)
       {
         Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
 
@@ -1132,7 +1152,6 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       }
     }
   }
-
 
   int levels = Levels;
 

@@ -82,7 +82,7 @@ struct tbf_config_t
     int32_t   env_shadow_rescale  =  1;
     bool      half_float_shadows  = false;
     bool      dump_shaders        = false;
-    bool      force_post_mips     = false; // Mipmap generation on post-processing
+    bool      force_post_mips     = true; // Mipmap generation on post-processing
     bool      fix_map_res         = true;
     bool      high_res_reflection = false;
     bool      high_res_bloom      = false;

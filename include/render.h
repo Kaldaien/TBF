@@ -403,6 +403,31 @@ namespace tbf
       std::unordered_set <IDirect3DVertexBuffer9 *> vertex_buffers; // TODO: Hash the data and assign a more useful identifier
     } extern last_frame;
 
+    struct render_target_class_s
+    {
+      struct shadow_s
+      {
+        struct resolution_s
+        {
+          const UINT Low, Med, High;             //   Low      Medium     High
+        } const None        { 0,      0,    0 }, //------------------------------
+                Character   { 64,   128,  256 }, //  64x64,   128x128,   256x256
+                Environment { 512, 1024, 2048 }; // 512x512, 1024x1024, 2048x2048
+    
+        const resolution_s* type = &None;
+      } shadow;
+    
+      struct {
+        enum {
+          None         = 0x0,
+          DepthOfField = 0x1,
+          Bloom        = 0x2,
+          Reflection   = 0x4,
+          Map          = 0x8
+        } type = None;
+      } postproc;
+    };
+
     struct render_target_tracking_s
     {
       void clear (void) { pixel_shaders.clear (); vertex_shaders.clear (); active = false; }

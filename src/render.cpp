@@ -1004,16 +1004,21 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
         CComPtr <IDirect3DBaseTexture9> pBaseTex0 = nullptr;
         CComPtr <IDirect3DBaseTexture9> pBaseTex1 = nullptr;
         
-        tbf::RenderFix::pDevice->GetTexture (0, &pBaseTex0); if (pBaseTex0) pBaseTex0->GenerateMipSubLevels ();
-        tbf::RenderFix::pDevice->GetTexture (1, &pBaseTex1); if (pBaseTex1) pBaseTex1->GenerateMipSubLevels ();
-        
-        tbf::RenderFix::pDevice->SetSamplerState (0, D3DSAMP_MAGFILTER, D3DTEXF_ANISOTROPIC);
-        tbf::RenderFix::pDevice->SetSamplerState (0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
-        tbf::RenderFix::pDevice->SetSamplerState (0, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
-        
-        tbf::RenderFix::pDevice->SetSamplerState (1, D3DSAMP_MAGFILTER, D3DTEXF_ANISOTROPIC);
-        tbf::RenderFix::pDevice->SetSamplerState (1, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
-        tbf::RenderFix::pDevice->SetSamplerState (1, D3DSAMP_MIPFILTER, D3DTEXF_LINEAR);
+        if (SUCCEEDED (tbf::RenderFix::pDevice->GetTexture (0, &pBaseTex0))) {
+          if (pBaseTex0) pBaseTex0->GenerateMipSubLevels ();
+
+          tbf::RenderFix::pDevice->SetSamplerState (0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+          tbf::RenderFix::pDevice->SetSamplerState (0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+          tbf::RenderFix::pDevice->SetSamplerState (0, D3DSAMP_MIPFILTER, D3DTEXF_POINT);
+        }
+
+        if (SUCCEEDED (tbf::RenderFix::pDevice->GetTexture (1, &pBaseTex1))) {
+          if (pBaseTex1) pBaseTex1->GenerateMipSubLevels ();
+
+          tbf::RenderFix::pDevice->SetSamplerState (1, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+          tbf::RenderFix::pDevice->SetSamplerState (1, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+          tbf::RenderFix::pDevice->SetSamplerState (1, D3DSAMP_MIPFILTER, D3DTEXF_POINT);
+        }
       }
     };
 
@@ -1074,7 +1079,7 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   // Adjust Character Drop Shadows
   //
   if (pViewport->Width == pViewport->Height &&
-     (pViewport->Width == 64 || pViewport->Width == 128 || pViewport->Width == 256))
+     ( pViewport->Width == 64 || pViewport->Width == 128 || pViewport->Width == 256))
 {
     D3DVIEWPORT9 rescaled_shadow = *pViewport;
 
@@ -1082,6 +1087,8 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
 
     rescaled_shadow.Width  <<= shift;
     rescaled_shadow.Height <<= shift;
+
+    PostProcessMipmaps ();
 
     return D3D9SetViewport_Original (This, &rescaled_shadow);
   }
@@ -1100,18 +1107,18 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
     rescaled_shadow.Width  <<= config.render.env_shadow_rescale;
     rescaled_shadow.Height <<= config.render.env_shadow_rescale;
 
+    PostProcessMipmaps ();
+
     return D3D9SetViewport_Original (This, &rescaled_shadow);
   }
 
   //
   // Adjust Post-Processing (Depth of Field)
   //
-  else if ( ( ( pViewport->Width  == 2048 &&
-                pViewport->Height == 1024 ) ||
-              ( pViewport->Width  == 1024 &&
-                pViewport->Height == 512  ) ||
-              ( pViewport->Width  == 512  &&
-                pViewport->Height == 256  ) ) && config.render.postproc_ratio > 0.0f) {
+  else if ( ( pViewport->Width  == TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) &&
+              pViewport->Height == TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) / 2 ) &&
+            config.render.postproc_ratio > 0.0f )
+  {
     D3DVIEWPORT9 rescaled_post_proc = *pViewport;
 
     float scale_x, scale_y;
@@ -1288,13 +1295,9 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
   //
   else if (StartRegister     == 240 &&
            Vector4fCount     == 1   &&
-         ( ( pConstantData [0] == -1.0f / 512.0f &&
-             pConstantData [1] ==  1.0f / 256.0f ) ||
-           ( pConstantData [0] == -1.0f / 1024.0f &&
-             pConstantData [1] ==  1.0f / 512.0f ) ||
-           ( pConstantData [0] == -1.0f / 2048.0f &&
-             pConstantData [1] ==  1.0f / 1024.0f) ) &&
-      config.render.postproc_ratio > 0.0f)
+           ( pConstantData [0] == -1.0f / (float) TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) &&
+             pConstantData [1] ==  1.0f / (float)(TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) / 2) ) &&
+            config.render.postproc_ratio > 0.0f )
   {
     if (SUCCEEDED (This->GetRenderTarget (0, &tbf::RenderFix::pPostProcessSurface)))
       tbf::RenderFix::pPostProcessSurface->Release ();
@@ -1388,8 +1391,10 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
 
             //TBF_ComputeAspectScale (scale_x, scale_y, x_off, y_off);
 
-            float rescale_x = 512.0f / ((float)tbf::RenderFix::width  * config.render.postproc_ratio * scale_x);
-            float rescale_y = 256.0f / ((float)tbf::RenderFix::height * config.render.postproc_ratio * scale_y);
+            float rescale_x = (float) TBF_NextPowerOfTwo (tbf::RenderFix::width / 2)
+                               / ((float)tbf::RenderFix::width  * config.render.postproc_ratio * scale_x);
+            float rescale_y = (float)(TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) / 2)
+                               / ((float)tbf::RenderFix::height * config.render.postproc_ratio * scale_y);
 
             for (int i = 0; i < 8; i += 2) {
               newData [i] = pConstantData [i] * rescale_x;
