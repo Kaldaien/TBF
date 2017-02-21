@@ -1691,7 +1691,8 @@ public:
 protected:
   static unsigned int __stdcall Spooler (LPVOID user);
 
-  tbf_tex_load_s* getNextJob   (void) {
+  tbf_tex_load_s* getNextJob   (void)
+  {
     tbf_tex_load_s* job       = nullptr;
     DWORD           dwResults = 0;
 
@@ -1699,11 +1700,14 @@ protected:
       //dwResults = WaitForSingleObject (events_.jobs_added, INFINITE);
     //}
 
-    if (jobs_.empty ())
-      return nullptr;
-
     EnterCriticalSection (&cs_jobs);
     {
+      if (jobs_.empty ())
+      {
+        LeaveCriticalSection (&cs_jobs);
+        return nullptr;
+      }
+
       job = jobs_.front ();
             jobs_.pop   ();
     }
@@ -1718,11 +1722,10 @@ protected:
     {
       // Remove the temporary reference we added earlier
       finished->pDest->Release ();
-
       results_.push (finished);
-      SetEvent      (events_.results_waiting);
     }
     LeaveCriticalSection (&cs_results);
+    SetEvent             (events_.results_waiting);
   }
 
 private:
@@ -2297,10 +2300,10 @@ TBFix_LoadQueuedTextures (void)
   if (resample_pool != nullptr)
     finished_resamples = resample_pool->getFinished ();
 
-  for (auto it = finished_resamples.begin (); it != finished_resamples.end (); /*it++*/)
+  for (auto&& it : finished_resamples )
   {
     tbf_tex_load_s* load =
-      *it;
+      it;
 
     QueryPerformanceCounter (&load->end);
 
@@ -2324,8 +2327,8 @@ TBFix_LoadQueuedTextures (void)
 
     if (pTex != nullptr)
     {
-      pTex->load_time = (float)(1000.0 * (double)(load->end.QuadPart - load->start.QuadPart) /
-                                          (double)load->freq.QuadPart);
+      //pTex->load_time = (float)(1000.0 * (double)(load->end.QuadPart - load->start.QuadPart) /
+                                          //(double)load->freq.QuadPart);
     }
 
     ISKTextureD3D9* pSKTex =
@@ -2398,10 +2401,10 @@ TBFix_LoadQueuedTextures (void)
     delete load;
   }
 
-  for (auto it = finished_streams.begin (); it != finished_streams.end (); /*it++*/)
+  for (auto&& it : finished_streams )
   {
     tbf_tex_load_s* load =
-      *it;
+      it;
 
     QueryPerformanceCounter (&load->end);
 
@@ -2425,8 +2428,8 @@ TBFix_LoadQueuedTextures (void)
 
     if (pTex != nullptr)
     {
-      pTex->load_time = (float)(1000.0 * (double)(load->end.QuadPart - load->start.QuadPart) /
-                                           (double)load->freq.QuadPart);
+      //pTex->load_time = (float)(1000.0 * (double)(load->end.QuadPart - load->start.QuadPart) /
+                                          //(double)load->freq.QuadPart);
     }
 
     ISKTextureD3D9* pSKTex =
@@ -2656,8 +2659,6 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
   if (freq.QuadPart == 0LL)
     QueryPerformanceFrequency (&freq);
 
-  QueryPerformanceCounter     (&start);
-
   uint32_t checksum =
     crc32 (0, pSrcData, SrcDataSize);
 
@@ -2796,6 +2797,8 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
 
   bool will_replace = config.textures.quick_load && resample;
 
+  QueryPerformanceCounter     (&start);
+
   //tex_log->Log (L"D3DXCreateTextureFromFileInMemoryEx (... MipLevels=%lu ...)", MipLevels);
   hr =
     D3DXCreateTextureFromFileInMemoryEx_Original ( pDevice,
@@ -2805,6 +2808,8 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
                                                            Filter,     MipFilter, ColorKey,
                                                              pSrcInfo, pPalette,
                                                                ppTexture );
+
+  QueryPerformanceCounter     (&end);
 
   if (SUCCEEDED (hr))
   {
@@ -3012,8 +3017,6 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
     load_op = nullptr;
   }
 
-  QueryPerformanceCounter (&end);
-
   if (SUCCEEDED (hr))
   {
     if (config.textures.cache && checksum != 0x00)
@@ -3034,7 +3037,7 @@ D3DXCreateTextureFromFileInMemoryEx_Detour (
       tbf::RenderFix::tex_mgr.addTexture (checksum, pTex, SrcDataSize);
     }
 
-    if (false) {//config.textures.log) {
+    if (false) {
       tex_log->Log ( L"[Load Trace] Texture:   (%lu x %lu) * <LODs: %lu> - FAST_CRC32: %X",
                       Width, Height, (*ppTexture)->GetLevelCount (), checksum );
       tex_log->Log ( L"[Load Trace]              Usage: %-20s - Format: %-20s",
@@ -3871,11 +3874,9 @@ TBFix_LogUsedTextures (void)
 
     tex_log->Log (L"[ Tex. Log ] ---------- FrameTrace ----------- ");
 
-    for ( auto it  = textures_used.begin ();
-               it != textures_used.end   ();
-             ++it ) {
+    for ( auto&& it  : textures_used ) {
       auto tex_record =
-        tbf::RenderFix::tex_mgr.getTexture (*it);
+        tbf::RenderFix::tex_mgr.getTexture (it);
 
       // Handle the RARE case where a purge happens immediately following
       //   the last frame
@@ -3885,11 +3886,11 @@ TBFix_LogUsedTextures (void)
         ISKTextureD3D9* pSKTex =
           (ISKTextureD3D9 *)tex_record->d3d9_tex;
 
-        textures_used_last_dump.push_back (*it);
+        textures_used_last_dump.push_back (it);
 
         tex_log->Log ( L"[ Tex. Log ] %08x.dds  { Base: %6.2f MiB,  "
                        L"Inject: %6.2f MiB,  Load Time: %8.3f ms }",
-                         *it,
+                         it,
                            (double)pSKTex->tex_size /
                              (1024.0 * 1024.0),
 
@@ -3897,7 +3898,7 @@ TBFix_LogUsedTextures (void)
                        (double)pSKTex->override_size / 
                              (1024.0 * 1024.0) : 0.0,
 
-                           tbf::RenderFix::tex_mgr.getTexture (*it)->load_time );
+                           tbf::RenderFix::tex_mgr.getTexture (it)->load_time );
       }
     }
 
