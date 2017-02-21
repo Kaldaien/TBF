@@ -738,7 +738,7 @@ TBFix_DrawConfigUI (void)
         ImGui::TextColored
                        (ImVec4 (1.0f, 0.3f, 0.3f, 1.0f),
                          "%#5lu   Misses",             tbf::RenderFix::tex_mgr.getMissCount   ()          );  ImGui::NextColumn ();
-        ImGui::Text    ( "Time:    %#7.01lf  s  ", tbf::RenderFix::tex_mgr.getTimeSaved       () / 1000.0f);
+        ImGui::Text    ( "Time:    %#6.04lf  s  ", tbf::RenderFix::tex_mgr.getTimeSaved       () / 1000.0f);
       ImGui::Columns   ( 1 );
 
       ImGui::Separator (   );
