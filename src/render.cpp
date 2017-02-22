@@ -769,18 +769,6 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
   else
   {
-    typedef uint32_t (__stdcall *SK_Steam_PiratesAhoy_pfn)(void);
-    static SK_Steam_PiratesAhoy_pfn SK_Steam_PiratesAhoy =
-      (SK_Steam_PiratesAhoy_pfn)
-        GetProcAddress (GetModuleHandle (config.system.injector.c_str ()), "SK_Steam_PiratesAhoy");
-
-    if (SK_Steam_PiratesAhoy () != 0x00)
-    {
-      SKX_DrawExternalOSD    ("ToBFix", "Pirates Run at 45 FPS!");
-      SK_GetCommandProcessor ()->ProcessCommandLine ("TargetFPS 45.0");
-    }
-    else
-    {
     extern bool  __show_cache;
     extern DWORD last_queue_update;
 
@@ -810,7 +798,6 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
     else
       SKX_DrawExternalOSD ("ToBFix", "");
-    }
   }
 
   HRESULT hr = D3D9EndScene_Original (This);
