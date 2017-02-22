@@ -20,6 +20,8 @@
  *
 **/
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "render.h"
 #include "framerate.h"
 #include "config.h"
@@ -28,7 +30,7 @@
 
 #include "textures.h"
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <d3d9.h>
 #include <d3d9types.h>
@@ -66,28 +68,34 @@ struct smaa_constants_s
   } reprojection;
 };
 
+typedef uint32_t (__stdcall *SK_Steam_PiratesAhoy_pfn)(void);
 
-typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
-(
-  IDirect3DDevice9*  This,
-  D3DRENDERSTATETYPE State,
-  DWORD              Value
-);
+extern SetRenderState_pfn               D3D9SetRenderState_Original;
+       SetSamplerState_pfn              D3D9SetSamplerState_Original          = nullptr;
 
-typedef HRESULT (STDMETHODCALLTYPE *TestCooperativeLevel_pfn)
-(
-  IDirect3DDevice9* This
-);
+DrawPrimitive_pfn                       D3D9DrawPrimitive_Original            = nullptr;
+DrawIndexedPrimitive_pfn                D3D9DrawIndexedPrimitive_Original     = nullptr;
+DrawPrimitiveUP_pfn                     D3D9DrawPrimitiveUP_Original          = nullptr;
+DrawIndexedPrimitiveUP_pfn              D3D9DrawIndexedPrimitiveUP_Original   = nullptr;
+SetStreamSource_pfn                     D3D9SetStreamSource_Original          = nullptr;
 
-extern SetRenderState_pfn D3D9SetRenderState_Original;
+SK_BeginBufferSwap_pfn                  SK_BeginBufferSwap                    = nullptr;
+SK_EndBufferSwap_pfn                    SK_EndBufferSwap                      = nullptr;
+EndScene_pfn                            D3D9EndScene_Original                 = nullptr;
+SK_SetPresentParamsD3D9_pfn             SK_SetPresentParamsD3D9_Original      = nullptr;
+Reset_pfn                               D3D9Reset_Original                    = nullptr;
+TestCooperativeLevel_pfn                D3D9TestCooperativeLevel_Original     = nullptr;
 
-TestCooperativeLevel_pfn                D3D9TestCooperativeLevel_Original            = nullptr;
-DrawPrimitive_pfn                       D3D9DrawPrimitive_Original                   = nullptr;
-DrawIndexedPrimitive_pfn                D3D9DrawIndexedPrimitive_Original            = nullptr;
-DrawPrimitiveUP_pfn                     D3D9DrawPrimitiveUP_Original                 = nullptr;
-DrawIndexedPrimitiveUP_pfn              D3D9DrawIndexedPrimitiveUP_Original          = nullptr;
-SetStreamSource_pfn                     D3D9SetStreamSource_Original                 = nullptr;
-SK_SetPresentParamsD3D9_pfn             SK_SetPresentParamsD3D9_Original             = nullptr;
+UpdateSurface_pfn                       D3D9UpdateSurface_Original            = nullptr;
+SetScissorRect_pfn                      D3D9SetScissorRect_Original           = nullptr;
+SetViewport_pfn                         D3D9SetViewport_Original              = nullptr;
+
+D3DXDisassembleShader_pfn               D3DXDisassembleShader                 = nullptr;
+SetVertexShader_pfn                     D3D9SetVertexShader_Original          = nullptr;
+SetPixelShader_pfn                      D3D9SetPixelShader_Original           = nullptr;
+SetVertexShaderConstantF_pfn            D3D9SetVertexShaderConstantF_Original = nullptr;
+SetPixelShaderConstantF_pfn             D3D9SetPixelShaderConstantF_Original  = nullptr;
+
 
 
 extern bool pending_loads            (void);
@@ -146,16 +154,6 @@ TBF_ComputeAspectCoeffs (float& x, float& y, float& xoff, float& yoff)
 }
 
 #include "hook.h"
-
-typedef HRESULT (STDMETHODCALLTYPE *SetSamplerState_pfn)
-(IDirect3DDevice9*   This,
-  DWORD               Sampler,
-  D3DSAMPLERSTATETYPE Type,
-  DWORD               Value);
-
-SetSamplerState_pfn D3D9SetSamplerState_Original = nullptr;
-
-LPVOID SetSamplerState = nullptr;
 
 COM_DECLSPEC_NOTHROW
 HRESULT
@@ -269,42 +267,6 @@ tbf::RenderFix::frame_state_s tbf::RenderFix::last_frame;
 uint32_t vs_checksum = 0;
 uint32_t ps_checksum = 0;
 
-typedef interface ID3DXBuffer ID3DXBuffer;
-typedef interface ID3DXBuffer *LPD3DXBUFFER;
-
-// {8BA5FB08-5195-40e2-AC58-0D989C3A0102}
-DEFINE_GUID(IID_ID3DXBuffer, 
-0x8ba5fb08, 0x5195, 0x40e2, 0xac, 0x58, 0xd, 0x98, 0x9c, 0x3a, 0x1, 0x2);
-
-#undef INTERFACE
-#define INTERFACE ID3DXBuffer
-
-DECLARE_INTERFACE_(ID3DXBuffer, IUnknown)
-{
-    // IUnknown
-    STDMETHOD  (        QueryInterface)   (THIS_ REFIID iid, LPVOID *ppv) PURE;
-    STDMETHOD_ (ULONG,  AddRef)           (THIS) PURE;
-    STDMETHOD_ (ULONG,  Release)          (THIS) PURE;
-
-    // ID3DXBuffer
-    STDMETHOD_ (LPVOID, GetBufferPointer) (THIS) PURE;
-    STDMETHOD_ (DWORD,  GetBufferSize)    (THIS) PURE;
-};
-
-typedef HRESULT (WINAPI *D3DXGetShaderConstantTable_pfn)(
-  _In_  const DWORD                *pFunction,
-  _Out_       LPD3DXCONSTANTTABLE *ppConstantTable
-);
-
-typedef HRESULT (WINAPI *D3DXDisassembleShader_pfn)(
-  _In_  const DWORD         *pShader,
-  _In_        BOOL            EnableColorCode,
-  _In_        LPCSTR         pComments,
-  _Out_       LPD3DXBUFFER *ppDisassembly
-);
-
-D3DXDisassembleShader_pfn D3DXDisassembleShader = nullptr;
-
 void
 SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
                            uint32_t crc32,
@@ -312,88 +274,85 @@ SK_D3D9_DumpShader ( const wchar_t* wszPrefix,
 {
   static bool dump = config.render.dump_shaders;
 
-  if (dump)
+  if ( D3DXDisassembleShader != nullptr)
   {
-    if (GetFileAttributes (L"TBFix_Res\\dump\\shaders") !=
-         FILE_ATTRIBUTE_DIRECTORY) {
-      CreateDirectoryW (L"TBFix_Res",                nullptr);
-      CreateDirectoryW (L"TBFix_Res\\dump",          nullptr);
-      CreateDirectoryW (L"TBFix_Res\\dump\\shaders", nullptr);
-    }
-
-    wchar_t wszDumpName [MAX_PATH] = { L'\0' };
-
-    swprintf_s ( wszDumpName,
-                   MAX_PATH, 
-                     L"TBFix_Res\\dump\\shaders\\%s_%08x.html",
-                       wszPrefix, crc32 );
-
-    if ( D3DXDisassembleShader           != nullptr &&
-         GetFileAttributes (wszDumpName) == INVALID_FILE_ATTRIBUTES )
+    if (dump)
     {
-      CComPtr <ID3DXBuffer> pDisasm = nullptr;
-
-      HRESULT hr =
-        D3DXDisassembleShader ((DWORD *)pbFunc, TRUE, "", &pDisasm);
-
-      if (SUCCEEDED (hr))
+      if (GetFileAttributes (L"TBFix_Res\\dump\\shaders") !=
+           FILE_ATTRIBUTE_DIRECTORY)
       {
-        FILE* fDump = _wfsopen (wszDumpName,  L"wb", _SH_DENYWR);
+        CreateDirectoryW (L"TBFix_Res",                nullptr);
+        CreateDirectoryW (L"TBFix_Res\\dump",          nullptr);
+        CreateDirectoryW (L"TBFix_Res\\dump\\shaders", nullptr);
+      }
 
-        if (fDump != NULL) {
-          fwrite ( pDisasm->GetBufferPointer (),
-                     pDisasm->GetBufferSize  (),
-                       1,
-                         fDump );
-          fclose (fDump);
+      wchar_t wszDumpName [MAX_PATH] = { L'\0' };
+
+      swprintf_s ( wszDumpName,
+                     MAX_PATH, 
+                       L"TBFix_Res\\dump\\shaders\\%s_%08x.html",
+                         wszPrefix, crc32 );
+
+      if ( GetFileAttributes (wszDumpName) == INVALID_FILE_ATTRIBUTES )
+      {
+        CComPtr <ID3DXBuffer> pDisasm = nullptr;
+      
+        HRESULT hr =
+          D3DXDisassembleShader ((DWORD *)pbFunc, TRUE, "", &pDisasm);
+      
+        if (SUCCEEDED (hr))
+        {
+          FILE* fDump = _wfsopen (wszDumpName,  L"wb", _SH_DENYWR);
+      
+          if (fDump != NULL)
+          {
+            fwrite ( pDisasm->GetBufferPointer (),
+                       pDisasm->GetBufferSize  (),
+                         1,
+                           fDump );
+            fclose (fDump);
+          }
         }
       }
     }
-  }
 
-  CComPtr <ID3DXBuffer> pDisasm = nullptr;
+    CComPtr <ID3DXBuffer> pDisasm = nullptr;
 
-  HRESULT hr =
-    D3DXDisassembleShader ((DWORD *)pbFunc, FALSE, "", &pDisasm);
+    HRESULT hr =
+      D3DXDisassembleShader ((DWORD *)pbFunc, FALSE, "", &pDisasm);
 
-  if (SUCCEEDED (hr) && strlen ((const char *)pDisasm->GetBufferPointer ()))
-  {
-    char* szDisasm = strdup ((const char *)pDisasm->GetBufferPointer ());
-
-    char* comments_end  =                strstr (szDisasm,          "\n ");
-    char* footer_begins = comments_end ? strstr (comments_end + 1, "\n\n") : nullptr;
-
-    if (comments_end)  *comments_end  = '\0'; else (comments_end  = "  ");
-    if (footer_begins) *footer_begins = '\0'; else (footer_begins = "  ");
-
-    if (! wcsicmp (wszPrefix, L"ps"))
+    if (SUCCEEDED (hr) && strlen ((const char *)pDisasm->GetBufferPointer ()))
     {
-      ps_disassembly.emplace ( crc32, tbf::RenderFix::shader_disasm_s {
-                                        szDisasm,
-                                          comments_end + 1,
-                                            footer_begins + 1 }
-                             );
-    }
+      char* szDisasm = _strdup ((const char *)pDisasm->GetBufferPointer ());
 
-    else
-    {
-      vs_disassembly.emplace ( crc32, tbf::RenderFix::shader_disasm_s {
-                                        szDisasm,
-                                          comments_end + 1,
-                                            footer_begins + 1 }
-                             );
-    }
+      char* comments_end  =                strstr (szDisasm,          "\n ");
+      char* footer_begins = comments_end ? strstr (comments_end + 1, "\n\n") : nullptr;
 
-    free (szDisasm);
+      if (comments_end)  *comments_end  = '\0'; else (comments_end  = "  ");
+      if (footer_begins) *footer_begins = '\0'; else (footer_begins = "  ");
+
+      if (! _wcsicmp (wszPrefix, L"ps"))
+      {
+        ps_disassembly.emplace ( crc32, tbf::RenderFix::shader_disasm_s {
+                                          szDisasm,
+                                            comments_end + 1,
+                                              footer_begins + 1 }
+                               );
+      }
+
+      else
+      {
+        vs_disassembly.emplace ( crc32, tbf::RenderFix::shader_disasm_s {
+                                          szDisasm,
+                                            comments_end + 1,
+                                              footer_begins + 1 }
+                               );
+      }
+
+      free (szDisasm);
+    }
   }
 }
-
-
-typedef HRESULT (STDMETHODCALLTYPE *SetVertexShader_pfn)
-  (IDirect3DDevice9*       This,
-   IDirect3DVertexShader9* pShader);
-
-SetVertexShader_pfn D3D9SetVertexShader_Original = nullptr;
 
 COM_DECLSPEC_NOTHROW
 HRESULT
@@ -470,13 +429,6 @@ D3D9SetVertexShader_Detour (IDirect3DDevice9*       This,
 
   return D3D9SetVertexShader_Original (This, pShader);
 }
-
-
-typedef HRESULT (STDMETHODCALLTYPE *SetPixelShader_pfn)
-  (IDirect3DDevice9*      This,
-   IDirect3DPixelShader9* pShader);
-
-SetPixelShader_pfn D3D9SetPixelShader_Original = nullptr;
 
 COM_DECLSPEC_NOTHROW
 HRESULT
@@ -703,25 +655,6 @@ TBF_ShouldSkipRenderPass (void)
   return false;
 }
 
-typedef void (STDMETHODCALLTYPE *SK_BeginBufferSwap_pfn)(void);
-SK_BeginBufferSwap_pfn SK_BeginBufferSwap = nullptr;
-
-typedef HRESULT (STDMETHODCALLTYPE *SK_EndBufferSwap_pfn)
-  (HRESULT   hr,
-   IUnknown* device);
-SK_EndBufferSwap_pfn SK_EndBufferSwap = nullptr;
-
-typedef HRESULT (STDMETHODCALLTYPE *SetScissorRect_pfn)(
-  IDirect3DDevice9* This,
-  const RECT*       pRect);
-
-SetScissorRect_pfn D3D9SetScissorRect_Original = nullptr;
-
-typedef HRESULT (STDMETHODCALLTYPE *EndScene_pfn)
-(IDirect3DDevice9* This);
-
-EndScene_pfn D3D9EndScene_Original = nullptr;
-
 int draw_count  = 0;
 int next_draw   = 0;
 int scene_count = 0;
@@ -751,8 +684,6 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
   tbf::RenderFix::draw_state.cegui_active = true;
 
-  typedef BOOL (__stdcall *SKX_DrawExternalOSD_pfn)(const char* szAppName, const char* szText);
-
   static HMODULE               hMod =
     GetModuleHandle (config.system.injector.c_str ());
   static SKX_DrawExternalOSD_pfn SKX_DrawExternalOSD
@@ -769,7 +700,6 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
   else
   {
-    typedef uint32_t (__stdcall *SK_Steam_PiratesAhoy_pfn)(void);
     static SK_Steam_PiratesAhoy_pfn SK_Steam_PiratesAhoy =
       (SK_Steam_PiratesAhoy_pfn)
         GetProcAddress (GetModuleHandle (config.system.injector.c_str ()), "SK_Steam_PiratesAhoy");
@@ -781,35 +711,35 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
     }
     else
     {
-    extern bool  __show_cache;
-    extern DWORD last_queue_update;
+      extern bool  __show_cache;
+      extern DWORD last_queue_update;
 
-    if (last_queue_update + 250 < timeGetTime ())
-      mod_text = "";
+      if (last_queue_update + 250 < timeGetTime ())
+        mod_text = "";
 
-    if (__show_cache)
-    {
-      std::string output;
+      if (__show_cache)
+      {
+        std::string output;
 
-      output  = "Texture Cache\n";
-      output += "-------------\n";
-      output += tbf::RenderFix::tex_mgr.osdStats ();
+        output  = "Texture Cache\n";
+        output += "-------------\n";
+        output += tbf::RenderFix::tex_mgr.osdStats ();
 
-      if (! mod_text.empty ()) {
-        output += "\n";
-        output += mod_text;
+        if (! mod_text.empty ()) {
+          output += "\n";
+          output += mod_text;
+        }
+
+        SKX_DrawExternalOSD ("ToBFix", output.c_str ());
+
+        output = "";
       }
 
-      SKX_DrawExternalOSD ("ToBFix", output.c_str ());
+      else if (config.textures.show_loading_text)
+        SKX_DrawExternalOSD ("ToBFix", mod_text.c_str ());
 
-      output = "";
-    }
-
-    else if (config.textures.show_loading_text)
-      SKX_DrawExternalOSD ("ToBFix", mod_text.c_str ());
-
-    else
-      SKX_DrawExternalOSD ("ToBFix", "");
+      else
+        SKX_DrawExternalOSD ("ToBFix", "");
     }
   }
 
@@ -884,15 +814,6 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
 
   return hr;
 }
-
-typedef HRESULT (STDMETHODCALLTYPE *UpdateSurface_pfn)
-  ( _In_       IDirect3DDevice9  *This,
-    _In_       IDirect3DSurface9 *pSourceSurface,
-    _In_ const RECT              *pSourceRect,
-    _In_       IDirect3DSurface9 *pDestinationSurface,
-    _In_ const POINT             *pDestinationPoint );
-
-UpdateSurface_pfn D3D9UpdateSurface_Original = nullptr;
 
 COM_DECLSPEC_NOTHROW
 HRESULT
@@ -1000,12 +921,6 @@ D3D9SetScissorRect_Detour (IDirect3DDevice9* This,
 
   return D3D9SetScissorRect_Original (This, &fixed_scissor);
 }
-
-typedef HRESULT (STDMETHODCALLTYPE *SetViewport_pfn)(
-        IDirect3DDevice9* This,
-  CONST D3DVIEWPORT9*     pViewport);
-
-SetViewport_pfn D3D9SetViewport_Original = nullptr;
 
 COM_DECLSPEC_NOTHROW
 HRESULT
@@ -1248,15 +1163,6 @@ D3D9DrawIndexedPrimitive_Detour (IDirect3DDevice9* This,
                                                   primCount );
 }
 
-
-typedef HRESULT (STDMETHODCALLTYPE *SetVertexShaderConstantF_pfn)(
-  IDirect3DDevice9* This,
-  UINT              StartRegister,
-  CONST float*      pConstantData,
-  UINT              Vector4fCount);
-
-SetVertexShaderConstantF_pfn D3D9SetVertexShaderConstantF_Original = nullptr;
-
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -1484,16 +1390,6 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
   return D3D9SetVertexShaderConstantF_Original (This, StartRegister, pConstantData, Vector4fCount);
 }
 
-
-
-typedef HRESULT (STDMETHODCALLTYPE *SetPixelShaderConstantF_pfn)(
-  IDirect3DDevice9* This,
-  UINT              StartRegister,
-  CONST float*      pConstantData,
-  UINT              Vector4fCount);
-
-SetVertexShaderConstantF_pfn  D3D9SetPixelShaderConstantF_Original = nullptr;
-
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -1717,13 +1613,6 @@ tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
   fullscreen = (! pPresentationParameters->Windowed);
 }
 
-typedef HRESULT (__stdcall *Reset_pfn)(
-  IDirect3DDevice9     *This,
- D3DPRESENT_PARAMETERS *pPresentationParameters
-);
-
-Reset_pfn D3D9Reset_Original = nullptr;
-
 COM_DECLSPEC_NOTHROW
 HRESULT
 __stdcall
@@ -1890,8 +1779,7 @@ tbf::RenderFix::Init (void)
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetSamplerState_Override",
                       D3D9SetSamplerState_Detour,
-            (LPVOID*)&D3D9SetSamplerState_Original,
-                     &SetSamplerState );
+            (LPVOID*)&D3D9SetSamplerState_Original );
 
   // Needed for shadow re-scaling
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9SetViewport_Override",

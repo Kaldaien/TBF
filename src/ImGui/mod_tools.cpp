@@ -74,7 +74,7 @@ TBF_DrawFileList (bool& can_scroll)
       {
         enumerated_source_s source;
 
-        char szFileName [MAX_PATH] = { };
+        char szFileName [MAX_PATH] = { '\0' };
 
         if (archive_no != std::numeric_limits <unsigned int>::max ()) {
           sprintf (szFileName, "%ws", archives [archive_no].c_str ()); 

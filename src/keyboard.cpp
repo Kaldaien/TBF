@@ -218,8 +218,9 @@ tbf::KeyboardFix::UpdateConfig (void)
 
   for (int i = 0; i < swapped_keys.size (); i++)
   {
-    wchar_t wszPair [64] = { };
-    swprintf ( wszPair,
+    wchar_t wszPair [64] = { L'\0' };
+
+    swprintf ( wszPair, 63,
                  L"%lu-%lu",
                    swapped_keys [i].first,
                    swapped_keys [i].second );
@@ -309,10 +310,10 @@ TBF_DrawRemapList (void)
   
     for ( int line = 0; line < remaps.size (); line++)
     {
-      char szDescription [512] = { };
+      char szDescription [512] = { '\0' };
 
-      sprintf ( szDescription, "%s  <==>  %s", remaps [line].in.name.c_str  (),
-                                               remaps [line].out.name.c_str () );
+      snprintf ( szDescription, 511, "%s  <==>  %s", remaps [line].in.name.c_str  (),
+                                                     remaps [line].out.name.c_str () );
       if (line == sel)
       {
         bool selected = true;

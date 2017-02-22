@@ -53,35 +53,6 @@
 #define TBFIX_TEXTURE_EXT L".dds"
 
 
-typedef HRESULT (STDMETHODCALLTYPE *StretchRect_pfn)
-  (      IDirect3DDevice9    *This,
-         IDirect3DSurface9   *pSourceSurface,
-   const RECT                *pSourceRect,
-         IDirect3DSurface9   *pDestSurface,
-   const RECT                *pDestRect,
-         D3DTEXTUREFILTERTYPE Filter
-  );
-
-typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
-(
-  IDirect3DDevice9*  This,
-  D3DRENDERSTATETYPE State,
-  DWORD              Value
-);
-
-typedef HRESULT (WINAPI *D3DXLoadSurfaceFromSurface_pfn)
-(
-  _In_       LPDIRECT3DSURFACE9  pDestSurface,
-  _In_ const PALETTEENTRY       *pDestPalette,
-  _In_ const RECT               *pDestRect,
-  _In_       LPDIRECT3DSURFACE9  pSrcSurface,
-  _In_ const PALETTEENTRY       *pSrcPalette,
-  _In_ const RECT               *pSrcRect,
-  _In_       DWORD               Filter,
-  _In_       D3DCOLOR            ColorKey
-);
-
-
 static D3DXSaveTextureToFile_pfn               D3DXSaveTextureToFile                        = nullptr;
 static D3DXCreateTextureFromFileInMemoryEx_pfn D3DXCreateTextureFromFileInMemoryEx_Original = nullptr;
 
@@ -835,14 +806,8 @@ D3D9SetDepthStencilSurface_Detour (
 }
 
 
-uint32_t debug_tex_id = 0UL;
+uint32_t debug_tex_id      =   0UL;
 uint32_t current_tex [256] = { 0ui32 };
-
-typedef HRESULT (STDMETHODCALLTYPE *SetSamplerState_pfn)
-(IDirect3DDevice9*   This,
-  DWORD               Sampler,
-  D3DSAMPLERSTATETYPE Type,
-  DWORD               Value);
 
 extern SetSamplerState_pfn D3D9SetSamplerState_Original;
 
@@ -1273,52 +1238,13 @@ extern
 uint32_t
 crc32 (uint32_t crc, const void *buf, size_t size);
 
-typedef HRESULT (WINAPI *D3DXGetImageInfoFromFileInMemory_pfn)
-(
-  _In_ LPCVOID        pSrcData,
-  _In_ UINT           SrcDataSize,
-  _In_ D3DXIMAGE_INFO *pSrcInfo
-);
 
 D3DXGetImageInfoFromFileInMemory_pfn
   D3DXGetImageInfoFromFileInMemory = nullptr;
-
-typedef HRESULT (WINAPI *D3DXGetImageInfoFromFile_pfn)
-(
-  _In_ LPCWSTR         pSrcFile,
-  _In_ D3DXIMAGE_INFO *pSrcInfo
-);
-
 D3DXGetImageInfoFromFile_pfn
-  D3DXGetImageInfoFromFile = nullptr;
-
-typedef HRESULT (WINAPI *D3DXCreateTextureFromFileEx_pfn)
-(
-  _In_    LPDIRECT3DDEVICE9  pDevice,
-  _In_    LPCWSTR            pSrcFile,
-  _In_    UINT               Width,
-  _In_    UINT               Height,
-  _In_    UINT               MipLevels,
-  _In_    DWORD              Usage,
-  _In_    D3DFORMAT          Format,
-  _In_    D3DPOOL            Pool,
-  _In_    DWORD              Filter,
-  _In_    DWORD              MipFilter,
-  _In_    D3DCOLOR           ColorKey,
-  _Inout_ D3DXIMAGE_INFO     *pSrcInfo,
-  _Out_   PALETTEENTRY       *pPalette,
-  _Out_   LPDIRECT3DTEXTURE9 *ppTexture
-);
-
+  D3DXGetImageInfoFromFile         = nullptr;
 D3DXCreateTextureFromFileEx_pfn
-  D3DXCreateTextureFromFileEx = nullptr;
-
-typedef HRESULT (WINAPI *D3DXCreateTextureFromFile_pfn)
-(
-  _In_  LPDIRECT3DDEVICE9   pDevice,
-  _In_  LPCWSTR             pSrcFile,
-  _Out_ LPDIRECT3DTEXTURE9 *ppTexture
-);
+  D3DXCreateTextureFromFileEx      = nullptr;
 
 static D3DXCreateTextureFromFile_pfn
   D3DXCreateTextureFromFile = nullptr;

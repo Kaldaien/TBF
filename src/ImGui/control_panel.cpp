@@ -439,8 +439,8 @@ TBFix_DrawConfigUI (void)
   {
     frame = 0;
 
-    io.DisplaySize.x = tbf::RenderFix::width;
-    io.DisplaySize.y = tbf::RenderFix::height;
+    io.DisplaySize.x = (float)tbf::RenderFix::width;
+    io.DisplaySize.y = (float)tbf::RenderFix::height;
 
     ImGui::SetNextWindowPosCenter (ImGuiSetCond_Always);;
   }

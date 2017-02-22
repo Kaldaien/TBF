@@ -612,6 +612,28 @@ typedef HRESULT (STDMETHODCALLTYPE *EndScene_pfn)(
 
 #include <d3d9.h>
 
+typedef interface ID3DXBuffer ID3DXBuffer;
+typedef interface ID3DXBuffer *LPD3DXBUFFER;
+
+// {8BA5FB08-5195-40e2-AC58-0D989C3A0102}
+DEFINE_GUID(IID_ID3DXBuffer, 
+0x8ba5fb08, 0x5195, 0x40e2, 0xac, 0x58, 0xd, 0x98, 0x9c, 0x3a, 0x1, 0x2);
+
+#undef INTERFACE
+#define INTERFACE ID3DXBuffer
+
+DECLARE_INTERFACE_(ID3DXBuffer, IUnknown)
+{
+    // IUnknown
+    STDMETHOD  (        QueryInterface)   (THIS_ REFIID iid, LPVOID *ppv) PURE;
+    STDMETHOD_ (ULONG,  AddRef)           (THIS) PURE;
+    STDMETHOD_ (ULONG,  Release)          (THIS) PURE;
+
+    // ID3DXBuffer
+    STDMETHOD_ (LPVOID, GetBufferPointer) (THIS) PURE;
+    STDMETHOD_ (DWORD,  GetBufferSize)    (THIS) PURE;
+};
+
 typedef D3DPRESENT_PARAMETERS* (__stdcall *SK_SetPresentParamsD3D9_pfn)
 (
   IDirect3DDevice9      *pDevice,
@@ -667,6 +689,105 @@ typedef HRESULT (STDMETHODCALLTYPE *SetStreamSource_pfn)
   UINT                    OffsetInBytes,
   UINT                    Stride
 );
+
+typedef BOOL (__stdcall *SKX_DrawExternalOSD_pfn)
+( _In_ const char* szAppName,
+  _In_ const char* szText
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
+( _In_ IDirect3DDevice9*  This,
+  _In_ D3DRENDERSTATETYPE State,
+  _In_ DWORD              Value
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *TestCooperativeLevel_pfn)
+( _In_ IDirect3DDevice9* This
+);
+
+typedef void    (STDMETHODCALLTYPE *SK_BeginBufferSwap_pfn)
+(
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SK_EndBufferSwap_pfn)
+( _In_    HRESULT   hr,
+  _Inout_ IUnknown* device
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetScissorRect_pfn)
+( _In_       IDirect3DDevice9* This,
+  _In_ const RECT*             pRect
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *EndScene_pfn)
+( _In_ IDirect3DDevice9* This
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetSamplerState_pfn)
+( _In_ IDirect3DDevice9*   This,
+  _In_ DWORD               Sampler,
+  _In_ D3DSAMPLERSTATETYPE Type,
+  _In_ DWORD               Value
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetVertexShader_pfn)
+( _In_     IDirect3DDevice9*       This,
+  _In_opt_ IDirect3DVertexShader9* pShader
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetPixelShader_pfn)
+( _In_     IDirect3DDevice9*      This,
+  _In_opt_ IDirect3DPixelShader9* pShader
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *UpdateSurface_pfn)
+( _In_       IDirect3DDevice9  *This,
+  _In_       IDirect3DSurface9 *pSourceSurface,
+  _In_ const RECT              *pSourceRect,
+  _In_       IDirect3DSurface9 *pDestinationSurface,
+  _In_ const POINT             *pDestinationPoint
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetViewport_pfn)
+( _In_       IDirect3DDevice9* This,
+  _In_ CONST D3DVIEWPORT9*     pViewport
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetVertexShaderConstantF_pfn)
+( _In_       IDirect3DDevice9* This,
+  _In_       UINT              StartRegister,
+  _In_ CONST float*            pConstantData,
+  _In_       UINT              Vector4fCount
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetPixelShaderConstantF_pfn)
+( _In_       IDirect3DDevice9* This,
+  _In_       UINT              StartRegister,
+  _In_ CONST float*            pConstantData,
+  _In_       UINT              Vector4fCount
+);
+
+typedef HRESULT (WINAPI *D3DXGetShaderConstantTable_pfn)
+( _In_  const DWORD                *pFunction,
+  _Out_       LPD3DXCONSTANTTABLE *ppConstantTable
+);
+
+typedef HRESULT (WINAPI *D3DXDisassembleShader_pfn)
+( _In_  const DWORD         *pShader,
+  _In_        BOOL            EnableColorCode,
+  _In_        LPCSTR         pComments,
+  _Out_       LPD3DXBUFFER *ppDisassembly
+);
+
+typedef HRESULT (__stdcall *Reset_pfn)
+( _In_    IDirect3DDevice9      *This,
+  _Inout_ D3DPRESENT_PARAMETERS *pPresentationParameters
+);
+
+
+
+
+extern SetSamplerState_pfn D3D9SetSamplerState_Original;
 
 
 

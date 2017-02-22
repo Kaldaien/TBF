@@ -225,7 +225,7 @@ SKPlugIn_Init (HMODULE hModSpecialK)
 
           tbf::FrameRateFix::Init ();
 
-          if (tbf::RenderFix::fullscreen)
+          if (tbf::RenderFix::fullscreen && tbf::RenderFix::hWndDevice)
           {
             //
             // Fix input problems in game (namely, ESC key doesn't register unti Alt+Tab).

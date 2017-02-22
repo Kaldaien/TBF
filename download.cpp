@@ -99,7 +99,7 @@ TBF_DownloadThread (LPVOID user)
   URL_COMPONENTSA url_comp;
   url_comp.dwStructSize = sizeof URL_COMPONENTSA;
 
-  InternetCrackUrlA (download->szURL, strlen (download->szURL), 0x00, &url_comp);
+  InternetCrackUrlA (download->szURL, (DWORD)strlen (download->szURL), 0x00, &url_comp);
 
   HINTERNET hInetHost =
     InternetConnectA ( hInetRoot,

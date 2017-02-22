@@ -466,8 +466,7 @@ public:
 };
 
 typedef HRESULT (STDMETHODCALLTYPE *D3DXCreateTextureFromFileInMemoryEx_pfn)
-(
-  _In_        LPDIRECT3DDEVICE9  pDevice,
+( _In_        LPDIRECT3DDEVICE9  pDevice,
   _In_        LPCVOID            pSrcData,
   _In_        UINT               SrcDataSize,
   _In_        UINT               Width,
@@ -484,16 +483,15 @@ typedef HRESULT (STDMETHODCALLTYPE *D3DXCreateTextureFromFileInMemoryEx_pfn)
   _Out_       LPDIRECT3DTEXTURE9 *ppTexture
 );
 
-typedef HRESULT (STDMETHODCALLTYPE *D3DXSaveTextureToFile_pfn)(
-  _In_           LPCWSTR                 pDestFile,
+typedef HRESULT (STDMETHODCALLTYPE *D3DXSaveTextureToFile_pfn)
+( _In_           LPCWSTR                 pDestFile,
   _In_           D3DXIMAGE_FILEFORMAT    DestFormat,
   _In_           LPDIRECT3DBASETEXTURE9  pSrcTexture,
   _In_opt_ const PALETTEENTRY           *pSrcPalette
 );
 
 typedef HRESULT (WINAPI *D3DXSaveSurfaceToFile_pfn)
-(
-  _In_           LPCWSTR               pDestFile,
+( _In_           LPCWSTR               pDestFile,
   _In_           D3DXIMAGE_FILEFORMAT  DestFormat,
   _In_           LPDIRECT3DSURFACE9    pSrcSurface,
   _In_opt_ const PALETTEENTRY         *pSrcPalette,
@@ -501,8 +499,7 @@ typedef HRESULT (WINAPI *D3DXSaveSurfaceToFile_pfn)
 );
 
 typedef HRESULT (STDMETHODCALLTYPE *CreateTexture_pfn)
-(
-  IDirect3DDevice9   *This,
+( IDirect3DDevice9   *This,
   UINT                Width,
   UINT                Height,
   UINT                Levels,
@@ -514,8 +511,7 @@ typedef HRESULT (STDMETHODCALLTYPE *CreateTexture_pfn)
 );
 
 typedef HRESULT (STDMETHODCALLTYPE *CreateRenderTarget_pfn)
-(
-  IDirect3DDevice9     *This,
+( IDirect3DDevice9     *This,
   UINT                  Width,
   UINT                  Height,
   D3DFORMAT             Format,
@@ -527,33 +523,99 @@ typedef HRESULT (STDMETHODCALLTYPE *CreateRenderTarget_pfn)
 );
 
 typedef HRESULT (STDMETHODCALLTYPE *CreateDepthStencilSurface_pfn)
-(
-  IDirect3DDevice9     *This,
-  UINT                  Width,
-  UINT                  Height,
-  D3DFORMAT             Format,
-  D3DMULTISAMPLE_TYPE   MultiSample,
-  DWORD                 MultisampleQuality,
-  BOOL                  Discard,
-  IDirect3DSurface9   **ppSurface,
-  HANDLE               *pSharedHandle
+( _In_    IDirect3DDevice9     *This,
+  _In_    UINT                  Width,
+  _In_    UINT                  Height,
+  _In_    D3DFORMAT             Format,
+  _In_    D3DMULTISAMPLE_TYPE   MultiSample,
+  _In_    DWORD                 MultisampleQuality,
+  _In_    BOOL                  Discard,
+  _Inout_ IDirect3DSurface9   **ppSurface,
+  _Out_   HANDLE               *pSharedHandle
 );
 
-typedef HRESULT (STDMETHODCALLTYPE *SetTexture_pfn)(
-  _In_ IDirect3DDevice9      *This,
+typedef HRESULT (STDMETHODCALLTYPE *SetTexture_pfn)
+( _In_ IDirect3DDevice9      *This,
   _In_ DWORD                  Sampler,
   _In_ IDirect3DBaseTexture9 *pTexture
 );
 
-typedef HRESULT (STDMETHODCALLTYPE *SetRenderTarget_pfn)(
-  _In_ IDirect3DDevice9      *This,
+typedef HRESULT (STDMETHODCALLTYPE *SetRenderTarget_pfn)
+( _In_ IDirect3DDevice9      *This,
   _In_ DWORD                  RenderTargetIndex,
   _In_ IDirect3DSurface9     *pRenderTarget
 );
 
-typedef HRESULT (STDMETHODCALLTYPE *SetDepthStencilSurface_pfn)(
-  _In_ IDirect3DDevice9      *This,
+typedef HRESULT (STDMETHODCALLTYPE *SetDepthStencilSurface_pfn)
+( _In_ IDirect3DDevice9      *This,
   _In_ IDirect3DSurface9     *pNewZStencil
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *StretchRect_pfn)
+(      IDirect3DDevice9    *This,
+       IDirect3DSurface9   *pSourceSurface,
+ const RECT                *pSourceRect,
+       IDirect3DSurface9   *pDestSurface,
+ const RECT                *pDestRect,
+       D3DTEXTUREFILTERTYPE Filter
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetRenderState_pfn)
+( _In_ IDirect3DDevice9*  This,
+  _In_ D3DRENDERSTATETYPE State,
+  _In_ DWORD              Value
+);
+
+typedef HRESULT (WINAPI *D3DXLoadSurfaceFromSurface_pfn)
+( _In_       LPDIRECT3DSURFACE9  pDestSurface,
+  _In_ const PALETTEENTRY       *pDestPalette,
+  _In_ const RECT               *pDestRect,
+  _In_       LPDIRECT3DSURFACE9  pSrcSurface,
+  _In_ const PALETTEENTRY       *pSrcPalette,
+  _In_ const RECT               *pSrcRect,
+  _In_       DWORD               Filter,
+  _In_       D3DCOLOR            ColorKey
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetSamplerState_pfn)
+( _In_ IDirect3DDevice9*   This,
+  _In_ DWORD               Sampler,
+  _In_ D3DSAMPLERSTATETYPE Type,
+  _In_ DWORD               Value
+);
+
+typedef HRESULT (WINAPI *D3DXGetImageInfoFromFileInMemory_pfn)
+( _In_ LPCVOID        pSrcData,
+  _In_ UINT           SrcDataSize,
+  _In_ D3DXIMAGE_INFO *pSrcInfo
+);
+
+typedef HRESULT (WINAPI *D3DXGetImageInfoFromFile_pfn)
+( _In_ LPCWSTR         pSrcFile,
+  _In_ D3DXIMAGE_INFO *pSrcInfo
+);
+
+typedef HRESULT (WINAPI *D3DXCreateTextureFromFileEx_pfn)
+( _In_    LPDIRECT3DDEVICE9  pDevice,
+  _In_    LPCWSTR            pSrcFile,
+  _In_    UINT               Width,
+  _In_    UINT               Height,
+  _In_    UINT               MipLevels,
+  _In_    DWORD              Usage,
+  _In_    D3DFORMAT          Format,
+  _In_    D3DPOOL            Pool,
+  _In_    DWORD              Filter,
+  _In_    DWORD              MipFilter,
+  _In_    D3DCOLOR           ColorKey,
+  _Inout_ D3DXIMAGE_INFO     *pSrcInfo,
+  _Out_   PALETTEENTRY       *pPalette,
+  _Out_   LPDIRECT3DTEXTURE9 *ppTexture
+);
+
+typedef HRESULT (WINAPI *D3DXCreateTextureFromFile_pfn)
+( _In_  LPDIRECT3DDEVICE9   pDevice,
+  _In_  LPCWSTR             pSrcFile,
+  _Out_ LPDIRECT3DTEXTURE9 *ppTexture
 );
 
 HRESULT
