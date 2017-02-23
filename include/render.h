@@ -488,7 +488,7 @@ namespace tbf
 
     struct vertex_buffer_tracking_s
     {
-      void clear (void) { active = false; num_draws = 0; }
+      void clear (void) { active = false; num_draws = 0; instances = 0; }
 
       IDirect3DVertexBuffer9*       vertex_buffer = nullptr;
       //uint32_t                      crc32        =  0x00;
@@ -496,6 +496,10 @@ namespace tbf
       bool                          wireframe     = false;
       bool                          active        = false;
       int                           num_draws     =     0;
+      int                           instanced     =     0;
+      int                           instances     =     1;
+      std::unordered_set <IDirect3DVertexBuffer9 *>
+                                    wireframes;
     } extern tracked_vb;
 
     struct shader_disasm_s {
@@ -688,6 +692,12 @@ typedef HRESULT (STDMETHODCALLTYPE *SetStreamSource_pfn)
   IDirect3DVertexBuffer9 *pStreamData,
   UINT                    OffsetInBytes,
   UINT                    Stride
+);
+
+typedef HRESULT (STDMETHODCALLTYPE *SetStreamSourceFreq_pfn)
+( _In_ IDirect3DDevice9 *This,
+  _In_ UINT              StreamNumber,
+  _In_ UINT              FrequencyParameter
 );
 
 typedef BOOL (__stdcall *SKX_DrawExternalOSD_pfn)

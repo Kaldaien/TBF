@@ -40,6 +40,7 @@
 tbf::RenderFix::tbf_draw_states_s
   tbf::RenderFix::draw_state;
 
+int             instances = 0;
 extern uint32_t current_tex [256];
 
 struct smaa_constants_s
@@ -69,6 +70,7 @@ struct smaa_constants_s
 };
 
 typedef uint32_t (__stdcall *SK_Steam_PiratesAhoy_pfn)(void);
+typedef void     (__stdcall *SK_ResizeOSD_pfn)(float,const char*);
 
 extern SetRenderState_pfn               D3D9SetRenderState_Original;
        SetSamplerState_pfn              D3D9SetSamplerState_Original          = nullptr;
@@ -78,6 +80,7 @@ DrawIndexedPrimitive_pfn                D3D9DrawIndexedPrimitive_Original     = 
 DrawPrimitiveUP_pfn                     D3D9DrawPrimitiveUP_Original          = nullptr;
 DrawIndexedPrimitiveUP_pfn              D3D9DrawIndexedPrimitiveUP_Original   = nullptr;
 SetStreamSource_pfn                     D3D9SetStreamSource_Original          = nullptr;
+SetStreamSourceFreq_pfn                 D3D9SetStreamSourceFreq_Original      = nullptr;
 
 SK_BeginBufferSwap_pfn                  SK_BeginBufferSwap                    = nullptr;
 SK_EndBufferSwap_pfn                    SK_EndBufferSwap                      = nullptr;
@@ -603,18 +606,19 @@ TBF_ShouldSkipRenderPass (void)
 
 
 
+  bool wireframe = false;
+
+  if (tbf::RenderFix::tracked_vb.wireframes.count (vb_stream0))
+    wireframe = true;
+
   if (tracked_vb)
   {
+    tbf::RenderFix::tracked_vb.instances  = instances;
+    tbf::RenderFix::tracked_vb.instanced += instances;
     tbf::RenderFix::tracked_vb.num_draws++;
 
     if (tbf::RenderFix::tracked_vb.wireframe)
-      tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_WIREFRAME);
-  }
-
-  else
-  {
-    if (tbf::RenderFix::tracked_vb.wireframe)
-      tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
+      wireframe = true;
   }
 
   if (tracked_vb && tbf::RenderFix::tracked_vb.cancel_draws)
@@ -650,6 +654,10 @@ TBF_ShouldSkipRenderPass (void)
                       vs_checksum, ps_checksum );
     }
   }
+
+
+  if (wireframe)
+    tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_WIREFRAME);
 
 
   return false;
@@ -700,14 +708,44 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
   else
   {
+    static SK_ResizeOSD_pfn SK_ResizeOSD =
+      TBF_ImportFunctionFromSpecialK ( "SK_ResizeOSD",
+                                         SK_ResizeOSD );
+
     static SK_Steam_PiratesAhoy_pfn SK_Steam_PiratesAhoy =
-      (SK_Steam_PiratesAhoy_pfn)
-        GetProcAddress (GetModuleHandle (config.system.injector.c_str ()), "SK_Steam_PiratesAhoy");
+      TBF_ImportFunctionFromSpecialK ( "SK_Steam_PiratesAhoy",
+                                         SK_Steam_PiratesAhoy );
 
     if (SK_Steam_PiratesAhoy () != 0x00)
     {
-      SKX_DrawExternalOSD    ("ToBFix", "Pirates Run at 45 FPS!");
-      SK_GetCommandProcessor ()->ProcessCommandLine ("TargetFPS 45.0");
+             DWORD dwTime      = timeGetTime ();
+      static bool  blink       = true;
+      static DWORD dwLastBlink = dwTime;
+
+      if (blink)
+      {
+        if (tbf::FrameRateFix::GetTargetFrametime () < 30.0f)
+          SKX_DrawExternalOSD    ("ToBFix", "Pirates Run at 45 FPS Max!");
+
+        if (dwLastBlink < dwTime -  1500)
+        {
+          blink       = false;
+          dwLastBlink = dwTime;
+        }
+      }
+
+      else
+      {
+        SKX_DrawExternalOSD    ("ToBFix", "");
+
+        if (dwLastBlink < dwTime - 3333)
+        {
+          blink       = true;
+          dwLastBlink = dwTime;
+        }
+      }
+
+      SK_GetCommandProcessor ()->ProcessCommandLine ("TargetFPS 60.0");
     }
     else
     {
@@ -808,6 +846,8 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
   tbf::RenderFix::tracked_vs.clear ();
   tbf::RenderFix::tracked_ps.clear ();
   tbf::RenderFix::tracked_vb.clear ();
+
+  D3D9SetStreamSourceFreq_Original (tbf::RenderFix::pDevice, 0, 0);
 
   //if (config.framerate.minimize_latency)
     //tbf::FrameRateFix::RenderTick ();
@@ -1157,10 +1197,13 @@ D3D9DrawIndexedPrimitive_Detour (IDirect3DDevice9* This,
     return S_OK;
 
 
-  return D3D9DrawIndexedPrimitive_Original ( This, Type,
-                                              BaseVertexIndex, MinVertexIndex,
-                                                NumVertices, startIndex,
-                                                  primCount );
+  HRESULT hr =
+    D3D9DrawIndexedPrimitive_Original ( This, Type,
+                                          BaseVertexIndex, MinVertexIndex,
+                                            NumVertices, startIndex,
+                                              primCount );
+
+  tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
 }
 
 COM_DECLSPEC_NOTHROW
@@ -1462,8 +1505,12 @@ D3D9DrawPrimitive_Detour (IDirect3DDevice9* This,
   }
 #endif
 
-  return D3D9DrawPrimitive_Original ( This, PrimitiveType,
-                                        StartVertex, PrimitiveCount );
+  HRESULT hr =  D3D9DrawPrimitive_Original ( This, PrimitiveType,
+                                               StartVertex, PrimitiveCount );
+
+  tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
+
+  return hr;
 }
 
 const wchar_t*
@@ -1514,12 +1561,16 @@ D3D9DrawPrimitiveUP_Detour ( IDirect3DDevice9* This,
     return S_OK;
 
 
-  return
+  HRESULT hr =
     D3D9DrawPrimitiveUP_Original ( This,
                                      PrimitiveType,
                                        PrimitiveCount,
                                          pVertexStreamZeroData,
                                            VertexStreamZeroStride );
+
+  tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
+
+  return hr;
 }
 
 COM_DECLSPEC_NOTHROW
@@ -1558,7 +1609,7 @@ D3D9DrawIndexedPrimitiveUP_Detour ( IDirect3DDevice9* This,
     return S_OK;
 
 
-  return
+  HRESULT hr =
     D3D9DrawIndexedPrimitiveUP_Original (
       This,
         PrimitiveType,
@@ -1569,6 +1620,10 @@ D3D9DrawIndexedPrimitiveUP_Detour ( IDirect3DDevice9* This,
                   IndexDataFormat,
                     pVertexStreamZeroData,
                       VertexStreamZeroStride );
+
+  tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
+
+  return hr;
 }
 
 
@@ -1704,6 +1759,27 @@ D3D9SetStreamSource_Detour
   }
 
   return hr;
+}
+
+COM_DECLSPEC_NOTHROW
+HRESULT
+STDMETHODCALLTYPE
+D3D9SetStreamSourceFreq_Detour
+(
+  _In_ IDirect3DDevice9 *This,
+  _In_ UINT              StreamNumber,
+  _In_ UINT              FrequencyParameter )
+{
+  if (StreamNumber == 0 && FrequencyParameter & D3DSTREAMSOURCE_INDEXEDDATA)
+  {
+    instances = (FrequencyParameter & (~D3DSTREAMSOURCE_INDEXEDDATA));
+  }
+
+  if (StreamNumber == 1 && FrequencyParameter & D3DSTREAMSOURCE_INSTANCEDATA)
+  {
+  }
+
+  return D3D9SetStreamSourceFreq_Original (This, StreamNumber, FrequencyParameter);
 }
 
 __declspec (noinline)
@@ -1842,6 +1918,11 @@ tbf::RenderFix::Init (void)
                        "D3D9SetStreamSource_Override",
                         D3D9SetStreamSource_Detour,
              (LPVOID *)&D3D9SetStreamSource_Original );
+
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
+                       "D3D9SetStreamSourceFreq_Override",
+                        D3D9SetStreamSourceFreq_Detour,
+             (LPVOID *)&D3D9SetStreamSourceFreq_Original );
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9DrawPrimitive_Override",

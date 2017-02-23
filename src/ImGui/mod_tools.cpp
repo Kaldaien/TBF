@@ -364,8 +364,8 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
 
   if (ImGui::IsMouseHoveringRect (list->last_min, list->last_max))
   {
-         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
-    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+         if (ImGui::GetIO ().KeysDown [VK_OEM_4] && ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+    else if (ImGui::GetIO ().KeysDown [VK_OEM_6] && ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
   }
 
   ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
@@ -386,8 +386,8 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
     ImGui::BulletText   ("Press ] while the mouse is hovering this list to select the next shader");
     ImGui::EndTooltip   ();
 
-         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
-    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+         if (ImGui::GetIO ().KeysDown [VK_OEM_4] && ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+    else if (ImGui::GetIO ().KeysDown [VK_OEM_6] && ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
   }
 
   if (shaders.size ())
@@ -665,8 +665,8 @@ TBF_LiveVertexStreamView (bool& can_scroll)
 
   if (ImGui::IsMouseHoveringRect (list->last_min, list->last_max))
   {
-         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
-    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+         if (ImGui::GetIO ().KeysDown [VK_OEM_4] && ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+    else if (ImGui::GetIO ().KeysDown [VK_OEM_6] && ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
   }
 
   ImGui::PushStyleVar   (ImGuiStyleVar_ChildWindowRounding, 0.0f);
@@ -687,8 +687,8 @@ TBF_LiveVertexStreamView (bool& can_scroll)
     ImGui::BulletText   ("Press ] while the mouse is hovering this list to select the next shader");
     ImGui::EndTooltip   ();
 
-         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
-    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+         if (ImGui::GetIO ().KeysDown [VK_OEM_4] && ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+    else if (ImGui::GetIO ().KeysDown [VK_OEM_6] && ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
   }
 
   if (buffers.size ())
@@ -746,8 +746,22 @@ TBF_LiveVertexStreamView (bool& can_scroll)
   ImGui::BeginGroup    ();
 
   if (ImGui::IsItemHoveredRect ()) {
-         if (ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) list->sel--;
-    else if (ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) list->sel++;
+         if (ImGui::GetIO ().KeysDown [VK_OEM_4] && ImGui::GetIO ().KeysDownDuration [VK_OEM_4] == 0.0f) { list->sel--;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+    else if (ImGui::GetIO ().KeysDown [VK_OEM_6] && ImGui::GetIO ().KeysDownDuration [VK_OEM_6] == 0.0f) { list->sel++;  ImGui::GetIO ().WantCaptureKeyboard = true; }
+
+    if ( ImGui::GetIO ().KeysDownDuration ['W'] == 0.0f &&
+         ImGui::GetIO ().KeysDown [VK_CONTROL]          &&
+         ImGui::GetIO ().KeysDown [VK_SHIFT]               )
+    {
+      ImGui::GetIO ().WantCaptureKeyboard = true;
+
+      bool wireframe = tracker->wireframes.count (tracker->vertex_buffer);
+
+      if (wireframe && tracker->wireframes.count (tracker->vertex_buffer))
+        tracker->wireframes.erase   (tracker->vertex_buffer);
+      else
+        tracker->wireframes.emplace (tracker->vertex_buffer);
+    }
   }
 
   if (tracker->vertex_buffer != nullptr)
@@ -755,11 +769,18 @@ TBF_LiveVertexStreamView (bool& can_scroll)
     ImGui::Checkbox ("Cancel Draws Using Selected Vertex Buffer",  &tracker->cancel_draws);  ImGui::SameLine ();
 
     if (tracker->cancel_draws)
-      ImGui::TextDisabled ("%lu Skipped Draw%c Last Frame", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ');
+      ImGui::TextDisabled ("%lu Skipped Draw%c Last Frame [%lu Instanced]", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->instanced);
     else
-      ImGui::TextDisabled ("%lu Draw%c Last Frame        ", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ');
+      ImGui::TextDisabled ("%lu Draw%c Last Frame [%lu Instanced]        ", tracker->num_draws, tracker->num_draws != 1 ? 's' : ' ', tracker->instanced);
 
-    ImGui::Checkbox ("Draw Selected Vertex Buffer In Wireframe", &tracker->wireframe);
+    bool wireframe = tracker->wireframes.count (tracker->vertex_buffer);
+
+    ImGui::Checkbox ("Draw Selected Vertex Buffer In Wireframe", &wireframe);
+
+    if (wireframe)
+      tracker->wireframes.emplace (tracker->vertex_buffer);
+    else if (tracker->wireframes.count (tracker->vertex_buffer))
+      tracker->wireframes.erase   (tracker->vertex_buffer);
   }
   else
     tracker->cancel_draws = false;
@@ -789,8 +810,8 @@ TBFix_TextureModDlg (void)
                    &show_dlg,
                      ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders );
 
-  bool can_scroll = ImGui::IsMouseHoveringRect ( ImVec2 (ImGui::GetWindowPos ().x,                             ImGui::GetWindowPos ().y),
-                                                 ImVec2 (ImGui::GetWindowPos ().x + ImGui::GetWindowSize ().x, ImGui::GetWindowPos ().y + ImGui::GetWindowSize ().y) );
+  bool can_scroll = ImGui::IsWindowFocused () && ImGui::IsMouseHoveringRect ( ImVec2 (ImGui::GetWindowPos ().x,                             ImGui::GetWindowPos ().y),
+                                                                              ImVec2 (ImGui::GetWindowPos ().x + ImGui::GetWindowSize ().x, ImGui::GetWindowPos ().y + ImGui::GetWindowSize ().y) );
 
   ImGui::PushItemWidth (ImGui::GetWindowWidth () * 0.666f);
 

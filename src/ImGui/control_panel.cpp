@@ -442,7 +442,7 @@ TBFix_DrawConfigUI (void)
     io.DisplaySize.x = (float)tbf::RenderFix::width;
     io.DisplaySize.y = (float)tbf::RenderFix::height;
 
-    ImGui::SetNextWindowPosCenter (ImGuiSetCond_Always);;
+    ImGui::SetNextWindowPosCenter (ImGuiSetCond_Always);
   }
 
   ImGui::SetNextWindowSizeConstraints (ImVec2 (665, 50), ImVec2 ( ImGui::GetIO ().DisplaySize.x * 0.95f,
@@ -1605,8 +1605,10 @@ TBFix_DrawConfigUI (void)
     show_texture_mod_dlg = TBFix_TextureModDlg ();
   }
 
+  extern BeginScene_pfn D3D9BeginScene;
+
   if ( SUCCEEDED (
-         tbf::RenderFix::pDevice->BeginScene ()
+         D3D9BeginScene (tbf::RenderFix::pDevice)
        )
      )
   {

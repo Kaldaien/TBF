@@ -56,7 +56,7 @@
 static D3DXSaveTextureToFile_pfn               D3DXSaveTextureToFile                        = nullptr;
 static D3DXCreateTextureFromFileInMemoryEx_pfn D3DXCreateTextureFromFileInMemoryEx_Original = nullptr;
 
-static BeginScene_pfn                          D3D9BeginScene                               = nullptr;
+       BeginScene_pfn                          D3D9BeginScene                               = nullptr;
        SetRenderState_pfn                      D3D9SetRenderState                           = nullptr;
 
 static StretchRect_pfn                         D3D9StretchRect                              = nullptr;
