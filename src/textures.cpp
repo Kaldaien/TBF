@@ -786,7 +786,6 @@ D3D9StretchRect_Detour (      IDirect3DDevice9    *This,
 }
 
 
-std::set <UINT> tbf::RenderFix::active_samplers;
 extern IDirect3DTexture9* pFontTex;
 
 COM_DECLSPEC_NOTHROW

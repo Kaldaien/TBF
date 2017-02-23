@@ -111,9 +111,6 @@ namespace RenderFix {
       bool         cegui_active   = false;
     } extern draw_state;
 
-
-  extern std::set <UINT> active_samplers;
-
   class Texture {
   public:
     Texture (void) {

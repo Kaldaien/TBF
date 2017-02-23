@@ -396,12 +396,24 @@ namespace tbf
 
     struct frame_state_s
     {
-      void clear (void) { pixel_shaders.clear (); vertex_shaders.clear (); vertex_buffers.clear (); }
+      void clear (void) { pixel_shaders.clear (); vertex_shaders.clear (); vertex_buffers.dynamic.clear (); vertex_buffers.immutable.clear (); }
     
       std::unordered_set <uint32_t>                 pixel_shaders;
       std::unordered_set <uint32_t>                 vertex_shaders;
-      std::unordered_set <IDirect3DVertexBuffer9 *> vertex_buffers; // TODO: Hash the data and assign a more useful identifier
+
+      struct {
+        std::unordered_set <IDirect3DVertexBuffer9 *> dynamic;
+        std::unordered_set <IDirect3DVertexBuffer9 *> immutable;
+      } vertex_buffers;
     } extern last_frame;
+
+    struct known_objects_s
+    {
+      void clear (void) { static_vbs.clear (); dynamic_vbs.clear (); };
+
+      std::unordered_set <IDirect3DVertexBuffer9 *> static_vbs;
+      std::unordered_set <IDirect3DVertexBuffer9 *> dynamic_vbs;
+    } extern known_objs;
 
     struct render_target_class_s
     {
@@ -488,9 +500,58 @@ namespace tbf
 
     struct vertex_buffer_tracking_s
     {
-      void clear (void) { active = false; num_draws = 0; instances = 0; }
+      void clear (void) {
+        active = false; num_draws = 0; instances = 0;
+
+        vertex_shaders.clear ();
+        pixel_shaders.clear  ();
+        textures.clear       ();
+
+        for (auto it : vertex_decls) it->Release ();
+
+        vertex_decls.clear ();
+      }
+
+      void use (void)
+      {
+        extern uint32_t vs_checksum, ps_checksum;
+
+        vertex_shaders.emplace (vs_checksum);
+        pixel_shaders.emplace  (ps_checksum);
+
+        IDirect3DVertexDeclaration9* decl = nullptr;
+
+        if (SUCCEEDED (tbf::RenderFix::pDevice->GetVertexDeclaration (&decl)))
+        {
+          static D3DVERTEXELEMENT9 elem_decl [MAXD3DDECLLENGTH];
+          static UINT              num_elems;
+
+          // Run through the vertex decl and figure out which samplers have texcoords,
+          //   that is a pretty good indicator as to which textures are actually used...
+          if (SUCCEEDED (decl->GetDeclaration (elem_decl, &num_elems)))
+          {
+            extern uint32_t current_tex [256];
+
+            for ( int i = 0; i < num_elems; i++ )
+            {
+              if (elem_decl [i].Usage == D3DDECLUSAGE_TEXCOORD)
+                textures.emplace (current_tex [elem_decl [i].UsageIndex]);
+            }
+          }
+
+          if (! vertex_decls.count (decl))
+            vertex_decls.emplace (decl);
+          else
+            decl->Release ();
+        }
+      }
 
       IDirect3DVertexBuffer9*       vertex_buffer = nullptr;
+
+      std::unordered_set <
+        IDirect3DVertexDeclaration9*
+      >                             vertex_decls;
+
       //uint32_t                      crc32        =  0x00;
       bool                          cancel_draws  = false;
       bool                          wireframe     = false;
@@ -498,6 +559,11 @@ namespace tbf
       int                           num_draws     =     0;
       int                           instanced     =     0;
       int                           instances     =     1;
+
+      std::unordered_set <uint32_t> vertex_shaders;
+      std::unordered_set <uint32_t> pixel_shaders;
+      std::unordered_set <uint32_t> textures;
+
       std::unordered_set <IDirect3DVertexBuffer9 *>
                                     wireframes;
     } extern tracked_vb;
@@ -683,6 +749,16 @@ typedef HRESULT (STDMETHODCALLTYPE *DrawIndexedPrimitiveUP_pfn)
   D3DFORMAT         IndexDataFormat,
   const void       *pVertexStreamZeroData,
   UINT              VertexStreamZeroStride
+);
+
+typedef  HRESULT (STDMETHODCALLTYPE *CreateVertexBuffer_pfn)
+( _In_  IDirect3DDevice9        *This,
+  _In_  UINT                     Length,
+  _In_  DWORD                    Usage,
+  _In_  DWORD                    FVF,
+  _In_  D3DPOOL                  Pool,
+  _Out_ IDirect3DVertexBuffer9 **ppVertexBuffer,
+  _In_  HANDLE                  *pSharedHandle
 );
 
 typedef HRESULT (STDMETHODCALLTYPE *SetStreamSource_pfn)

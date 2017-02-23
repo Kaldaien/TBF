@@ -79,6 +79,7 @@ DrawPrimitive_pfn                       D3D9DrawPrimitive_Original            = 
 DrawIndexedPrimitive_pfn                D3D9DrawIndexedPrimitive_Original     = nullptr;
 DrawPrimitiveUP_pfn                     D3D9DrawPrimitiveUP_Original          = nullptr;
 DrawIndexedPrimitiveUP_pfn              D3D9DrawIndexedPrimitiveUP_Original   = nullptr;
+CreateVertexBuffer_pfn                  D3D9CreateVertexBuffer_Original       = nullptr;
 SetStreamSource_pfn                     D3D9SetStreamSource_Original          = nullptr;
 SetStreamSourceFreq_pfn                 D3D9SetStreamSourceFreq_Original      = nullptr;
 
@@ -613,6 +614,8 @@ TBF_ShouldSkipRenderPass (void)
 
   if (tracked_vb)
   {
+    tbf::RenderFix::tracked_vb.use ();
+
     tbf::RenderFix::tracked_vb.instances  = instances;
     tbf::RenderFix::tracked_vb.instanced += instances;
     tbf::RenderFix::tracked_vb.num_draws++;
@@ -1654,6 +1657,24 @@ tbf::RenderFix::Reset ( IDirect3DDevice9      *This,
 
   need_reset.graphics = false;
 
+  tbf::RenderFix::known_objs.clear ();
+
+
+  tbf::RenderFix::last_frame.clear ();
+  tbf::RenderFix::tracked_rt.clear ();
+  tbf::RenderFix::tracked_vs.clear ();
+  tbf::RenderFix::tracked_ps.clear ();
+  tbf::RenderFix::tracked_vb.clear ();
+
+  // Clearing the tracked VB only clears state, it doesn't
+  //   get rid of any data pointers.
+  //
+  //  (WE DID NOT QUERY THIS FROM THE D3D RUNTIME, DO NOT RELEASE)
+  tbf::RenderFix::tracked_vb.vertex_buffer = nullptr;
+  tbf::RenderFix::tracked_vb.wireframe     = false;
+  tbf::RenderFix::tracked_vb.wireframes.clear ();
+  // ^^^^ This is stupid, add a reset method.
+
   vs_checksums.clear ();
   ps_checksums.clear ();
 
@@ -1705,7 +1726,6 @@ D3D9TestCooperativeLevel_Detour ( IDirect3DDevice9 *This )
   return D3D9TestCooperativeLevel_Original (This);
 }
 
-#if 0
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -1718,9 +1738,25 @@ D3D9CreateVertexBuffer_Detour (
   _Out_ IDirect3DVertexBuffer9 **ppVertexBuffer,
   _In_  HANDLE                  *pSharedHandle )
 {
+  HRESULT hr = 
+    D3D9CreateVertexBuffer_Original ( This,
+                                        Length,
+                                          Usage,
+                                            FVF,
+                                              Pool,
+                                                ppVertexBuffer,
+                                                  pSharedHandle );
 
+  if (SUCCEEDED (hr))
+  {
+    if (Usage & D3DUSAGE_DYNAMIC)
+      tbf::RenderFix::known_objs.dynamic_vbs.emplace (*ppVertexBuffer);
+    else
+      tbf::RenderFix::known_objs.static_vbs.emplace (*ppVertexBuffer);
+  }
+ 
+  return hr;
 }
-#endif
 
 COM_DECLSPEC_NOTHROW
 HRESULT
@@ -1752,7 +1788,10 @@ D3D9SetStreamSource_Detour
 
   if (SUCCEEDED (hr))
   {
-    tbf::RenderFix::last_frame.vertex_buffers.emplace (pStreamData);
+    if (tbf::RenderFix::known_objs.dynamic_vbs.count (pStreamData))
+      tbf::RenderFix::last_frame.vertex_buffers.dynamic.emplace (pStreamData);
+    else
+      tbf::RenderFix::last_frame.vertex_buffers.immutable.emplace (pStreamData);
 
     if (StreamNumber == 0)
       vb_stream0 = pStreamData;
@@ -1842,12 +1881,16 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
 void
 tbf::RenderFix::Init (void)
 {
-  last_frame.vertex_shaders.reserve (256);
-  last_frame.pixel_shaders.reserve  (256);
-  ps_disassembly.reserve            (512);
-  vs_disassembly.reserve            (512);
-  vs_checksums.reserve              (8192);
-  ps_checksums.reserve              (8192);
+  last_frame.vertex_shaders.reserve           (256);
+  last_frame.pixel_shaders.reserve            (256);
+  last_frame.vertex_buffers.dynamic.reserve   (128);
+  last_frame.vertex_buffers.immutable.reserve (256);
+  known_objs.dynamic_vbs.reserve              (2048);
+  known_objs.static_vbs.reserve               (8192);
+  ps_disassembly.reserve                      (512);
+  vs_disassembly.reserve                      (512);
+  vs_checksums.reserve                        (8192);
+  ps_checksums.reserve                        (8192);
 
   trigger_reset = reset_stage_s::Clear;
 
@@ -1913,6 +1956,11 @@ tbf::RenderFix::Init (void)
                        "D3D9TestCooperativeLevel_Override",
                         D3D9TestCooperativeLevel_Detour,
              (LPVOID *)&D3D9TestCooperativeLevel_Original );
+
+  TBF_CreateDLLHook2 ( config.system.injector.c_str (),
+                       "D3D9CreateVertexBuffer_Override",
+                        D3D9CreateVertexBuffer_Detour,
+             (LPVOID *)&D3D9CreateVertexBuffer_Original );
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9SetStreamSource_Override",
@@ -2169,6 +2217,9 @@ tbf::RenderFix::shader_tracking_s
 
 tbf::RenderFix::vertex_buffer_tracking_s
                    tbf::RenderFix::tracked_vb;
+
+tbf::RenderFix::known_objects_s
+                   tbf::RenderFix::known_objs;
 
 void
 EnumConstant ( tbf::RenderFix::shader_tracking_s* pShader,
