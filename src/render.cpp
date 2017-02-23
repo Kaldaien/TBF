@@ -745,7 +745,7 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
         }
       }
 
-      SK_GetCommandProcessor ()->ProcessCommandLine ("TargetFPS 60.0");
+      SK_GetCommandProcessor ()->ProcessCommandLine ("TargetFPS 45.0");
     }
     else
     {
