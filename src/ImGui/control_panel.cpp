@@ -1605,10 +1605,10 @@ TBFix_DrawConfigUI (void)
     show_texture_mod_dlg = TBFix_TextureModDlg ();
   }
 
-  extern BeginScene_pfn D3D9BeginScene;
+  //extern BeginScene_pfn D3D9BeginScene;
 
   if ( SUCCEEDED (
-         D3D9BeginScene (tbf::RenderFix::pDevice)
+         tbf::RenderFix::pDevice->BeginScene ()//D3D9BeginScene (tbf::RenderFix::pDevice)
        )
      )
   {
