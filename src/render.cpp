@@ -85,7 +85,7 @@ SetStreamSourceFreq_pfn                 D3D9SetStreamSourceFreq_Original      = 
 
 SK_BeginBufferSwap_pfn                  SK_BeginBufferSwap                    = nullptr;
 SK_EndBufferSwap_pfn                    SK_EndBufferSwap                      = nullptr;
-EndScene_pfn                            D3D9EndScene_Original                 = nullptr;
+EndScene_pfn                            D3D9EndScene                          = nullptr;
 SK_SetPresentParamsD3D9_pfn             SK_SetPresentParamsD3D9_Original      = nullptr;
 Reset_pfn                               D3D9Reset_Original                    = nullptr;
 TestCooperativeLevel_pfn                D3D9TestCooperativeLevel_Original     = nullptr;
@@ -679,19 +679,18 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 {
   // Ignore anything that's not the primary render device.
   if (This != tbf::RenderFix::pDevice)
-    return D3D9EndScene_Original (This);
+    return D3D9EndScene (This);
 
   if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
-    return D3D9EndScene_Original (This);
+    return D3D9EndScene (This);
 
   // EndScene is invoked multiple times per-frame, but we
   //   are only interested in the first.
   if (scene_count++ > 0)
-    return D3D9EndScene_Original (This);
+    return D3D9EndScene (This);
 
-  if (pending_loads ()) {
+  if (pending_loads ())
     TBFix_LoadQueuedTextures ();
-  }
 
   tbf::RenderFix::draw_state.cegui_active = true;
 
@@ -784,7 +783,7 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
     }
   }
 
-  HRESULT hr = D3D9EndScene_Original (This);
+  HRESULT hr = D3D9EndScene (This);
 
   game_state.in_skit = false;
 
@@ -807,6 +806,9 @@ D3D9EndFrame_Pre (void)
 {
   if (GetCurrentThreadId () != InterlockedExchangeAdd (&tbf::RenderFix::dwRenderThreadID, 0))
     return SK_BeginBufferSwap();
+
+  if (pending_loads ())
+    TBFix_LoadQueuedTextures ();
 
   void TBFix_LogUsedTextures (void);
   TBFix_LogUsedTextures ();
@@ -837,8 +839,11 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
 
   InterlockedExchange (&tbf::RenderFix::dwRenderThreadID, GetCurrentThreadId ());
 
-  if (trigger_reset == reset_stage_s::Clear)
+  if (trigger_reset == reset_stage_s::Clear) {
     hr = SK_EndBufferSwap (hr, device);
+    if (pending_loads ())
+      TBFix_LoadQueuedTextures ();
+  }
   else
     hr = D3DERR_DEVICELOST;
 
@@ -1000,57 +1005,64 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
       }
     };
 
-  // Bloom (only?)
+  // Reflection (only?)
   //
   //
-  if ( config.render.high_res_reflection && (
-       ( pViewport->Width == tbf::RenderFix::width/2  && pViewport->Height == tbf::RenderFix::height/2  ) ) )
+  if ( ( pViewport->Width == tbf::RenderFix::width/2  && pViewport->Height == tbf::RenderFix::height/2  ) )
   {
-    D3DVIEWPORT9 rescaled_map = *pViewport;
-
-    rescaled_map.Width  *= 2;
-    rescaled_map.Height *= 2;
-
     PostProcessMipmaps ();
 
-    return D3D9SetViewport_Original (This, &rescaled_map);
+    if (config.render.high_res_reflection)
+    {
+      D3DVIEWPORT9 rescaled_map = *pViewport;
+      
+      rescaled_map.Width  *= 2;
+      rescaled_map.Height *= 2;
+
+      return D3D9SetViewport_Original (This, &rescaled_map);
+    }
   }
 
   // Bloom (only?)
   //
   //
-  if ( config.render.high_res_bloom && (
-       ( pViewport->Width == tbf::RenderFix::width/4  && pViewport->Height == tbf::RenderFix::height/4  ) ) )
+  if (  ( pViewport->Width == tbf::RenderFix::width/4  && pViewport->Height == tbf::RenderFix::height/4  ) )
   {
-    D3DVIEWPORT9 rescaled_map = *pViewport;
-
-    rescaled_map.Width  *= 2;
-    rescaled_map.Height *= 2;
-
     PostProcessMipmaps ();
 
-    return D3D9SetViewport_Original (This, &rescaled_map);
+    if (config.render.high_res_bloom)
+    {
+      D3DVIEWPORT9 rescaled_map = *pViewport;
+      
+      rescaled_map.Width  *= 2;
+      rescaled_map.Height *= 2;
+      
+      return D3D9SetViewport_Original (This, &rescaled_map);
+    }
   }
 
   // In-Game Map
   //
   //
-  if ( config.render.fix_map_res && (
+  if (
        ( pViewport->Width == tbf::RenderFix::width/3  && pViewport->Height == tbf::RenderFix::height/3  ) ||
        ( pViewport->Width == tbf::RenderFix::width/5  && pViewport->Height == tbf::RenderFix::height/5  ) ||
        ( pViewport->Width == tbf::RenderFix::width/6  && pViewport->Height == tbf::RenderFix::height/6  ) || 
        ( pViewport->Width == tbf::RenderFix::width/7  && pViewport->Height == tbf::RenderFix::height/7  ) ||
        ( pViewport->Width == tbf::RenderFix::width/8  && pViewport->Height == tbf::RenderFix::height/8  ) || 
        ( pViewport->Width == tbf::RenderFix::width/9  && pViewport->Height == tbf::RenderFix::height/9  ) ||
-       ( pViewport->Width == tbf::RenderFix::width/10 && pViewport->Height == tbf::RenderFix::height/10 ) ) )
+       ( pViewport->Width == tbf::RenderFix::width/10 && pViewport->Height == tbf::RenderFix::height/10 ) )
   {
-    D3DVIEWPORT9 rescaled_map = *pViewport;
-
-    rescaled_map.Width = tbf::RenderFix::width; rescaled_map.Height = tbf::RenderFix::height;
-
     PostProcessMipmaps ();
 
-    return D3D9SetViewport_Original (This, &rescaled_map);
+    if (config.render.fix_map_res)
+    {
+      D3DVIEWPORT9 rescaled_map = *pViewport;
+
+      rescaled_map.Width = tbf::RenderFix::width; rescaled_map.Height = tbf::RenderFix::height;
+
+      return D3D9SetViewport_Original (This, &rescaled_map);
+    }
   }
 
   //
@@ -1094,25 +1106,27 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
   // Adjust Post-Processing (Depth of Field)
   //
   else if ( ( pViewport->Width  == TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) &&
-              pViewport->Height == TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) / 2 ) &&
-            config.render.postproc_ratio > 0.0f )
+              pViewport->Height == TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) / 2 ) )
   {
-    D3DVIEWPORT9 rescaled_post_proc = *pViewport;
-
-    float scale_x, scale_y;
-    float x_off,   y_off;
-    scale_x = 1.0f; scale_y = 1.0f;
-    x_off   = 0.0f;   y_off = 0.0f;
-    //TBF_ComputeAspectScale (scale_x, scale_y, x_off, y_off);
-
-    rescaled_post_proc.Width  = (DWORD)(tbf::RenderFix::width  * config.render.postproc_ratio * scale_x);
-    rescaled_post_proc.Height = (DWORD)(tbf::RenderFix::height * config.render.postproc_ratio * scale_y);
-    rescaled_post_proc.X     += (DWORD)x_off;
-    rescaled_post_proc.Y     += (DWORD)y_off;
-
     PostProcessMipmaps ();
 
-    return D3D9SetViewport_Original (This, &rescaled_post_proc);
+    if (config.render.postproc_ratio > 0.0f)
+    {
+      D3DVIEWPORT9 rescaled_post_proc = *pViewport;
+      
+      float scale_x, scale_y;
+      float x_off,   y_off;
+      scale_x = 1.0f; scale_y = 1.0f;
+      x_off   = 0.0f;   y_off = 0.0f;
+      //TBF_ComputeAspectScale (scale_x, scale_y, x_off, y_off);
+      
+      rescaled_post_proc.Width  = (DWORD)(tbf::RenderFix::width  * config.render.postproc_ratio * scale_x);
+      rescaled_post_proc.Height = (DWORD)(tbf::RenderFix::height * config.render.postproc_ratio * scale_y);
+      rescaled_post_proc.X     += (DWORD)x_off;
+      rescaled_post_proc.Y     += (DWORD)y_off;
+
+      return D3D9SetViewport_Original (This, &rescaled_post_proc);
+    }
   }
 
   HRESULT hr = D3D9SetViewport_Original (This, pViewport);
@@ -1929,7 +1943,7 @@ tbf::RenderFix::Init (void)
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (), "D3D9EndScene_Override",
                        D3D9EndScene_Detour,
-             (LPVOID*)&D3D9EndScene_Original );
+             (LPVOID*)&D3D9EndScene );
 
   TBF_CreateDLLHook2 ( config.system.injector.c_str (),
                        "D3D9Reset_Override",

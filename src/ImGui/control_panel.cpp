@@ -453,7 +453,8 @@ TBFix_DrawConfigUI (void)
     was_reset = false;
   }
 
-  bool show_config = true;
+  static bool hook_marshall = true;
+        bool show_config    = true;
 
   ImGui::Begin ( "Tales of Berseria \"Fix\" (v " TBF_VERSION_STR_A ") Control Panel",
                    &show_config,
@@ -676,13 +677,16 @@ TBFix_DrawConfigUI (void)
         ImGui::TreePop  ();
       }
 
-      ImGui::SliderFloat ("Mipmap LOD Bias", &config.textures.lod_bias, -3.0f, /*config.textures.uncompressed ? 16.0f :*/ 3.0f);
-
-      if (ImGui::IsItemHovered ())
+      if (! *(bool *)SK_GetCommandProcessor ()->ProcessCommandLine ("d3d9.HasBrokenMipmapLODBias").getVariable ()->getValuePointer ())
       {
-        ImGui::BeginTooltip ();
-        ImGui::Text         ("Controls texture sharpness;  -3 = Sharpest (WILL shimmer),  0 = Neutral,  3 = Blurry");
-        ImGui::EndTooltip   ();
+        ImGui::SliderFloat ("Mipmap LOD Bias", &config.textures.lod_bias, -3.0f, /*config.textures.uncompressed ? 16.0f :*/ 3.0f);
+        
+        if (ImGui::IsItemHovered ())
+        {
+          ImGui::BeginTooltip ();
+          ImGui::Text         ("Controls texture sharpness;  -3 = Sharpest (WILL shimmer),  0 = Neutral,  3 = Blurry");
+          ImGui::EndTooltip   ();
+        }
       }
 
       ImGui::TreePop ();
@@ -1128,6 +1132,9 @@ TBFix_DrawConfigUI (void)
 
     tbf::RenderFix::need_reset.graphics |=
       ImGui::Checkbox ("Enable Debug Validation Layer", &config.render.validation);
+
+    ImGui::SameLine ();
+    ImGui::Checkbox ("Marshall UI Draws Through Hook", &hook_marshall);
 
     ImGui::TreePop ();
   }
@@ -1605,15 +1612,16 @@ TBFix_DrawConfigUI (void)
     show_texture_mod_dlg = TBFix_TextureModDlg ();
   }
 
-  //extern BeginScene_pfn D3D9BeginScene;
+  extern EndScene_pfn   D3D9EndScene;
+  extern BeginScene_pfn D3D9BeginScene;
 
   if ( SUCCEEDED (
-         tbf::RenderFix::pDevice->BeginScene ()//D3D9BeginScene (tbf::RenderFix::pDevice)
+         hook_marshall ? tbf::RenderFix::pDevice->BeginScene () : D3D9BeginScene (tbf::RenderFix::pDevice)
        )
      )
   {
     ImGui::Render                     ();
-    tbf::RenderFix::pDevice->EndScene ();
+    hook_marshall ? tbf::RenderFix::pDevice->EndScene () : D3D9EndScene (tbf::RenderFix::pDevice);
   }
 
   if (! show_config)

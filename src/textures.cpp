@@ -1119,14 +1119,19 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
     }
   }
 
-  int levels = Levels;
-
   if ( config.render.half_float_shadows &&
        (Usage & D3DUSAGE_RENDERTARGET ) &&
        Format == D3DFMT_R32F )
   {
     Format = D3DFMT_R16F;
   }
+
+  if (config.render.force_post_mips && (Usage & D3DUSAGE_RENDERTARGET))
+  {
+    Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
+  }
+
+  int levels = Levels;
 
   HRESULT result = 
     D3D9CreateTexture (This, Width, Height, levels, Usage,
