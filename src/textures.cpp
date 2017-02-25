@@ -1058,11 +1058,11 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       Width  = (UINT)(tbf::RenderFix::width  * config.render.postproc_ratio);
       Height = (UINT)(tbf::RenderFix::height * config.render.postproc_ratio);
 
-      if (config.render.force_post_mips)
-        Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
-
       tex_log->Log (L"[ PostProc ] (Post-Resolution: (%lu x %lu)", Width, Height);
     }
+
+    if (config.render.force_post_mips)
+      Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
   }
 
   else if (   ( config.render.fix_map_res    ||
@@ -1081,10 +1081,10 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       if (config.render.high_res_reflection)
       {
         Width *= 2; Height *= 2;
-
-        if (config.render.force_post_mips)
-          Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
       }
+
+      if (config.render.force_post_mips)
+        Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
     }
 
     if ( Original_Width  == tbf::RenderFix::width  / 4 &&
@@ -1095,10 +1095,10 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       if (config.render.high_res_bloom)
       {
         Width *= 2; Height *= 2;
-
-        if (config.render.force_post_mips)
-          Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
       }
+
+      if (config.render.force_post_mips)
+        Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
     }
 
     if ( Original_Width != Original_Height && (Original_Width / Original_Height == tbf::RenderFix::width / tbf::RenderFix::height) &&
@@ -1112,10 +1112,10 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
       if (config.render.fix_map_res)
       {
         Width = tbf::RenderFix::width; Height = tbf::RenderFix::height;
-
-        if (config.render.force_post_mips)
-          Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
       }
+
+      if (config.render.force_post_mips)
+        Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
     }
   }
 
@@ -1124,11 +1124,6 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
        Format == D3DFMT_R32F )
   {
     Format = D3DFMT_R16F;
-  }
-
-  if (config.render.force_post_mips && (Usage & D3DUSAGE_RENDERTARGET))
-  {
-    Levels = 1 + (UINT)floor (log2 (std::max (Width, Height)));
   }
 
   int levels = Levels;

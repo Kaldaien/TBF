@@ -876,6 +876,8 @@ TBF_LiveVertexStreamView (bool& can_scroll)
               case D3DDECLTYPE_FLOAT16_4:  return "half4";
               case D3DDECLTYPE_UNUSED:     return "UNUSED";
             }
+
+            return "UNKNOWN";
           };
 
         auto SK_D3D9_DeclUsageToStr = [](D3DDECLUSAGE usage, int idx) ->
