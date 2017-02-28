@@ -167,9 +167,10 @@ struct tbf_config_t
     std::wstring swap_keys   = L"";
     bool         swap_wasd   = false;
 
-    keybind_s hudless     { L"Ctrl+Shift+F10",       { true,  true,  false }, VK_F10  },
-              screenshot  { L"F10",                  { false, false, false }, VK_F10  },
-              config_menu { L"Ctrl+Shift+Backspace", { true,  true,  false }, VK_BACK };
+    keybind_s hudless      { L"Ctrl+Shift+F10",        { true,  true,  false }, VK_F10        },
+              screenshot   { L"F10",                   { false, false, false }, VK_F10        },
+              config_menu  { L"Ctrl+Shift+Backspace",  { true,  true,  false }, VK_BACK       },
+              aspect_ratio { L"Ctrl+Alt+Shift+.",      { true,  true,   true }, VK_OEM_PERIOD };
 
   } keyboard;
 
@@ -193,5 +194,7 @@ extern tbf_config_t config;
 bool TBF_LoadConfig (std::wstring name         = L"tbfix");
 void TBF_SaveConfig (std::wstring name         = L"tbfix",
                      bool         close_config = false);
+
+bool TBF_NV_DriverProfileChanged (void);
 
 #endif /* __TBF__CONFIG_H__ */

@@ -77,7 +77,13 @@ SKPlugIn_Shutdown (LPVOID* lpReserved)
     TBF_SaveConfig     ();
 
     // Weird thing to do at shutdown, right? :P This avoids any error popups while the game is in fullscreen exclusive.
-    tbf::RenderFix::InstallSGSSAA ();
+    //
+    //   Only change the driver profile if settings change in-game or
+    //     if a non-off mode is selected.
+    if ( config.render.nv.sgssaa_mode != 0 ||
+         TBF_NV_DriverProfileChanged () )
+      tbf::RenderFix::InstallSGSSAA ();
+
     tbf::RenderFix::Shutdown      ();
     //tbf::KeyboardFix::Shutdown  ();
 

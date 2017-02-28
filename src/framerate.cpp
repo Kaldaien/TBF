@@ -210,7 +210,7 @@ CreateTimerQueueTimer_Override (
   _In_     ULONG               Flags
 )
 {
-  // Fix compliance related issues present in both
+  // Fix compliance related issues   in both
   //   Tales of Symphonia and Zestiria
   if (Flags & 0x8) {
     Period = 0;

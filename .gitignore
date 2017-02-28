@@ -14,3 +14,5 @@ tbf.VC.db
 *.ipch
 *.ipch
 *.ipch
+/.vs/tbf/v15/Solution.VC.db-wal
+/.vs/tbf/v15/Solution.VC.db-shm

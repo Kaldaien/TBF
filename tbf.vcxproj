@@ -154,6 +154,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="download.cpp" />
+    <ClCompile Include="ImGui\memory_edit.cpp" />
     <ClCompile Include="src\command.cpp" />
     <ClCompile Include="src\config.cpp" />
     <ClCompile Include="src\dllmain.cpp">

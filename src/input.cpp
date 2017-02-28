@@ -125,6 +125,18 @@ SK_TBF_PluginKeyPress ( BOOL Control,
     return;
   }
 
+  const UINT uiAspectRatioToggleMask =
+    TBF_MakeKeyMask ( config.keyboard.aspect_ratio.vKey,
+                      config.keyboard.aspect_ratio.ctrl,
+                      config.keyboard.aspect_ratio.shift,
+                      config.keyboard.aspect_ratio.alt );
+
+  if (uiMaskedKeyCode == uiAspectRatioToggleMask)
+  {
+    config.render.aspect_correction = (! config.render.aspect_correction);
+    return;
+  }
+
   switch (uiMaskedKeyCode)
   {
     // Turn the OSD disclaimer off once the user figures out what the words OSD and toggle mean ;)

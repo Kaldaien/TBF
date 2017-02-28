@@ -465,6 +465,49 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
                                                                "Clamp Texture Coordinates For Selected Vertex Shader",
                         &tracker->clamp_coords );
 
+
+    if (config.render.aspect_correction)
+    {
+    bool whitelist =  shader_type == tbf_shader_class::Pixel ? tbf::RenderFix::aspect_ratio_data.whitelist.pixel_shaders.count  (tracker->crc32) :
+                                                               tbf::RenderFix::aspect_ratio_data.whitelist.vertex_shaders.count (tracker->crc32),
+         blacklist =  shader_type == tbf_shader_class::Pixel ? tbf::RenderFix::aspect_ratio_data.blacklist.pixel_shaders.count  (tracker->crc32) :
+                                                               tbf::RenderFix::aspect_ratio_data.blacklist.vertex_shaders.count (tracker->crc32);
+
+    if (ImGui::Checkbox ( shader_type == tbf_shader_class::Pixel ? "Force Aspect Ratio Correction ON For Selected Pixel Shader" :
+                                                                   "Force Aspect Ratio Correction ON For Selected Vertex Shader",
+                            &whitelist ))
+    {
+      if (whitelist)
+        shader_type == tbf_shader_class::Pixel ? tbf::RenderFix::aspect_ratio_data.whitelist.pixel_shaders.emplace  (tracker->crc32) :
+                                                 tbf::RenderFix::aspect_ratio_data.whitelist.vertex_shaders.emplace (tracker->crc32);
+      else
+        shader_type == tbf_shader_class::Pixel ? tbf::RenderFix::aspect_ratio_data.whitelist.pixel_shaders.erase  (tracker->crc32) :
+                                                 tbf::RenderFix::aspect_ratio_data.whitelist.vertex_shaders.erase (tracker->crc32);
+    }
+
+    if (ImGui::Checkbox ( shader_type == tbf_shader_class::Pixel ? "Force Aspect Ratio Correction OFF For Selected Pixel Shader" :
+                                                                   "Force Aspect Ratio Correction OFF For Selected Vertex Shader",
+                            &blacklist ))
+    {
+      if (blacklist)
+        shader_type == tbf_shader_class::Pixel ? tbf::RenderFix::aspect_ratio_data.blacklist.pixel_shaders.emplace  (tracker->crc32) :
+                                                 tbf::RenderFix::aspect_ratio_data.blacklist.vertex_shaders.emplace (tracker->crc32);
+      else
+        shader_type == tbf_shader_class::Pixel ? tbf::RenderFix::aspect_ratio_data.blacklist.pixel_shaders.erase  (tracker->crc32) :
+                                                 tbf::RenderFix::aspect_ratio_data.blacklist.vertex_shaders.erase (tracker->crc32);
+    }
+
+      if (shader_type == tbf_shader_class::Vertex)
+      {
+        extern uint32_t aspect_ratio_trigger;
+        bool trigger = (tracker->crc32 == aspect_ratio_trigger);
+      
+        if (ImGui::Checkbox ( "Use as Aspect Ratio Trigger", &trigger))
+          aspect_ratio_trigger = trigger ? tracker->crc32 : 0x00;
+      }
+    }
+
+
     ImGui::Separator      ();
     ImGui::EndGroup       ();
 
@@ -532,10 +575,12 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
           snprintf ( szOrdinal, 64, " (%c%-3lu) ",
                         it2.RegisterSet != D3DXRS_SAMPLER ? 'c' : 's',
                           it2.RegisterIndex );
-          snprintf ( szOrdEl,  96,  "%s::%lu", // Uniquely identify parameters that share registers
-                       szOrdinal, el++ );
-          snprintf ( szName, 192, "%-24s :%s",
-                       it2.Name, szOrdinal );
+          snprintf ( szOrdEl,  96,  "%s::%lu %c", // Uniquely identify parameters that share registers
+                       szOrdinal, el++, shader_type == tbf_shader_class::Pixel ? 'p' : 'v' );
+          snprintf ( szName, 192, "[%s] %-24s :%s",
+                       shader_type == tbf_shader_class::Pixel ? "ps" :
+                                                                "vs",
+                         it2.Name, szOrdinal );
 
           if (it2.Type == D3DXPT_FLOAT && it2.Class == D3DXPC_VECTOR)
           {
@@ -555,10 +600,12 @@ TBF_LiveShaderClassView (tbf_shader_class shader_type, bool& can_scroll)
         snprintf ( szOrdinal, 64, " (%c%-3lu) ",
                      it.RegisterSet != D3DXRS_SAMPLER ? 'c' : 's',
                         it.RegisterIndex );
-        snprintf ( szOrdEl,  96,  "%s::%lu", // Uniquely identify parameters that share registers
-                       szOrdinal, el++ );
-        snprintf ( szName, 192, "%-24s :%s",
-                     it.Name, szOrdinal );
+        snprintf ( szOrdEl,  96,  "%s::%lu %c", // Uniquely identify parameters that share registers
+                       szOrdinal, el++, shader_type == tbf_shader_class::Pixel ? 'p' : 'v' );
+        snprintf ( szName, 192, "[%s] %-24s :%s",
+                     shader_type == tbf_shader_class::Pixel ? "ps" :
+                                                              "vs",
+                         it.Name, szOrdinal );
 
         if (it.Type == D3DXPT_FLOAT && it.Class == D3DXPC_VECTOR)
         {
@@ -1134,6 +1181,28 @@ TBFix_TextureModDlg (void)
     ImGui::SameLine ();
 
     ImGui::Checkbox ("Highlight Selected Texture in Game",    &config.textures.highlight_debug_tex);
+
+    bool whitelist = tbf::RenderFix::aspect_ratio_data.whitelist.textures.count (debug_tex_id),
+         blacklist = tbf::RenderFix::aspect_ratio_data.blacklist.textures.count (debug_tex_id);
+
+    if (config.render.aspect_correction)
+    {
+      if (ImGui::Checkbox ("Force Aspect Ratio Correction ON For Selected Texture", &whitelist))
+      {
+        if (whitelist)
+          tbf::RenderFix::aspect_ratio_data.whitelist.textures.emplace (debug_tex_id);
+        else
+          tbf::RenderFix::aspect_ratio_data.whitelist.textures.erase (debug_tex_id);
+      }
+      
+      if (ImGui::Checkbox ("Force Aspect Ratio Correction OFF For Selected Texture", &blacklist))
+      {
+        if (blacklist)
+          tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (debug_tex_id);
+        else
+          tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (debug_tex_id);
+      }
+    }
 
     ImGui::Separator ();
     ImGui::EndChild  ();

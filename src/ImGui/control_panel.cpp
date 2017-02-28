@@ -1226,6 +1226,30 @@ TBFix_DrawConfigUI (void)
     }
   }
 
+  if (ImGui::CollapsingHeader ("Aspect Ratio"))
+  {
+    ImGui::TreePush ("");
+
+    extern bool fix_scissor;
+
+    ImGui::Checkbox ("Enable Aspect Ratio Correction (EXPERIMENTAL)", &config.render.aspect_correction);
+    ImGui::Checkbox ("Fix Scissor Rectangle", &fix_scissor);
+
+    ImGui::Text ("Aspect Ratio Toggle Keybinding:  %ws",  config.keyboard.aspect_ratio.human_readable.c_str ());
+
+    if (ImGui::IsItemHovered ()) {
+      ImGui::SetTooltip ("Click here to change.");
+    }
+
+    if (ImGui::IsItemClicked ()) {
+      ImGui::OpenPopup ("Keyboard Binding");
+    }
+
+    TBFix_KeybindDialog (&config.keyboard.aspect_ratio);
+
+    ImGui::TreePop ();
+  }
+
   if (ImGui::CollapsingHeader ("Input"))
   {
     ImGui::TreePush  ("");

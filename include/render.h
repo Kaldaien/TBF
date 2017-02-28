@@ -440,6 +440,16 @@ namespace tbf
       } postproc;
     };
 
+    struct aspect_ratio_data_s
+    {
+      struct {
+        std::unordered_set <uint32_t> pixel_shaders;
+        std::unordered_set <uint32_t> vertex_shaders;
+        std::unordered_set <uint32_t> textures;
+      } whitelist, blacklist;
+      
+    } extern aspect_ratio_data;
+
     struct render_target_tracking_s
     {
       void clear (void) { pixel_shaders.clear (); vertex_shaders.clear (); active = false; }
