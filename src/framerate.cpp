@@ -330,7 +330,8 @@ tbf::FrameRateFix::Init (void)
   uint8_t mask []    = { 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff };
 
   void* limiter_addr =
-    TBF_Scan (sig, sizeof (sig), mask);
+    TBF_Scan (sig, sizeof (sig), mask, 16);
+  // x64 functions are 16-byte aligned in Microsoft's ABI, use this to speed the search up
 
   uintptr_t rip      = (uintptr_t)limiter_addr + 18;
 

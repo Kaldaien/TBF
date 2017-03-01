@@ -35,7 +35,7 @@ TBF_GetBaseAddr (void)
 }
 
 void*
-TBF_Scan (uint8_t* pattern, size_t len, uint8_t* mask)
+TBF_Scan (uint8_t* pattern, size_t len, uint8_t* mask, int align)
 {
   uint8_t* base_addr = (uint8_t *)GetModuleHandle (nullptr);
 
@@ -57,8 +57,12 @@ TBF_Scan (uint8_t* pattern, size_t len, uint8_t* mask)
   uint8_t* end_addr  = (uint8_t *)mem_info.BaseAddress + mem_info.RegionSize;
 
   if (base_addr != (uint8_t *)0x400000) {
-    dll_log->Log ( L"[ Sig Scan ] Expected module base addr. 40000h, but got: %ph",
-                    base_addr );
+    static bool warned = false;
+    if (! warned) {
+      dll_log->Log ( L"[ Sig Scan ] Expected module base addr. 40000h, but got: %ph",
+                      base_addr );
+      warned = true;
+    }
   }
 
   size_t pages = 0;
@@ -87,17 +91,25 @@ uint8_t* const PAGE_WALK_LIMIT = (base_addr + (uintptr_t)(1ULL << 36));
   } 
 
   if (end_addr > PAGE_WALK_LIMIT) {
-    dll_log->Log ( L"[ Sig Scan ] Module page walk resulted in end addr. out-of-range: %ph",
-                    end_addr );
-    dll_log->Log ( L"[ Sig Scan ]  >> Restricting to %ph",
-                    PAGE_WALK_LIMIT );
+    static bool warned = false;
+
+    if (! warned) {
+      dll_log->Log ( L"[ Sig Scan ] Module page walk resulted in end addr. out-of-range: %ph",
+                      end_addr );
+      dll_log->Log ( L"[ Sig Scan ]  >> Restricting to %ph",
+                      PAGE_WALK_LIMIT );
+      warned = true;
+    }
+
     end_addr = (uint8_t *)PAGE_WALK_LIMIT;
   }
 
+#if 0
   dll_log->Log ( L"[ Sig Scan ] Module image consists of %zu pages, from %ph to %ph",
                   pages,
                     base_addr,
                       end_addr );
+#endif
 #endif
 
   __SK_base_img_addr = base_addr;
@@ -142,11 +154,24 @@ uint8_t* const PAGE_WALK_LIMIT = (base_addr + (uintptr_t)(1ULL << 36));
       if (mask != nullptr && (! mask [idx]))
         match = true;
 
-      if (match) {
+      if (match)
+      {
         if (++idx == len)
-          return (void *)begin;
+        {
+          if (((uintptr_t)begin % align) == 0)
+            return (void *)begin;
+          else
+          {
+            begin += (idx + 1);
+            begin += align - ((uintptr_t)begin % align);
 
-        ++it;
+            it     = begin;
+            idx    = 0;
+          }
+        }
+
+        else
+          ++it;
       }
 
       else {
@@ -154,7 +179,10 @@ uint8_t* const PAGE_WALK_LIMIT = (base_addr + (uintptr_t)(1ULL << 36));
         if (it > end_addr - len)
           break;
 
-        it  = ++begin;
+        begin += (idx + 1);
+        begin += align - ((uintptr_t)begin % align);
+
+        it  = begin;
         idx = 0;
       }
     }
@@ -189,7 +217,7 @@ SK_InjectMemory ( LPVOID   base_addr,
 }
 
 void*
-TBF_ScanEx (uint8_t* pattern, size_t len, uint8_t* mask, void* after)
+TBF_ScanEx (uint8_t* pattern, size_t len, uint8_t* mask, void* after, int align)
 {
   uint8_t* base_addr = (uint8_t *)GetModuleHandle (nullptr);
 
@@ -209,11 +237,6 @@ TBF_ScanEx (uint8_t* pattern, size_t len, uint8_t* mask, void* after)
 #else
            base_addr = (uint8_t *)mem_info.BaseAddress;//AllocationBase;
   uint8_t* end_addr  = (uint8_t *)mem_info.BaseAddress + mem_info.RegionSize;
-
-  if (base_addr != (uint8_t *)0x400000) {
-    dll_log->Log ( L"[ Sig Scan ] Expected module base addr. 40000h, but got: %ph",
-                    base_addr );
-  }
 
   size_t pages = 0;
 
@@ -241,23 +264,11 @@ uint8_t* const PAGE_WALK_LIMIT = (base_addr + (uintptr_t)(1ULL << 36));
   } 
 
   if (end_addr > PAGE_WALK_LIMIT) {
-    dll_log->Log ( L"[ Sig Scan ] Module page walk resulted in end addr. out-of-range: %ph",
-                    end_addr );
-    dll_log->Log ( L"[ Sig Scan ]  >> Restricting to %ph",
-                    PAGE_WALK_LIMIT );
     end_addr = (uint8_t *)PAGE_WALK_LIMIT;
   }
-
-  dll_log->Log ( L"[ Sig Scan ] Module image consists of %zu pages, from %ph to %ph",
-                  pages,
-                    base_addr,
-                      end_addr );
 #endif
 
-  __SK_base_img_addr = base_addr;
-  __SK_end_img_addr  = end_addr;
-
-  uint8_t*  begin = (uint8_t *)base_addr;
+  uint8_t*  begin = (uint8_t *)after + align;
   uint8_t*  it    = begin;
   int       idx   = 0;
 
@@ -286,7 +297,8 @@ uint8_t* const PAGE_WALK_LIMIT = (base_addr + (uintptr_t)(1ULL << 36));
     if (next_rgn >= end_addr)
       break;
 
-    while (it < next_rgn) {
+    while (it < next_rgn)
+    {
       uint8_t* scan_addr = it;
 
       bool match = (*scan_addr == pattern [idx]);
@@ -296,26 +308,36 @@ uint8_t* const PAGE_WALK_LIMIT = (base_addr + (uintptr_t)(1ULL << 36));
       if (mask != nullptr && (! mask [idx]))
         match = true;
 
-      if (match) {
-        if (++idx == len) {
-          if ((void *)begin > after)
+      if (match)
+      {
+        if (++idx == len)
+        {
+          if (((uintptr_t)begin % align) == 0)
             return (void *)begin;
-          else {
-            it  = ++begin;
-            idx = 0;
-            continue;
+          else
+          {
+            begin += (idx + 1);
+            begin += align - ((uintptr_t)begin % align);
+
+            it     = begin;
+            idx    = 0;
           }
         }
 
-        ++it;
+        else
+          ++it;
       }
 
-      else {
+      else
+      {
         // No match?!
         if (it > end_addr - len)
           break;
 
-        it  = ++begin;
+        begin += (idx+1);
+        begin += align - ((uintptr_t)begin % align);
+
+        it  = begin;
         idx = 0;
       }
     }

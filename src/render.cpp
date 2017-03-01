@@ -1234,9 +1234,6 @@ private:
 void
 TBF_Viewport_HUD (IDirect3DDevice9* This, uint32_t vs_checksum, uint32_t ps_checksum)
 {
-  D3DVIEWPORT9 vp;
-  This->GetViewport (&vp);
-
   //if (vp.Height != tbf::RenderFix::height || vp.Width != tbf::RenderFix::width || vp.MaxZ != 1.0f || vp.MinZ != 0.0f || vp.X != 0 || vp.Y != 0)
     //return;
 
@@ -1259,8 +1256,8 @@ TBF_Viewport_HUD (IDirect3DDevice9* This, uint32_t vs_checksum, uint32_t ps_chec
   if (tbf::RenderFix::width > tbf::RenderFix::height * (16.0f / 9.0f))
   {
     D3DVIEWPORT9 new_vp;
-    new_vp.MinZ   = vp.MinZ;
-    new_vp.MaxZ   = vp.MaxZ;
+    new_vp.MinZ   = last_viewport.MinZ;
+    new_vp.MaxZ   = last_viewport.MaxZ;
     new_vp.Width  = tbf::RenderFix::height * (16.0f / 9.0f);
     new_vp.Height = tbf::RenderFix::height;
     new_vp.X      = (tbf::RenderFix::width - tbf::RenderFix::height * (16.0f / 9.0f)) / 2;
@@ -1271,8 +1268,8 @@ TBF_Viewport_HUD (IDirect3DDevice9* This, uint32_t vs_checksum, uint32_t ps_chec
   else
   {
     D3DVIEWPORT9 new_vp;
-    new_vp.MinZ   = vp.MinZ;
-    new_vp.MaxZ   = vp.MaxZ;
+    new_vp.MinZ   = last_viewport.MinZ;
+    new_vp.MaxZ   = last_viewport.MaxZ;
     new_vp.Width  = tbf::RenderFix::width;
     new_vp.Height = tbf::RenderFix::width * (9.0f  / 16.0f);
     new_vp.X      = 0;
@@ -2147,6 +2144,8 @@ tbf::RenderFix::Init (void)
   aspect_ratio_data.blacklist.textures.emplace (0x5f245e67); // Star's Shadow (Also used on one menu screen)
   aspect_ratio_data.blacklist.textures.emplace (0x7ca202a3); // Pulsing ring around Star
 
+  aspect_ratio_data.blacklist.textures.emplace (0xc070b309); // Border around location names [Stretch Horiz]
+
   aspect_ratio_data.blacklist.textures.emplace (0x952b0ff8); // NPC Dialog Background
 
   ////aspect_ratio_data.blacklist.pixel_shaders.emplace (0x872e7c85); // Pixel Shader for Skits (in general)
@@ -2322,24 +2321,35 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
 
    uint8_t signature [] = { 0x39, 0x8E, 0xE3, 0x3F };
 
-  if (*(float *)(uintptr_t)config.render.aspect_addr != 16.0f / 9.0f)
+  if ( config.render.aspect_ratio > (16.0f / 9.0f) + 0.001f ||
+       config.render.aspect_ratio < (16.0f / 9.0f) - 0.001f )
   {
-    void* addr = TBF_Scan(signature, sizeof(float), nullptr);
+    void* addr =
+      TBF_Scan (signature, sizeof (float), nullptr, 4);
+
     do {
       if (addr == nullptr)
         break;
 
-      dll_log->Log (L"[Asp. Ratio] Scanned Aspect Ratio Address: %06Xh", addr);
+      HMODULE hMod;
 
-      DWORD dwOld;
+      if (GetModuleHandleExW ( GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT |
+                               GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCWSTR)addr, &hMod ))
+      {
+        if (hMod != GetModuleHandle (nullptr))
+          continue;
 
-      VirtualProtect (addr, sizeof (float), PAGE_READWRITE, &dwOld);
-      *(float *)addr = config.render.aspect_ratio;
-      VirtualProtect (addr, sizeof (float), dwOld,          &dwOld);
+        dll_log->Log (L"[Asp. Ratio] Scanned Aspect Ratio Address: %06Xh", addr);
 
-      aspect_ratio.addrs [aspect_ratio.count++] = (float *)addr;
+        DWORD dwOld;
 
-    } while (addr != nullptr && (addr = TBF_ScanEx (signature, sizeof (float), nullptr, addr)));
+        VirtualProtect (addr, sizeof (float), PAGE_READWRITE, &dwOld);
+        *(float *)addr = config.render.aspect_ratio;
+        VirtualProtect (addr, sizeof (float), dwOld,          &dwOld);
+
+        aspect_ratio.addrs [aspect_ratio.count++] = (float *)addr;
+      }
+    } while (addr != nullptr && (addr = TBF_ScanEx (signature, sizeof (float), nullptr, addr, 4)));
   }
 
 #if 0
