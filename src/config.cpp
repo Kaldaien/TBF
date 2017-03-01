@@ -468,6 +468,17 @@ TBF_LoadConfig (std::wstring name)
       L"Resolution.PostProcess",
         L"HighResReflection" );
 
+  render.aspect_ratio =
+    static_cast <tbf::ParameterFloat *>
+      (g_ParameterFactory.create_parameter <float> (
+        L"Last Known Aspect Ratio")
+    );
+  render.aspect_ratio->register_to_ini (
+    render_ini,
+      L"Resolution.AspectRatio",
+        L"LastKnownRatio"
+  );
+
   render.aspect_correction =
     static_cast <tbf::ParameterBool *>
       (g_ParameterFactory.create_parameter <bool> (
@@ -902,6 +913,7 @@ TBF_LoadConfig (std::wstring name)
   render.half_precision_shadows->load     (config.render.half_float_shadows);
 
   render.aspect_correction->load          (config.render.aspect_correction);
+  render.aspect_ratio->load               (config.render.aspect_ratio);
 
   render.dump_shaders->load               (config.render.dump_shaders);
   render.fix_map_res->load                (config.render.fix_map_res);
@@ -1008,6 +1020,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   render.dump_shaders->store        (config.render.dump_shaders);
 
   render.aspect_correction->store      (config.render.aspect_correction);
+  render.aspect_ratio->store           (config.render.aspect_ratio);
 
   render.rescale_shadows->store        (config.render.shadow_rescale);
   render.rescale_env_shadows->store    (config.render.env_shadow_rescale);

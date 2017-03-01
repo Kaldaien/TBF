@@ -47,6 +47,23 @@ bool            fix_scissor     = true;
 int             instances       = 0;
 extern uint32_t current_tex [256];
 
+struct {
+  float* addrs [16] = { nullptr };
+  int    count      =     0;
+
+  void setAspectRatio (float aspect)
+  {
+    DWORD dwOld;
+    for (int i = 0; i < count; i++)
+    {
+      VirtualProtect (addrs [i], sizeof (float), PAGE_READWRITE, &dwOld);
+      *((float *)addrs) = aspect;
+      VirtualProtect (addrs [i], sizeof (float), dwOld,          &dwOld);
+    }
+  }
+} aspect_ratio;
+
+
 struct smaa_constants_s
 {
   struct
@@ -965,8 +982,8 @@ D3D9SetScissorRect_Detour (IDirect3DDevice9* This,
   if (tbf::RenderFix::draw_state.cegui_active)
     return D3D9SetScissorRect_Original (This, pRect);
 
-  // If we don't care about aspect ratio, then just early-out
-  if ((! config.render.aspect_correction) || (! fix_scissor))
+  // If we don't care about aspect ratio or if we're in a skit, then just early-out
+  if ((! config.render.aspect_correction) || ((! fix_scissor) || *TBF_GetFlagFromIdx (34)))
     return D3D9SetScissorRect_Original (This, pRect);
 
   // Otherwise, fix this because the UI's scissor rectangles are
@@ -2273,7 +2290,7 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
     *SK_GetCommandProcessor ();
 
   //fovy_         = TBF_CreateVar (SK_IVariable::Float, &config.render.fovy,         this);
-  //aspect_ratio_ = TBF_CreateVar (SK_IVariable::Float, &config.render.aspect_ratio, this);
+  aspect_ratio_ = TBF_CreateVar (SK_IVariable::Float, &config.render.aspect_ratio, this);
 
   SK_IVariable* aspect_correct_vids = TBF_CreateVar (SK_IVariable::Boolean, &config.render.blackbar_videos);
   SK_IVariable* aspect_correction   = TBF_CreateVar (SK_IVariable::Boolean, &config.render.aspect_correction);
@@ -2288,7 +2305,7 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
   SK_IVariable* rescale_shadows     = TBF_CreateVar (SK_IVariable::Int,     &config.render.shadow_rescale);
   SK_IVariable* rescale_env_shadows = TBF_CreateVar (SK_IVariable::Int,     &config.render.env_shadow_rescale);
 
-  //command.AddVariable ("AspectRatio",         aspect_ratio_);
+  command.AddVariable ("AspectRatio",         aspect_ratio_);
   //command.AddVariable ("FOVY",                fovy_);
 
   command.AddVariable ("Textures.Remaster",     remaster_textures);
@@ -2303,14 +2320,31 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
   command.AddVariable ("PostProcessRatio",      postproc_ratio);
   command.AddVariable ("ClearBlackbars",        clear_blackbars);
 
-#if 0
    uint8_t signature [] = { 0x39, 0x8E, 0xE3, 0x3F };
 
-  if (*(float *)(uintptr_t)config.render.aspect_addr != 16.0f / 9.0f) {
-    void* addr = TBF_Scan (signature, sizeof (float), nullptr);
-    if (addr != nullptr && (addr = TBF_ScanEx (signature, sizeof (float), nullptr, addr)))
-{
+  if (*(float *)(uintptr_t)config.render.aspect_addr != 16.0f / 9.0f)
+  {
+    void* addr = TBF_Scan(signature, sizeof(float), nullptr);
+    do {
+      if (addr == nullptr)
+        break;
+
       dll_log->Log (L"[Asp. Ratio] Scanned Aspect Ratio Address: %06Xh", addr);
+
+      DWORD dwOld;
+
+      VirtualProtect (addr, sizeof (float), PAGE_READWRITE, &dwOld);
+      *(float *)addr = config.render.aspect_ratio;
+      VirtualProtect (addr, sizeof (float), dwOld,          &dwOld);
+
+      aspect_ratio.addrs [aspect_ratio.count++] = (float *)addr;
+
+    } while (addr != nullptr && (addr = TBF_ScanEx (signature, sizeof (float), nullptr, addr)));
+  }
+
+#if 0
+    if (addr != nullptr && )
+    {
       config.render.aspect_addr = (uintptr_t)addr;
 
       char szAspectCommand [64];
