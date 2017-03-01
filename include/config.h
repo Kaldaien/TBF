@@ -30,6 +30,7 @@ extern std::wstring DEFAULT_BK2;
 
 struct keybind_s
 {
+  const char*  bind_name;
   std::wstring human_readable;
 
   struct {
@@ -74,7 +75,7 @@ struct tbf_config_t
     float     aspect_ratio        = 1.777778f;
     uintptr_t aspect_addr         = 0x00D56494ULL;//0x00D52398;
     uintptr_t fovy_addr           = 0x00D56498ULL;//0x00D5239C;
-    bool      blackbar_videos     = false;  // OBSOLETE
+    bool      blackbar_videos     = false;
     bool      aspect_correction   = false;
     float     postproc_ratio      =  0.5f;
     bool      clear_blackbars     = false;
@@ -167,10 +168,13 @@ struct tbf_config_t
     std::wstring swap_keys   = L"";
     bool         swap_wasd   = false;
 
-    keybind_s hudless      { L"Ctrl+Shift+F10",        { true,  true,  false }, VK_F10        },
-              screenshot   { L"F10",                   { false, false, false }, VK_F10        },
-              config_menu  { L"Ctrl+Shift+Backspace",  { true,  true,  false }, VK_BACK       },
-              aspect_ratio { L"Ctrl+Alt+Shift+.",      { true,  true,   true }, VK_OEM_PERIOD };
+    keybind_s hudless         { "Hudless",        L"Ctrl+Shift+F10",        { true,  true,  false }, VK_F10        },
+              screenshot      { "Screenshot",     L"F10",                   { false, false, false }, VK_F10        },
+              config_menu     { "CfgMenu",        L"Ctrl+Shift+Backspace",  { true,  true,  false }, VK_BACK       },
+              aspect_ratio    { "AspectRatio",    L"Ctrl+Alt+Shift+.",      { true,  true,   true }, VK_OEM_PERIOD },
+              clear_enemies   { "ClearEnemies",   L"Ctrl+Shift+F1",         { true,  true,  false }, VK_F1         },
+              respawn_enemies { "RespawnEnemies", L"Ctrl+Shift+F2",         { true,  true,  false }, VK_F2         },
+              battle_timestop { "BattleTimestop", L"Ctrl+Shift+/",          { true,  true,  false }, 0             };
 
   } keyboard;
 

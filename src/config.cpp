@@ -143,6 +143,10 @@ struct {
 struct {
   tbf::ParameterStringW* swap_keys;
   tbf::ParameterBool*    swap_wasd;
+
+  tbf::ParameterStringW* clear_enemies;
+  tbf::ParameterStringW* respawn_enemies;
+  tbf::ParameterStringW* battle_timestop;
 } keyboard;
 
 
@@ -804,6 +808,37 @@ TBF_LoadConfig (std::wstring name)
       L"Keyboard.Remap",
         L"SwapKeys" );
 
+  keyboard.clear_enemies =
+    static_cast <tbf::ParameterStringW *>
+    (g_ParameterFactory.create_parameter <std::wstring>(
+         L"Clear Enemies On Screen")
+    );
+  keyboard.clear_enemies->register_to_ini (
+    keyboard_ini,
+      L"Keyboard.Debug",
+        L"ClearEnemies" );
+
+  keyboard.respawn_enemies =
+    static_cast <tbf::ParameterStringW *>
+    (g_ParameterFactory.create_parameter <std::wstring>(
+         L"Respawn Enemies On Screen")
+    );
+  keyboard.respawn_enemies->register_to_ini (
+    keyboard_ini,
+      L"Keyboard.Debug",
+        L"RespawnEnemies" );
+
+  keyboard.battle_timestop =
+    static_cast <tbf::ParameterStringW *>
+    (g_ParameterFactory.create_parameter <std::wstring> (
+         L"Pause Battle")
+    );
+  keyboard.battle_timestop->register_to_ini (
+    keyboard_ini,
+      L"Keyboard.Debug",
+        L"BattleTimestop" );
+
+
 
   sys.version =
     static_cast <tbf::ParameterStringW *>
@@ -926,9 +961,15 @@ TBF_LoadConfig (std::wstring name)
   screenshots.keep->load            (config.screenshots.keep);
   screenshots.hudless_keybind->load (config.keyboard.hudless.human_readable);
   render.aspect_ratio_keybind->load (config.keyboard.aspect_ratio.human_readable);
+  keyboard.clear_enemies->load      (config.keyboard.clear_enemies.human_readable);
+  keyboard.respawn_enemies->load    (config.keyboard.respawn_enemies.human_readable);
+  keyboard.battle_timestop->load    (config.keyboard.battle_timestop.human_readable);
 
-  config.keyboard.hudless.parse      ();
-  config.keyboard.aspect_ratio.parse ();
+  config.keyboard.hudless.parse         ();
+  config.keyboard.aspect_ratio.parse    ();
+  config.keyboard.clear_enemies.parse   ();
+  config.keyboard.respawn_enemies.parse ();
+  config.keyboard.battle_timestop.parse ();
 
   textures.remaster->load          (config.textures.remaster);
   textures.uncompressed->load      (config.textures.uncompressed);
@@ -1023,8 +1064,11 @@ TBF_SaveConfig (std::wstring name, bool close_config)
   input.gamepad.texture_set->store         (config.input.gamepad.texture_set);
   input.gamepad.virtual_controllers->store (config.input.gamepad.virtual_controllers);
 
-  config.keyboard.hudless.update      ();
-  config.keyboard.aspect_ratio.update ();
+  config.keyboard.hudless.update         ();
+  config.keyboard.aspect_ratio.update    ();
+  config.keyboard.clear_enemies.update   ();
+  config.keyboard.respawn_enemies.update ();
+  config.keyboard.battle_timestop.update ();
 
   screenshots.add_to_steam->store    (config.screenshots.import_to_steam);
   screenshots.keep->store            (config.screenshots.keep);
@@ -1033,6 +1077,9 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   keyboard.swap_wasd->store        (config.keyboard.swap_wasd);
   keyboard.swap_keys->store        (config.keyboard.swap_keys);
+  keyboard.clear_enemies->store    (config.keyboard.clear_enemies.human_readable);
+  keyboard.respawn_enemies->store  (config.keyboard.respawn_enemies.human_readable);
+  keyboard.battle_timestop->store  (config.keyboard.battle_timestop.human_readable);
 
   sys.version->store             (TBF_VER_STR);
   //sys.intro_video->store         (config.system.intro_video);

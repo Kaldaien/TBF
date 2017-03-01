@@ -957,7 +957,7 @@ TBF_LiveVertexStreamView (bool& can_scroll)
         {
           ImGui::Separator ();
 
-          for (int i = 0; i < num_elems; i++)
+          for (UINT i = 0; i < num_elems; i++)
           {
             if (elem_decl [i].Type != D3DDECLTYPE_UNUSED)
             {

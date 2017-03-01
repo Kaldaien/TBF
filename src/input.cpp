@@ -137,6 +137,40 @@ SK_TBF_PluginKeyPress ( BOOL Control,
     return;
   }
 
+
+  const UINT uiClearEnemiesMask =
+    TBF_MakeKeyMask ( config.keyboard.clear_enemies.vKey,
+                      config.keyboard.clear_enemies.ctrl,
+                      config.keyboard.clear_enemies.shift,
+                      config.keyboard.clear_enemies.alt );
+
+  const UINT uiRespawnEnemiesMask =
+    TBF_MakeKeyMask ( config.keyboard.respawn_enemies.vKey,
+                      config.keyboard.respawn_enemies.ctrl,
+                      config.keyboard.respawn_enemies.shift,
+                      config.keyboard.respawn_enemies.alt );
+
+  const UINT uiBattleTimestopMask =
+    TBF_MakeKeyMask ( config.keyboard.battle_timestop.vKey,
+                      config.keyboard.battle_timestop.ctrl,
+                      config.keyboard.battle_timestop.shift,
+                      config.keyboard.battle_timestop.alt );
+
+  if (uiMaskedKeyCode == uiClearEnemiesMask) {
+    game_state.clear_enemies.set ();
+    return;
+  }
+
+  if (uiMaskedKeyCode == uiRespawnEnemiesMask) {
+    game_state.respawn_enemies.set ();
+    return;
+  }
+
+  if (uiMaskedKeyCode == uiBattleTimestopMask) {
+    *TBF_GetFlagFromIdx (12) = (! *TBF_GetFlagFromIdx (12));
+    return;
+  }
+
   switch (uiMaskedKeyCode)
   {
     // Turn the OSD disclaimer off once the user figures out what the words OSD and toggle mean ;)

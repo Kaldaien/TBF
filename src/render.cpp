@@ -42,8 +42,9 @@ tbf::RenderFix::tbf_draw_states_s
 
 D3DVIEWPORT9    last_viewport;
 
-bool            fix_scissor = true;
-int             instances   = 0;
+bool            fullscreen_blit = false;
+bool            fix_scissor     = true;
+int             instances       = 0;
 extern uint32_t current_tex [256];
 
 struct smaa_constants_s
@@ -117,6 +118,7 @@ enum reset_stage_s {
 
 uint32_t aspect_ratio_trigger = 0x00;
 int      needs_aspect         = 0;
+uint32_t last_vs              = 0;
 
 uint32_t
 TBF_MakeShadowBitShift (uint32_t dim)
@@ -524,7 +526,7 @@ const uint32_t PS_CHECKSUM_UI    =  363447431UL;
 const uint32_t VS_CHECKSUM_UI    =  657093040UL;
 
 bool
-TBF_ShouldSkipRenderPass (D3DPRIMITIVETYPE PrimitiveType)
+TBF_ShouldSkipRenderPass (D3DPRIMITIVETYPE PrimitiveType, UINT PrimitiveCount, UINT StartVertex)
 {
   if (vs_checksum == aspect_ratio_trigger || aspect_ratio_trigger == 0x00)
     needs_aspect++;
@@ -654,18 +656,25 @@ TBF_ShouldSkipRenderPass (D3DPRIMITIVETYPE PrimitiveType)
 
 
 
-  if (config.render.aspect_correction && needs_aspect > 0 && PrimitiveType == D3DPT_TRIANGLESTRIP && current_tex [0] != 0x00)
+  if ((! fullscreen_blit) && config.render.aspect_correction && needs_aspect > 0 && PrimitiveType == D3DPT_TRIANGLESTRIP)
   {
-    if ( tbf::RenderFix::aspect_ratio_data.whitelist.vertex_shaders.count (vs_checksum) ||
-         tbf::RenderFix::aspect_ratio_data.whitelist.pixel_shaders.count  (ps_checksum) ||
-         tbf::RenderFix::aspect_ratio_data.whitelist.textures.count       (current_tex [0]) )
+    if ( tbf::RenderFix::aspect_ratio_data.whitelist.vertex_shaders.count (vs_checksum)     ||
+         tbf::RenderFix::aspect_ratio_data.whitelist.pixel_shaders.count  (ps_checksum)     ||
+         tbf::RenderFix::aspect_ratio_data.whitelist.textures.count       (current_tex [0]) ||
+         tbf::RenderFix::aspect_ratio_data.whitelist.textures.count       (current_tex [1]) )
     {
       extern void
       TBF_Viewport_HUD (IDirect3DDevice9* This, uint32_t vs_checksum, uint32_t ps_checksum);
-    
-      TBF_Viewport_HUD (tbf::RenderFix::pDevice, vs_checksum, ps_checksum);
+
+      {
+        // Don't do this in skits
+        if (! *((uint8_t *)TBF_GetBaseAddr () + 0xF1D1BE))
+          TBF_Viewport_HUD (tbf::RenderFix::pDevice, vs_checksum, ps_checksum);
+      }
     }
   }
+
+  last_vs = vs_checksum;
 
 
 
@@ -814,6 +823,7 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
   game_state.in_skit = false;
 
   needs_aspect       = false;
+  fullscreen_blit    = false;
   draw_count         = 0;
   next_draw          = 0;
 
@@ -860,6 +870,7 @@ D3D9EndFrame_Post (HRESULT hr, IUnknown* device)
     return SK_EndBufferSwap (hr, device);
 
   needs_aspect = 0;
+  last_vs      = 0;
   scene_count  = 0;
 
   InterlockedExchange (&tbf::RenderFix::dwRenderThreadID, GetCurrentThreadId ());
@@ -1226,16 +1237,6 @@ TBF_Viewport_HUD (IDirect3DDevice9* This, uint32_t vs_checksum, uint32_t ps_chec
   // Fullscreen pause menu
   if (vs_checksum == 0x066e0873 && ps_checksum == 0x975d2194)
   {
-    float fColor [4] { 1.0f, 1.0f, 1.0f, 1.0f }; 
-    This->GetVertexShaderConstantF (4, fColor, 1);
-
-    // Fade-to/from-Black
-    if (fColor [0] == 0.0f && fColor [1] == 0.0f && fColor [2] == 0.0f)
-      return;
-
-    // Fade-to/from-White
-    if (fColor [0] == 1.0f && fColor [1] == 1.0f && fColor [2] == 1.0f)
-      return;
   }
 
   if (tbf::RenderFix::width > tbf::RenderFix::height * (16.0f / 9.0f))
@@ -1338,7 +1339,7 @@ D3D9DrawIndexedPrimitive_Detour (IDirect3DDevice9* This,
   ++draw_count;
 
 
-  if (TBF_ShouldSkipRenderPass (Type)) {
+  if (TBF_ShouldSkipRenderPass (Type, primCount, startIndex)) {
     if (config.render.aspect_correction)
       D3D9SetViewport_Original (This, &last_viewport);
     return S_OK;
@@ -1552,16 +1553,35 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
     }
   }
 
-  if (config.render.aspect_correction && StartRegister == 240) {
-    //if (1.0f / pConstantData [0] != -tbf::RenderFix::width)
-      //needs_aspect = 1;
-    //else
-      //needs_aspect = 0;
+  if (StartRegister == 0 &&
+      Vector4fCount == 5)
+  {
+    fullscreen_blit = false;
 
-    //if (needs_aspect) {
-      //dll_log->Log (L"[FrameTrace] VS: %lx, %f, %f, %f, %f", vs_checksum, 1.0f / pConstantData [0], 1.0f / pConstantData [1],
-                                                                                 //pConstantData [2],        pConstantData [3] );
-    //}
+    if (pConstantData [ 0] == 2.0f / 1280.0f &&
+        pConstantData [ 5] == 2.0f / 720.0f)
+    {
+      //
+      // If the origin is translated all the way to the left, we assume this
+      //   is an effect that covers the entire screen.
+      //
+      //  (Also anything that is not horizontally translated)
+      //
+      if ( (vs_checksum == 0x66e0873 && ( ps_checksum == 3087596655 || ps_checksum == 0x975d2194)) || ps_checksum == 0xf00fa274 )
+      {
+        if ((pConstantData [12] == -pConstantData [15]) ||
+            (pConstantData [12] ==  pConstantData [15]) ||
+            (pConstantData [12] == 0.0f && pConstantData [15] == 1.0f))
+        {
+        // Do not stretch skits
+        //if (game_state.inExplanation () && pConstantData [19] == 0.4f) {
+          //game_state.in_skit = true;
+        //} else
+          //dll_log->Log (L"Trigger!");
+          fullscreen_blit    = true;
+        }
+      }
+    }
   }
 
 
@@ -1659,7 +1679,7 @@ D3D9DrawPrimitive_Detour (IDirect3DDevice9* This,
   tbf::RenderFix::draw_state.draws++;
 
 
-  if (TBF_ShouldSkipRenderPass (PrimitiveType)) {
+  if (TBF_ShouldSkipRenderPass (PrimitiveType, PrimitiveCount, StartVertex)) {
     if (config.render.aspect_correction)
       D3D9SetViewport_Original (This, &last_viewport);
     return S_OK;
@@ -1728,7 +1748,7 @@ D3D9DrawPrimitiveUP_Detour ( IDirect3DDevice9* This,
   tbf::RenderFix::draw_state.draws++;
 
 
-  if (TBF_ShouldSkipRenderPass(PrimitiveType)) {
+  if (TBF_ShouldSkipRenderPass(PrimitiveType, PrimitiveCount, 0)) {
     if (config.render.aspect_correction)
       D3D9SetViewport_Original (This, &last_viewport);
     return S_OK;
@@ -1782,7 +1802,7 @@ D3D9DrawIndexedPrimitiveUP_Detour ( IDirect3DDevice9* This,
   tbf::RenderFix::draw_state.draws++;
 
 
-  if (TBF_ShouldSkipRenderPass (PrimitiveType))
+  if (TBF_ShouldSkipRenderPass (PrimitiveType, PrimitiveCount, 0))
   {
     if (config.render.aspect_correction)
       D3D9SetViewport_Original (This, &last_viewport);
@@ -2094,10 +2114,6 @@ tbf::RenderFix::Init (void)
   aspect_ratio_data.whitelist.textures.emplace       (0xb11b9a20);
   aspect_ratio_data.whitelist.textures.emplace       (0x7ecb9487); // Menu Carrot (Colored)
 
-
-  // Don't want this in battle...
-  //aspect_ratio_data.whitelist.vertex_shaders.emplace (0x1982d008);
-  //aspect_ratio_data.blacklist.pixel_shaders.emplace  (0x975d2194);
 
   aspect_ratio_data.blacklist.pixel_shaders.emplace  (0x8088d328);
   aspect_ratio_data.blacklist.pixel_shaders.emplace  (0x95861657);
@@ -2566,3 +2582,5 @@ tbf::RenderFix::shader_tracking_s::use (IUnknown *pShader)
 }
 
 tbf::RenderFix::aspect_ratio_data_s tbf::RenderFix::aspect_ratio_data;
+
+game_state_t game_state;

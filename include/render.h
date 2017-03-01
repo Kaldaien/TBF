@@ -542,7 +542,7 @@ namespace tbf
           {
             extern uint32_t current_tex [256];
 
-            for ( int i = 0; i < num_elems; i++ )
+            for ( UINT i = 0; i < num_elems; i++ )
             {
               if (elem_decl [i].Usage == D3DDECLUSAGE_TEXCOORD)
                 textures.emplace (current_tex [elem_decl [i].UsageIndex]);
@@ -589,10 +589,51 @@ namespace tbf
   }
 }
 
+const uint32_t START_FLAG = 0xF1D19C;
+const int      MAX_FLAGS  = 40;
+
+extern uintptr_t
+TBF_GetBaseAddr (void);
+
+__forceinline
+uintptr_t
+TBF_GetFlagBase (void)
+{
+  return TBF_GetBaseAddr () + START_FLAG;
+}
+
+__forceinline
+uint8_t*
+TBF_GetFlagFromIdx (int idx)
+{
+  return (uint8_t *)TBF_GetFlagBase () + idx;
+}
+
 struct game_state_t {
-  BYTE*  base_addr    =  (BYTE *)0x2130309;
+  BYTE*  base_addr    =  (BYTE *)0xF1D19C;
   bool   in_skit      = false;
 
+  struct {
+    bool     want  = false;
+    uint64_t frame = 0;
+
+    void set (void) {
+      want  = true;
+      frame = 0;
+    }
+
+    void clear (void) {
+      want  = false;
+      frame = 0;
+    }
+
+    bool test (void) {
+      return want;
+    }
+  } clear_enemies, respawn_enemies;
+
+  // Applies to Tales of Zestiria only, flags have been
+  //   shifted around in Berseria
   struct data_t {
     /*  0 */ BYTE  Title;
     /*  1 */ BYTE  OpeningMovie;
@@ -680,7 +721,7 @@ struct game_state_t {
             //((data_t *)base_addr)->BattlePause  ||
             //((data_t *)base_addr)->Title);
   }
-} static game_state;
+} extern game_state;
 
 typedef HRESULT (STDMETHODCALLTYPE *BeginScene_pfn)(
   IDirect3DDevice9 *This

@@ -259,7 +259,7 @@ TBFix_KeybindDialog (keybind_s* keybind)
 
   ImGui::SetNextWindowSizeConstraints ( ImVec2 (font_size * 9, font_size * 3), ImVec2 (font_size * 30, font_size * 6));
 
-  if (ImGui::BeginPopupModal ("Keyboard Binding", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders))
+  if (ImGui::BeginPopupModal (keybind->bind_name, NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_ShowBorders))
   {
     ImGui::GetIO ().WantCaptureKeyboard = false;
 
@@ -1130,12 +1130,6 @@ TBFix_DrawConfigUI (void)
       ImGui::EndTooltip   ();
     }
 
-    tbf::RenderFix::need_reset.graphics |=
-      ImGui::Checkbox ("Enable Debug Validation Layer", &config.render.validation);
-
-    ImGui::SameLine ();
-    ImGui::Checkbox ("Marshall UI Draws Through Hook", &hook_marshall);
-
     ImGui::TreePop ();
   }
 
@@ -1242,7 +1236,7 @@ TBFix_DrawConfigUI (void)
     }
 
     if (ImGui::IsItemClicked ()) {
-      ImGui::OpenPopup ("Keyboard Binding");
+      ImGui::OpenPopup (config.keyboard.aspect_ratio.bind_name);
     }
 
     TBFix_KeybindDialog (&config.keyboard.aspect_ratio);
@@ -1295,7 +1289,7 @@ TBFix_DrawConfigUI (void)
     }
 
     if (ImGui::IsItemClicked ()) {
-      ImGui::OpenPopup ("Keyboard Binding");
+      ImGui::OpenPopup (config.keyboard.hudless.bind_name);
     }
 
     TBFix_KeybindDialog (&config.keyboard.hudless);
@@ -1536,6 +1530,92 @@ TBFix_DrawConfigUI (void)
       ImGui::SetTooltip ("Potentially useful for texture modders who need stuff to stand still but do not want the screen dimmed -- use with the mod's Auto-Pause feature.");
 
     ImGui::TreePop  ();
+  }
+
+  if (ImGui::CollapsingHeader ("Debug"))
+  {
+    ImGui::TreePush ("");
+
+    ImGui::BeginGroup   ();
+    ImGui::PushStyleVar (ImGuiStyleVar_ChildWindowRounding, 15.0f);
+    ImGui::BeginChild   ("Debug Flags", ImVec2 ( font_size           * 35,
+                                                 font_size_multiline * ( 1.3f + ( (MAX_FLAGS / 4) +
+                                                                                  (MAX_FLAGS % 4 > 0 ? 1 : 0) ) ) ),
+                                             true );
+    for (int i = 0; i < MAX_FLAGS; i++)
+    {
+      char szDesc [32] = { '\0' };
+      if (i == 0)
+        sprintf (szDesc, "Base %06x", (uint32_t)START_FLAG + i);
+      else
+        sprintf (szDesc, "Flag [%#4lu]", i);
+
+      extern uintptr_t
+      TBF_GetBaseAddr (void);
+
+      uint8_t* flag = (uint8_t *)(TBF_GetBaseAddr () + START_FLAG + i);
+
+      bool bFlag = *flag != 0;
+
+      if (ImGui::Checkbox (szDesc, &bFlag))
+        *flag = (bFlag ? 1 : 0);
+
+      if (((i + 1) % 4) != 0 && i != (MAX_FLAGS - 1))
+        ImGui::SameLine ();
+    }
+
+    ImGui::EndChild ();
+    ImGui::EndGroup ();
+
+    ImGui::SameLine   ();
+    ImGui::BeginGroup ();
+
+    tbf::RenderFix::need_reset.graphics |=
+      ImGui::Checkbox ("Enable D3D9 Debug Validation Layer", &config.render.validation);
+
+    ImGui::Checkbox ("Marshall UI Draws Through Hooked Procedures", &hook_marshall);
+
+    ImGui::Separator ();
+
+    ImGui::Text ("  Clear Enemies Keybinding:  %ws",  config.keyboard.clear_enemies.human_readable.c_str ());
+
+    if (ImGui::IsItemHovered ()) {
+      ImGui::SetTooltip ("Click here to change.");
+    }
+
+    if (ImGui::IsItemClicked ()) {
+      ImGui::OpenPopup (config.keyboard.clear_enemies.bind_name);
+    }
+
+    TBFix_KeybindDialog (&config.keyboard.clear_enemies);
+
+    ImGui::Text ("Respawn Enemies Keybinding:  %ws",  config.keyboard.respawn_enemies.human_readable.c_str ());
+
+    if (ImGui::IsItemHovered ()) {
+      ImGui::SetTooltip ("Click here to change.");
+    }
+
+    if (ImGui::IsItemClicked ()) {
+      ImGui::OpenPopup (config.keyboard.respawn_enemies.bind_name);
+    }
+
+    TBFix_KeybindDialog (&config.keyboard.respawn_enemies);
+
+    ImGui::Text ("Battle Timestop Keybinding:  %ws",  config.keyboard.battle_timestop.human_readable.c_str ());
+
+    if (ImGui::IsItemHovered ()) {
+      ImGui::SetTooltip ("Click here to change.");
+    }
+
+    if (ImGui::IsItemClicked ()) {
+      ImGui::OpenPopup (config.keyboard.battle_timestop.bind_name);
+    }
+
+    TBFix_KeybindDialog (&config.keyboard.battle_timestop);
+
+    ImGui::EndGroup ();
+
+    ImGui::TreePop ();
   }
 
   ImGui::PopItemWidth ();
