@@ -647,8 +647,9 @@ D3D9SetRenderState_Detour (IDirect3DDevice9*  This,
   }
 #endif
 
-  //if (State == D3DRS_SCISSORTESTENABLE && (! tbf::RenderFix::draw_state.cegui_active))
-    //Value = FALSE;
+
+  if (State == D3DRS_SCISSORTESTENABLE)
+    tbf::RenderFix::draw_state.scissor_test = (Value != FALSE);
 
   return D3D9SetRenderState (This, State, Value);
 }
@@ -809,7 +810,6 @@ D3D9SetDepthStencilSurface_Detour (
 
 
 uint32_t debug_tex_id      =   0UL;
-uint32_t current_tex [256] = { 0ui32 };
 
 extern SetSamplerState_pfn D3D9SetSamplerState_Original;
 
@@ -873,7 +873,7 @@ D3D9SetTexture_Detour (
     ISKTextureD3D9* pSKTex =
       (ISKTextureD3D9 *)pTexture;
 
-    current_tex [std::min (255UL, Sampler)] = pSKTex->tex_crc32;
+    tbf::RenderFix::draw_state.current_tex [std::min (255UL, Sampler)] = pSKTex->tex_crc32;
 
     if (vs_checksum == tbf::RenderFix::tracked_vs.crc32)  tbf::RenderFix::tracked_vs.current_textures [std::min (15UL, Sampler)] = pSKTex->tex_crc32;
     if (ps_checksum == tbf::RenderFix::tracked_ps.crc32)  tbf::RenderFix::tracked_ps.current_textures [std::min (15UL, Sampler)] = pSKTex->tex_crc32;

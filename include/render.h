@@ -28,9 +28,7 @@
 
 #include <d3d9.h>
 #include <d3d9types.h>
-
 #include <Windows.h>
-
 #include <unordered_set>
 
 //---------------------------------------------------------------------------
@@ -351,6 +349,8 @@ namespace tbf
 
     bool InstallSGSSAA (void);
 
+    void ClearBlackBars (void);
+
     // Indicates whether setting changes need a device reset
     struct reset_state_s {
       bool textures = false;
@@ -393,6 +393,45 @@ namespace tbf
 
     extern HMODULE            d3dx9_43_dll;
     extern HMODULE            user32_dll;
+
+    struct tbf_draw_states_s {
+      bool            has_aniso       = false; // Has he game even once set anisotropy?!
+      int             max_aniso       = 4;
+
+      D3DVIEWPORT9    vp              = { 0 };
+      bool            postprocessing  = false;
+      bool            fullscreen      = false;
+
+      // Most of these states are not tracked
+      DWORD           srcblend        = 0;
+      DWORD           dstblend        = 0;
+      DWORD           srcalpha        = 0;     // Separate Alpha Blend Eq: Src
+      DWORD           dstalpha        = 0;     // Separate Alpha Blend Eq: Dst
+      bool            alpha_test      = false; // Test Alpha?
+      DWORD           alpha_ref       = 0;     // Value to test.
+      bool            zwrite          = false; // Depth Mask
+
+      // This one is
+      bool            scissor_test    = false;
+
+      int             last_vs_vec4    = 0; // Number of vectors in the last call to
+                                          //   set vertex shader constant...
+
+      int             draws           = 0; // Number of draw calls
+      int             frames          = 0;
+
+      bool            cegui_active    = false;
+      
+      bool            fullscreen_blit = false;
+      bool            fix_scissor     = true;
+      int             instances       = 0;
+
+      uint32_t        current_tex  [256];
+      float           mat4_0       [16] = { 0.0f };
+      float           viewport_off [4]  = { 0.0f }; // Most vertex shaders use this and we can
+                                              //   test the set values to determine if a draw
+                                              //     is HUD or world-space.
+    } extern draw_state;
 
     struct frame_state_s
     {
@@ -540,12 +579,10 @@ namespace tbf
           //   that is a pretty good indicator as to which textures are actually used...
           if (SUCCEEDED (decl->GetDeclaration (elem_decl, &num_elems)))
           {
-            extern uint32_t current_tex [256];
-
             for ( UINT i = 0; i < num_elems; i++ )
             {
               if (elem_decl [i].Usage == D3DDECLUSAGE_TEXCOORD)
-                textures.emplace (current_tex [elem_decl [i].UsageIndex]);
+                textures.emplace (draw_state.current_tex [elem_decl [i].UsageIndex]);
             }
           }
 
@@ -635,37 +672,41 @@ struct game_state_t {
   // Applies to Tales of Zestiria only, flags have been
   //   shifted around in Berseria
   struct data_t {
-    /*  0 */ BYTE  Title;
-    /*  1 */ BYTE  OpeningMovie;
-    /*  2 */ BYTE  Game;
-    /*  3 */ BYTE  GamePause;
-    /*  4 */ BYTE  Loading0;
-    /*  5 */ BYTE  Loading1;
-    /*  6 */ BYTE  Explanation;
-    /*  7 */ BYTE  Menu;
-    /*  8 */ BYTE  Unknown0;
-    /*  9 */ BYTE  Unknown1;
-    /* 10 */ BYTE  Unknown2;
-    /* 11 */ BYTE  Battle;
-    /* 12 */ BYTE  BattlePause;
-    /* 13 */ BYTE  BattleSummary;
-    /* 14 */ BYTE  Unknown3;
-    /* 15 */ BYTE  Unknown4;
-    /* 16 */ BYTE  Unknown5;
-    /* 17 */ BYTE  Unknown6;
-    /* 18 */ BYTE  Unknown7;
+    /*  0 */ BYTE  Unknown0;
+    /*  1 */ BYTE  Unknown1;
+    /*  2 */ BYTE  Unknown2;
+    /*  3 */ BYTE  Unknown3;
+    /*  4 */ BYTE  Unknown4;
+    /*  5 */ BYTE  Unknown5;
+    /*  6 */ BYTE  FMV0;
+    /*  7 */ BYTE  TitleScreen;
+    /*  8 */ BYTE  FieldCamera; // ??
+    /*  9 */ BYTE  FieldPause;
+    /* 10 */ BYTE  Unknown10;
+    /* 11 */ BYTE  Unknown11;
+    /* 12 */ BYTE  Explanation; // Also used in skits // Also when talking to an NPC
+    /* 13 */ BYTE  Menu; 
+    /* 14 */ BYTE  BattleCamera;
+    /* 15 */ BYTE  Unknown15;
+    /* 16 */ BYTE  BattleResults;
+    /* 17 */ BYTE  Unknown17;
+    /* 18 */ BYTE  Unknown18;
     /* 19 */ BYTE  Cutscene;
-    /* 20 */ BYTE  Unknown8;
-    /* 21 */ BYTE  Unknown9;
-    /* 22 */ BYTE  Unknown10;
-    /* 23 */ BYTE  Unknown11;
-    /* 24 */ BYTE  Unknown12;
-    /* 25 */ BYTE  Unknown13;
-    /* 26 */ BYTE  Unknown14;
-    /* 27 */ BYTE  Unknown15;
-    /* 28 */ BYTE  Unknown16;
-    /* 29 */ BYTE  Unknown17;
+    /* 20 */ BYTE  Unknown20;
+    /* 21 */ BYTE  Unknown21;
+    /* 22 */ BYTE  Unknown22;
+    /* 23 */ BYTE  Unknown23;
+    /* 24 */ BYTE  Loading0;
+    /* 25 */ BYTE  Loading1;
+    /* 26 */ BYTE  Unknown26;
+    /* 27 */ BYTE  Unknown27;
+    /* 28 */ BYTE  Unknown28;
+    /* 29 */ BYTE  Unknown29;
     /* 30 */ BYTE  GameMenu;
+    /* 31 */ BYTE  FMV1;
+    /* 32 */ BYTE  PartySpeak0;
+    /* 33 */ BYTE  PartySpeak1; 
+    /* 34 */ BYTE  Skit;
   };
 
 #if 0
@@ -697,9 +738,9 @@ struct game_state_t {
   BYTE*  Cutscene     =  (BYTE *)(base_addr + 19); // Cutscene
 #endif
 
-  bool inBattle      (void) { return ((data_t *)base_addr)->Battle      & 0x1; }
-  bool inCutscene    (void) { return ((data_t *)base_addr)->Cutscene    & 0x1; }
-  bool inExplanation (void) { return ((data_t *)base_addr)->Explanation & 0x1; }
+  bool inBattle      (void) { return ((data_t *)base_addr)->BattleCamera & 0x1; }
+  bool inCutscene    (void) { return ((data_t *)base_addr)->Cutscene     & 0x1; }
+  bool inExplanation (void) { return ((data_t *)base_addr)->Explanation  & 0x1; }
   bool inSkit        (void) { return in_skit;                                  }
   bool inMenu        (void) { return ((data_t *)base_addr)->Menu        & 0x1; }
   bool isLoading     (void) { return (((data_t *)base_addr)->Loading0 & 0x1) ||

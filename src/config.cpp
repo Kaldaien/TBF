@@ -71,7 +71,6 @@ struct {
   tbf::ParameterInt*     aspect_addr;
   tbf::ParameterFloat*   fovy;
   tbf::ParameterFloat*   aspect_ratio;
-  tbf::ParameterBool*    aspect_correct_vids;
   tbf::ParameterBool*    aspect_correction;
   tbf::ParameterStringW* aspect_ratio_keybind;
   tbf::ParameterBool*    clear_blackbars;
@@ -488,6 +487,17 @@ TBF_LoadConfig (std::wstring name)
     render_ini,
       L"Resolution.AspectRatio",
         L"ApplyCorrection"
+  );
+
+  render.clear_blackbars =
+    static_cast <tbf::ParameterBool *>
+      (g_ParameterFactory.create_parameter <bool> (
+        L"Clear Blackbars (in video)")
+    );
+  render.clear_blackbars->register_to_ini (
+    render_ini,
+      L"Resolution.AspectRatio",
+        L"ClearBlackbars"
   );
 
   render.postproc_ratio =
@@ -914,6 +924,7 @@ TBF_LoadConfig (std::wstring name)
 
   render.aspect_correction->load          (config.render.aspect_correction);
   render.aspect_ratio->load               (config.render.aspect_ratio);
+  render.clear_blackbars->load            (config.render.clear_blackbars);
 
   render.dump_shaders->load               (config.render.dump_shaders);
   render.fix_map_res->load                (config.render.fix_map_res);
@@ -1021,6 +1032,7 @@ TBF_SaveConfig (std::wstring name, bool close_config)
 
   render.aspect_correction->store      (config.render.aspect_correction);
   render.aspect_ratio->store           (config.render.aspect_ratio);
+  render.clear_blackbars->store        (config.render.clear_blackbars);
 
   render.rescale_shadows->store        (config.render.shadow_rescale);
   render.rescale_env_shadows->store    (config.render.env_shadow_rescale);

@@ -84,33 +84,6 @@ namespace RenderFix {
     IDirect3DTexture9* pTex;
   };
 #endif
-
-    struct tbf_draw_states_s {
-      bool         has_aniso      = false; // Has he game even once set anisotropy?!
-      int          max_aniso      = 4;
-      bool         has_msaa       = false;
-      bool         use_msaa       = true;  // Allow MSAA toggle via console
-                                           //  without changing the swapchain.
-      D3DVIEWPORT9 vp             = { 0 };
-      bool         postprocessing = false;
-      bool         fullscreen     = false;
-
-      DWORD        srcblend       = 0;
-      DWORD        dstblend       = 0;
-      DWORD        srcalpha       = 0;     // Separate Alpha Blend Eq: Src
-      DWORD        dstalpha       = 0;     // Separate Alpha Blend Eq: Dst
-      bool         alpha_test     = false; // Test Alpha?
-      DWORD        alpha_ref      = 0;     // Value to test.
-      bool         zwrite         = false; // Depth Mask
-
-      int          last_vs_vec4   = 0; // Number of vectors in the last call to
-                                       //   set vertex shader constant...
-
-      int          draws          = 0; // Number of draw calls
-      int          frames         = 0;
-      bool         cegui_active   = false;
-    } extern draw_state;
-
   class Texture {
   public:
     Texture (void) {

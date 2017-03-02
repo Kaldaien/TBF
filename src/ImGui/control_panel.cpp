@@ -1035,6 +1035,39 @@ TBFix_DrawConfigUI (void)
 #endif
   }
 
+  if (ImGui::CollapsingHeader ("Aspect Ratio"))
+  {
+    ImGui::TreePush ("");
+
+    ImGui::Checkbox ("Enable Aspect Ratio Correction", &config.render.aspect_correction);
+    ImGui::Checkbox ("Clear Black Bars During Videos", &config.render.clear_blackbars);
+
+    ImGui::Text ("Aspect Ratio Toggle Keybinding:  %ws",  config.keyboard.aspect_ratio.human_readable.c_str ());
+
+    if (ImGui::IsItemHovered ()) {
+      ImGui::SetTooltip ("Click here to change.");
+    }
+
+    if (ImGui::IsItemClicked ()) {
+      ImGui::OpenPopup (config.keyboard.aspect_ratio.bind_name);
+    }
+
+    TBFix_KeybindDialog (&config.keyboard.aspect_ratio);
+
+    extern float original_aspect;
+
+    if ( original_aspect > config.render.aspect_ratio + 0.001f ||
+         original_aspect < config.render.aspect_ratio - 0.001f ) {
+      ImGui::Separator ();
+
+      ImGui::Bullet (); ImGui::SameLine ();
+
+      ImGui::TextColored (ImVec4 (1.0f, 0.8f, 0.2f, 1.0f), "Aspect Ratio Has Changed Since Startup, for best results return to the title screen.");
+    }
+
+    ImGui::TreePop ();
+  }
+
   if (ImGui::CollapsingHeader ("Post-Processing"))
   {
     ImGui::TreePush ("");
@@ -1218,41 +1251,6 @@ TBFix_DrawConfigUI (void)
 
       ImGui::TreePop ();
     }
-  }
-
-  if (ImGui::CollapsingHeader ("Aspect Ratio"))
-  {
-    ImGui::TreePush ("");
-
-    extern bool fix_scissor;
-
-    ImGui::Checkbox ("Enable Aspect Ratio Correction (EXPERIMENTAL)", &config.render.aspect_correction);
-    ImGui::Checkbox ("Fix Scissor Rectangle", &fix_scissor);
-
-    ImGui::Text ("Aspect Ratio Toggle Keybinding:  %ws",  config.keyboard.aspect_ratio.human_readable.c_str ());
-
-    if (ImGui::IsItemHovered ()) {
-      ImGui::SetTooltip ("Click here to change.");
-    }
-
-    if (ImGui::IsItemClicked ()) {
-      ImGui::OpenPopup (config.keyboard.aspect_ratio.bind_name);
-    }
-
-    TBFix_KeybindDialog (&config.keyboard.aspect_ratio);
-
-    extern float original_aspect;
-
-    if ( original_aspect > config.render.aspect_ratio + 0.001f ||
-         original_aspect < config.render.aspect_ratio - 0.001f ) {
-      ImGui::Separator ();
-
-      ImGui::Bullet (); ImGui::SameLine ();
-
-      ImGui::TextColored (ImVec4 (1.0f, 0.8f, 0.2f, 1.0f), "Aspect Ratio Has Changed Since Startup, for best results return to the title screen.");
-    }
-
-    ImGui::TreePop ();
   }
 
   if (ImGui::CollapsingHeader ("Input"))

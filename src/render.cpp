@@ -40,17 +40,6 @@
 tbf::RenderFix::tbf_draw_states_s
   tbf::RenderFix::draw_state;
 
-D3DVIEWPORT9    last_viewport;
-
-bool            fullscreen_blit = false;
-bool            fix_scissor     = true;
-int             instances       = 0;
-extern uint32_t current_tex [256];
-float           mat4_0       [16] = { 0.0f };
-float           viewport_off [4]  = { 0.0f }; // Most vertex shaders use this and we can
-                                              //   test the set values to determine if a draw
-                                              //     is HUD or world-space.
-
 struct {
   float* addrs [16] = { nullptr };
   int    count      =     0;
@@ -99,7 +88,7 @@ struct smaa_constants_s
 typedef uint32_t (__stdcall *SK_Steam_PiratesAhoy_pfn)(void);
 typedef void     (__stdcall *SK_ResizeOSD_pfn)(float,const char*);
 
-extern SetRenderState_pfn               D3D9SetRenderState_Original;
+extern SetRenderState_pfn               D3D9SetRenderState;
        SetSamplerState_pfn              D3D9SetSamplerState_Original          = nullptr;
 
 DrawPrimitive_pfn                       D3D9DrawPrimitive_Original            = nullptr;
@@ -648,8 +637,8 @@ TBF_ShouldSkipRenderPass (D3DPRIMITIVETYPE PrimitiveType, UINT PrimitiveCount, U
   {
     tbf::RenderFix::tracked_vb.use ();
 
-    tbf::RenderFix::tracked_vb.instances  = instances;
-    tbf::RenderFix::tracked_vb.instanced += instances;
+    tbf::RenderFix::tracked_vb.instances  = tbf::RenderFix::draw_state.instances;
+    tbf::RenderFix::tracked_vb.instanced += tbf::RenderFix::draw_state.instances;
     tbf::RenderFix::tracked_vb.num_draws++;
 
     if (tbf::RenderFix::tracked_vb.wireframe)
@@ -674,12 +663,12 @@ TBF_ShouldSkipRenderPass (D3DPRIMITIVETYPE PrimitiveType, UINT PrimitiveCount, U
   if (config.fun_stuff.disable_pause_dim && ps_checksum == config.fun_stuff.pause_dim_ps_crc32)
     return true;
 
-  if (config.fun_stuff.disable_smoke   && ps_checksum == config.fun_stuff.smoke_ps_crc32 && current_tex [0] == 0x16f618a8)
+  if (config.fun_stuff.disable_smoke   && ps_checksum == config.fun_stuff.smoke_ps_crc32 && tbf::RenderFix::draw_state.current_tex [0] == 0x16f618a8)
     return true;
 
 
 
-  if ((! fullscreen_blit) && config.render.aspect_correction && needs_aspect > 0)
+  if ((! tbf::RenderFix::draw_state.fullscreen_blit) && config.render.aspect_correction && needs_aspect > 0)
   {
     bool skip = false;
 
@@ -688,7 +677,7 @@ TBF_ShouldSkipRenderPass (D3DPRIMITIVETYPE PrimitiveType, UINT PrimitiveCount, U
 
     if ( (! skip) && ( tbf::RenderFix::aspect_ratio_data.whitelist.vertex_shaders.count (vs_checksum)     ||
                        tbf::RenderFix::aspect_ratio_data.whitelist.pixel_shaders.count  (ps_checksum)     ||
-                       tbf::RenderFix::aspect_ratio_data.whitelist.textures.count       (current_tex [0]) ) )
+                       tbf::RenderFix::aspect_ratio_data.whitelist.textures.count       (tbf::RenderFix::draw_state.current_tex [0]) ) )
     {
       extern void
       TBF_Viewport_HUD (IDirect3DDevice9* This, uint32_t vs_checksum, uint32_t ps_checksum);
@@ -699,7 +688,7 @@ TBF_ShouldSkipRenderPass (D3DPRIMITIVETYPE PrimitiveType, UINT PrimitiveCount, U
                                                         *TBF_GetFlagFromIdx (13)) );
 
         // Don't do this in skits
-        skip |= (*((uint8_t *)TBF_GetBaseAddr () + 0xF1D1BE));
+        if (! skip) skip = (*((uint8_t *)TBF_GetBaseAddr () + 0xF1D1BE));
 
         if (! skip)
           TBF_Viewport_HUD (tbf::RenderFix::pDevice, vs_checksum, ps_checksum);
@@ -740,6 +729,70 @@ int scene_count = 0;
 
 std::string mod_text;
 
+void
+tbf::RenderFix::ClearBlackBars (void)
+{
+  if (! *TBF_GetFlagFromIdx (31))
+    return;
+
+  D3DCOLOR color = 0xff000000;
+
+  int width = tbf::RenderFix::width;
+  int height = (9.0f / 16.0f) * width;
+
+  // We can't do this, so instead we need to sidebar the stuff
+  if (height > tbf::RenderFix::height) {
+    width  = (16.0f / 9.0f) * tbf::RenderFix::height;
+    height = tbf::RenderFix::height;
+  }
+
+  if (height != tbf::RenderFix::height) {
+    RECT top;
+    top.top    = 0;
+    top.left   = 0;
+    top.right  = tbf::RenderFix::width;
+    top.bottom = top.top + (tbf::RenderFix::height - height) / 2 + 1;
+    D3D9SetScissorRect_Original (tbf::RenderFix::pDevice, &top);
+    D3D9SetRenderState          (tbf::RenderFix::pDevice, D3DRS_SCISSORTESTENABLE, 1);
+
+    tbf::RenderFix::pDevice->Clear (0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0xff);
+
+    RECT bottom;
+    bottom.top    = tbf::RenderFix::height - (tbf::RenderFix::height - height) / 2;
+    bottom.left   = 0;
+    bottom.right  = tbf::RenderFix::width;
+    bottom.bottom = tbf::RenderFix::height;
+    D3D9SetScissorRect_Original (tbf::RenderFix::pDevice, &bottom);
+
+    tbf::RenderFix::pDevice->Clear (0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0xff);
+
+    D3D9SetRenderState          (tbf::RenderFix::pDevice, D3DRS_SCISSORTESTENABLE, tbf::RenderFix::draw_state.scissor_test);
+  }
+
+  if (width != tbf::RenderFix::width) {
+    RECT left;
+    left.top    = 0;
+    left.left   = 0;
+    left.right  = left.left + (tbf::RenderFix::width - width) / 2 + 1;
+    left.bottom = tbf::RenderFix::height;
+    D3D9SetScissorRect_Original (tbf::RenderFix::pDevice, &left);
+    D3D9SetRenderState          (tbf::RenderFix::pDevice, D3DRS_SCISSORTESTENABLE, 1);
+
+    tbf::RenderFix::pDevice->Clear (0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0xff);
+
+    RECT right;
+    right.top    = 0;
+    right.left   = tbf::RenderFix::width - (tbf::RenderFix::width - width) / 2;
+    right.right  = tbf::RenderFix::width;
+    right.bottom = tbf::RenderFix::height;
+    D3D9SetScissorRect_Original (tbf::RenderFix::pDevice, &right);
+
+    tbf::RenderFix::pDevice->Clear (0, NULL, D3DCLEAR_TARGET, color, 1.0f, 0xff);
+
+    D3D9SetRenderState          (tbf::RenderFix::pDevice, D3DRS_SCISSORTESTENABLE, tbf::RenderFix::draw_state.scissor_test);
+  }
+}
+
 COM_DECLSPEC_NOTHROW
 HRESULT
 STDMETHODCALLTYPE
@@ -759,6 +812,9 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
   if (pending_loads ())
     TBFix_LoadQueuedTextures ();
+
+  if (config.render.clear_blackbars)
+    tbf::RenderFix::ClearBlackBars ();
 
   tbf::RenderFix::draw_state.cegui_active = true;
 
@@ -855,8 +911,13 @@ D3D9EndScene_Detour (IDirect3DDevice9* This)
 
   game_state.in_skit = false;
 
+  tbf::RenderFix::draw_state.fullscreen_blit = false;
+
+  memset (tbf::RenderFix::draw_state.viewport_off, static_cast <int> (0.0f), sizeof (float)    * 4  );
+  memset (tbf::RenderFix::draw_state.mat4_0,       static_cast <int> (0.0f), sizeof (float)    * 16 );
+  memset (tbf::RenderFix::draw_state.current_tex,  0x00,                     sizeof (uint32_t) * 256);
+
   needs_aspect       = false;
-  fullscreen_blit    = false;
   draw_count         = 0;
   next_draw          = 0;
 
@@ -1005,7 +1066,7 @@ D3D9SetScissorRect_Detour (IDirect3DDevice9* This,
     return D3D9SetScissorRect_Original (This, pRect);
 
   // If we don't care about aspect ratio or if we're in a skit, then just early-out
-  if ((! config.render.aspect_correction) || ((! fix_scissor) || *TBF_GetFlagFromIdx (34)))
+  if ((! config.render.aspect_correction) || ((! tbf::RenderFix::draw_state.fix_scissor) || *TBF_GetFlagFromIdx (34)))
     return D3D9SetScissorRect_Original (This, pRect);
 
   // Otherwise, fix this because the UI's scissor rectangles are
@@ -1092,7 +1153,7 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
       rescaled_map.Width  *= 2;
       rescaled_map.Height *= 2;
 
-      last_viewport = rescaled_map;
+      tbf::RenderFix::draw_state.vp = rescaled_map;
 
       return D3D9SetViewport_Original (This, &rescaled_map);
     }
@@ -1112,7 +1173,7 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
       rescaled_map.Width  *= 2;
       rescaled_map.Height *= 2;
 
-      last_viewport = rescaled_map;
+      tbf::RenderFix::draw_state.vp = rescaled_map;
       
       return D3D9SetViewport_Original (This, &rescaled_map);
     }
@@ -1138,7 +1199,7 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
 
       rescaled_map.Width = tbf::RenderFix::width; rescaled_map.Height = tbf::RenderFix::height;
 
-      last_viewport = rescaled_map;
+      tbf::RenderFix::draw_state.vp = rescaled_map;
 
       return D3D9SetViewport_Original (This, &rescaled_map);
     }
@@ -1159,7 +1220,7 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
 
     PostProcessMipmaps ();
 
-    last_viewport = rescaled_shadow;
+    tbf::RenderFix::draw_state.vp = rescaled_shadow;
 
     return D3D9SetViewport_Original (This, &rescaled_shadow);
   }
@@ -1180,7 +1241,7 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
 
     PostProcessMipmaps ();
 
-    last_viewport = rescaled_shadow;
+    tbf::RenderFix::draw_state.vp = rescaled_shadow;
 
     return D3D9SetViewport_Original (This, &rescaled_shadow);
   }
@@ -1208,13 +1269,13 @@ D3D9SetViewport_Detour (IDirect3DDevice9* This,
       rescaled_post_proc.X     += (DWORD)x_off;
       rescaled_post_proc.Y     += (DWORD)y_off;
 
-      last_viewport = rescaled_post_proc;
+      tbf::RenderFix::draw_state.vp = rescaled_post_proc;
 
       return D3D9SetViewport_Original (This, &rescaled_post_proc);
     }
   }
 
-  last_viewport = *pViewport;
+  tbf::RenderFix::draw_state.vp = *pViewport;
 
   HRESULT hr = D3D9SetViewport_Original (This, pViewport);
 
@@ -1225,17 +1286,18 @@ void
 TBF_Viewport_HUD (IDirect3DDevice9* This, uint32_t vs_checksum, uint32_t ps_checksum)
 {
   // If non-1.0, the draw is in projective-space... if 1.0 it is a regular HUD/UI draw
-  if (mat4_0 [15] != 1.0f)
+  if (tbf::RenderFix::draw_state.mat4_0 [15] != 1.0f)
     return;
 
   // These should never be aspect ratio corrected
 
   if ( tbf::RenderFix::aspect_ratio_data.blacklist.vertex_shaders.count (vs_checksum) ||
        tbf::RenderFix::aspect_ratio_data.blacklist.pixel_shaders.count  (ps_checksum) ||
-       tbf::RenderFix::aspect_ratio_data.blacklist.textures.count       (current_tex [0]) )
+       tbf::RenderFix::aspect_ratio_data.blacklist.textures.count       (tbf::RenderFix::draw_state.current_tex [0]) )
   {
     // UI element (the only one) that shares a shader with worldspace HUD elements
-    if (current_tex [0] != 0x7625bb78 && current_tex [0] != 0xb11b9a20)
+    if ( tbf::RenderFix::draw_state.current_tex [0] != 0x7625bb78 &&
+         tbf::RenderFix::draw_state.current_tex [0] != 0xb11b9a20 )
       return;
   }
 
@@ -1243,14 +1305,14 @@ TBF_Viewport_HUD (IDirect3DDevice9* This, uint32_t vs_checksum, uint32_t ps_chec
   //   when PS 0xdb409773 (map) is not active.
   //
   //   This produces streaming particles on the menu screens that fill the entire screen
-  if (current_tex [0] == 0x620950f9 && ps_checksum != 0xdb409773)
+  if (tbf::RenderFix::draw_state.current_tex [0] == 0x620950f9 && ps_checksum != 0xdb409773)
     return;
 
   if (tbf::RenderFix::width > tbf::RenderFix::height * (16.0f / 9.0f))
   {
     D3DVIEWPORT9 new_vp;
-    new_vp.MinZ   = last_viewport.MinZ;
-    new_vp.MaxZ   = last_viewport.MaxZ;
+    new_vp.MinZ   = tbf::RenderFix::draw_state.vp.MinZ;
+    new_vp.MaxZ   = tbf::RenderFix::draw_state.vp.MaxZ;
     new_vp.Width  = tbf::RenderFix::height * (16.0f / 9.0f);
     new_vp.Height = tbf::RenderFix::height;
     new_vp.X      = (tbf::RenderFix::width - tbf::RenderFix::height * (16.0f / 9.0f)) / 2;
@@ -1261,8 +1323,8 @@ TBF_Viewport_HUD (IDirect3DDevice9* This, uint32_t vs_checksum, uint32_t ps_chec
   else
   {
     D3DVIEWPORT9 new_vp;
-    new_vp.MinZ   = last_viewport.MinZ;
-    new_vp.MaxZ   = last_viewport.MaxZ;
+    new_vp.MinZ   = tbf::RenderFix::draw_state.vp.MinZ;
+    new_vp.MaxZ   = tbf::RenderFix::draw_state.vp.MaxZ;
     new_vp.Width  = tbf::RenderFix::width;
     new_vp.Height = tbf::RenderFix::width * (9.0f  / 16.0f);
     new_vp.X      = 0;
@@ -1348,7 +1410,7 @@ D3D9DrawIndexedPrimitive_Detour (IDirect3DDevice9* This,
 
   if (TBF_ShouldSkipRenderPass (Type, primCount, startIndex)) {
     if (config.render.aspect_correction)
-      D3D9SetViewport_Original (This, &last_viewport);
+      D3D9SetViewport_Original (This, &tbf::RenderFix::draw_state.vp);
     return S_OK;
   }
 
@@ -1360,7 +1422,7 @@ D3D9DrawIndexedPrimitive_Detour (IDirect3DDevice9* This,
                                               primCount );
 
   if (config.render.aspect_correction)
-    D3D9SetViewport_Original (This, &last_viewport);
+    D3D9SetViewport_Original (This, &tbf::RenderFix::draw_state.vp);
 
   tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
 
@@ -1384,7 +1446,7 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
   }
 
   if (StartRegister == 240 && Vector4fCount >= 1)
-    memcpy (viewport_off, pConstantData, sizeof (float) * 4);
+    memcpy (tbf::RenderFix::draw_state.viewport_off, pConstantData, sizeof (float) * 4);
 
   //
   // Model Shadows
@@ -1565,11 +1627,11 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
 
   if (StartRegister == 0)
   {
-    fullscreen_blit = false;
+    tbf::RenderFix::draw_state.fullscreen_blit = false;
 
     if (Vector4fCount == 5)
     {
-      memcpy (mat4_0, pConstantData, sizeof (float) * 16);
+      memcpy (tbf::RenderFix::draw_state.mat4_0, pConstantData, sizeof (float) * 16);
 
       if (pConstantData [ 0] == 2.0f / 1280.0f &&
           pConstantData [ 5] == 2.0f / 720.0f)
@@ -1591,7 +1653,7 @@ D3D9SetVertexShaderConstantF_Detour (IDirect3DDevice9* This,
             //game_state.in_skit = true;
           //} else
             //dll_log->Log (L"Trigger!");
-            fullscreen_blit = true;
+            tbf::RenderFix::draw_state.fullscreen_blit = true;
           }
         }
       }
@@ -1695,7 +1757,7 @@ D3D9DrawPrimitive_Detour (IDirect3DDevice9* This,
 
   if (TBF_ShouldSkipRenderPass (PrimitiveType, PrimitiveCount, StartVertex)) {
     if (config.render.aspect_correction)
-      D3D9SetViewport_Original (This, &last_viewport);
+      D3D9SetViewport_Original (This, &tbf::RenderFix::draw_state.vp);
     return S_OK;
   }
 
@@ -1711,7 +1773,7 @@ D3D9DrawPrimitive_Detour (IDirect3DDevice9* This,
                                                StartVertex, PrimitiveCount );
 
   if (config.render.aspect_correction)
-    D3D9SetViewport_Original (This, &last_viewport);
+    D3D9SetViewport_Original (This, &tbf::RenderFix::draw_state.vp);
 
   tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
 
@@ -1764,7 +1826,7 @@ D3D9DrawPrimitiveUP_Detour ( IDirect3DDevice9* This,
 
   if (TBF_ShouldSkipRenderPass(PrimitiveType, PrimitiveCount, 0)) {
     if (config.render.aspect_correction)
-      D3D9SetViewport_Original (This, &last_viewport);
+      D3D9SetViewport_Original (This, &tbf::RenderFix::draw_state.vp);
     return S_OK;
   }
 
@@ -1777,7 +1839,7 @@ D3D9DrawPrimitiveUP_Detour ( IDirect3DDevice9* This,
                                            VertexStreamZeroStride );
 
   if (config.render.aspect_correction)
-    D3D9SetViewport_Original (This, &last_viewport);
+    D3D9SetViewport_Original (This, &tbf::RenderFix::draw_state.vp);
 
   tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
 
@@ -1819,7 +1881,7 @@ D3D9DrawIndexedPrimitiveUP_Detour ( IDirect3DDevice9* This,
   if (TBF_ShouldSkipRenderPass (PrimitiveType, PrimitiveCount, 0))
   {
     if (config.render.aspect_correction)
-      D3D9SetViewport_Original (This, &last_viewport);
+      D3D9SetViewport_Original (This, &tbf::RenderFix::draw_state.vp);
     return S_OK;
   }
 
@@ -1837,7 +1899,7 @@ D3D9DrawIndexedPrimitiveUP_Detour ( IDirect3DDevice9* This,
                       VertexStreamZeroStride );
 
   if (config.render.aspect_correction)
-    D3D9SetViewport_Original (This, &last_viewport);
+    D3D9SetViewport_Original (This, &tbf::RenderFix::draw_state.vp);
 
   tbf::RenderFix::pDevice->SetRenderState (D3DRS_FILLMODE, D3DFILL_SOLID);
 
@@ -2026,7 +2088,7 @@ D3D9SetStreamSourceFreq_Detour
 {
   if (StreamNumber == 0 && FrequencyParameter & D3DSTREAMSOURCE_INDEXEDDATA)
   {
-    instances = (FrequencyParameter & (~D3DSTREAMSOURCE_INDEXEDDATA));
+    tbf::RenderFix::draw_state.instances = (FrequencyParameter & (~D3DSTREAMSOURCE_INDEXEDDATA));
   }
 
   if (StreamNumber == 1 && FrequencyParameter & D3DSTREAMSOURCE_INSTANCEDATA)
@@ -2090,6 +2152,42 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
   }
 
   aspect_ratio.setAspectRatio ((float)tbf::RenderFix::width / (float)tbf::RenderFix::height);
+
+  if (config.render.aspect_ratio > 16.0f / 9.0f) {
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xb8453aa6); // Red Horizontal Stripe in Menus
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xc070b309); // Border around location names [Stretch Horiz]
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0x886664be); // Skit Background Frame   [ Stretch Horizontally ]
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xcf860df0); // Skit Background Frame   [ Stretch Horizontally ]
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xd27b7033); // Expand Horizontally
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xf9aca330); // Expand Horizontally
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xa650f90b); // Expand Horizontally
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xc31cc516); // Expand Horizontally
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xf2a7470b); // Main UI frame [Stretch Horiz]
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xac8976c1); // Background for text such as (Favorable Encounter)
+
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xb0e5dbd7); // Stretch Vert
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0x2355f634); // Stretch Vert
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0x555812e3); // Stretch Vert
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0x55e94ca3); // Stretch Vert
+  }
+
+  else {
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xb8453aa6); // Red Horizontal Stripe in Menus
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xc070b309); // Border around location names [Stretch Horiz]
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0x886664be); // Skit Background Frame   [ Stretch Horizontally ]
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xcf860df0); // Skit Background Frame   [ Stretch Horizontally ]
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xd27b7033); // Expand Horizontally
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xf9aca330); // Expand Horizontally
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xa650f90b); // Expand Horizontally
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xc31cc516); // Expand Horizontally
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xf2a7470b); // Main UI frame [Stretch Horiz]
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xac8976c1); // Background for text such as (Favorable Encounter)
+
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xb0e5dbd7); // Stretch Vert
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0x2355f634); // Stretch Vert
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0x555812e3); // Stretch Vert
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0x55e94ca3); // Stretch Vert
+  }
 
 #if 0
   // Change the Aspect Ratio
@@ -2155,6 +2253,9 @@ tbf::RenderFix::Init (void)
   aspect_ratio_data.whitelist.textures.emplace       (0xffb52073);
 
 
+  aspect_ratio_data.whitelist.textures.emplace      (0xc591e1f4);
+
+
   // Streaming particles on title screen
 //  aspect_ratio_data.blacklist.textures.emplace       (0x620950f9);
 
@@ -2171,22 +2272,10 @@ tbf::RenderFix::Init (void)
   aspect_ratio_data.blacklist.vertex_shaders.emplace (0xfedf053e);
 #endif
 
-
-  aspect_ratio_data.blacklist.textures.emplace (0xee718441); // Map Background
-  aspect_ratio_data.blacklist.textures.emplace (0xc070b309); // Border around location names [Stretch Horiz]
-
-  aspect_ratio_data.blacklist.textures.emplace (0x952b0ff8); // NPC Dialog Background
-
-  ////aspect_ratio_data.blacklist.pixel_shaders.emplace (0x872e7c85); // Pixel Shader for Skits (in general)
-  aspect_ratio_data.blacklist.textures.emplace      (0x886664be); // Skit Background Frame   [ Stretch Horizontally ]
-  aspect_ratio_data.blacklist.textures.emplace      (0xcf860df0); // Skit Background Frame   [ Stretch Horizontally ]
-
-  aspect_ratio_data.blacklist.textures.emplace      (0xf2a7470b); // Main UI frame [Stretch Horiz]
-
-  aspect_ratio_data.blacklist.textures.emplace (0x2d762a65);
-  aspect_ratio_data.blacklist.textures.emplace (0xb8453aa6);
-  aspect_ratio_data.blacklist.textures.emplace (0xac8976c1); // Background for text such as (Favorable Encounter)
+  aspect_ratio_data.blacklist.textures.emplace (0x2d762a65); // Menu   Background (brown)
+  aspect_ratio_data.blacklist.textures.emplace (0xee718441); // Map    Background (dims existing color)
   aspect_ratio_data.blacklist.textures.emplace (0x5ce3fac6); // Framed Background
+  aspect_ratio_data.blacklist.textures.emplace (0x952b0ff8); // NPC Dialog Background
 
   // World Radials
   aspect_ratio_data.blacklist.textures.emplace (0xc312e635);

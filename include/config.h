@@ -78,7 +78,7 @@ struct tbf_config_t
     bool      blackbar_videos     = false;
     bool      aspect_correction   = false;
     float     postproc_ratio      =  0.5f;
-    bool      clear_blackbars     = false;
+    bool      clear_blackbars     =  true;
     int32_t   shadow_rescale      = -2;
     int32_t   env_shadow_rescale  =  1;
     bool      half_float_shadows  = false;
