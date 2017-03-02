@@ -2173,7 +2173,6 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
 
   else {
     tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xb8453aa6); // Red Horizontal Stripe in Menus
-    tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xc070b309); // Border around location names [Stretch Horiz]
     tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0x886664be); // Skit Background Frame   [ Stretch Horizontally ]
     tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xcf860df0); // Skit Background Frame   [ Stretch Horizontally ]
     tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xd27b7033); // Expand Horizontally
@@ -2183,6 +2182,7 @@ SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
     tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xf2a7470b); // Main UI frame [Stretch Horiz]
     tbf::RenderFix::aspect_ratio_data.blacklist.textures.erase (0xac8976c1); // Background for text such as (Favorable Encounter)
 
+    tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xc070b309); // Border around location names [Stretch Vert]
     tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0xb0e5dbd7); // Stretch Vert
     tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0x2355f634); // Stretch Vert
     tbf::RenderFix::aspect_ratio_data.blacklist.textures.emplace (0x555812e3); // Stretch Vert
