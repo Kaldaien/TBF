@@ -1241,6 +1241,17 @@ TBFix_DrawConfigUI (void)
 
     TBFix_KeybindDialog (&config.keyboard.aspect_ratio);
 
+    extern float original_aspect;
+
+    if ( original_aspect > config.render.aspect_ratio + 0.001f ||
+         original_aspect < config.render.aspect_ratio - 0.001f ) {
+      ImGui::Separator ();
+
+      ImGui::Bullet (); ImGui::SameLine ();
+
+      ImGui::TextColored (ImVec4 (1.0f, 0.8f, 0.2f, 1.0f), "Aspect Ratio Has Changed Since Startup, for best results return to the title screen.");
+    }
+
     ImGui::TreePop ();
   }
 

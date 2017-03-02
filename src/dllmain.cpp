@@ -56,6 +56,12 @@ volatile DWORD        __TBF_TLS_INDEX   = MAXDWORD;
 SKX_SetPluginName_pfn SKX_SetPluginName = nullptr;
 
 
+// Since changing aspect ratio involves a trip back to the
+//   title screen, keep track of this to inform the user
+//     when that is necessary.
+float                 original_aspect   = 0.0f;
+
+
 
 __declspec (dllexport)
 BOOL
@@ -159,6 +165,8 @@ SKPlugIn_Init (HMODULE hModSpecialK)
     TBF_LoadConfig (L"tbfix_default");
     TBF_SaveConfig ();
   }
+
+  original_aspect = config.render.aspect_ratio;
 
   config.system.injector             = injector_dll;
 

@@ -647,6 +647,9 @@ D3D9SetRenderState_Detour (IDirect3DDevice9*  This,
   }
 #endif
 
+  //if (State == D3DRS_SCISSORTESTENABLE && (! tbf::RenderFix::draw_state.cegui_active))
+    //Value = FALSE;
+
   return D3D9SetRenderState (This, State, Value);
 }
 
@@ -1048,8 +1051,8 @@ D3D9CreateTexture_Detour (IDirect3DDevice9   *This,
   // Post-Processing ( NextPowerOfTwo (w/2) x NextPowerOfTwo (w/2) / 2 ) - FIXME damnit!
   //
   else if ( (   Usage  == D3DUSAGE_RENDERTARGET && Format == D3DFMT_A8R8G8B8 ) &&
-              ( Width  == TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) &&
-                Height == TBF_NextPowerOfTwo (tbf::RenderFix::width / 2) / 2 )  )
+              ( Width  ==  TBF_NextPowerOfTwo ( tbf::RenderFix::width  / 2 )   &&
+                Height == (TBF_NextPowerOfTwo ( tbf::RenderFix::height / 2 ) >> 1) ) )
   {
     rt_classify.postproc.type = rt_classify.postproc.DepthOfField;
 
