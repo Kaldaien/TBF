@@ -1040,7 +1040,20 @@ TBFix_DrawConfigUI (void)
     ImGui::TreePush ("");
 
     ImGui::Checkbox ("Enable Aspect Ratio Correction", &config.render.aspect_correction);
+    if (ImGui::IsItemHovered ())
+      ImGui::SetTooltip ("The first time you enable this, return to the title screen to have the camera's aspect ratio corrected.\n\n"
+                         "Also turn off the game's Aspect Ratio Correction feature.");
+
     ImGui::Checkbox ("Clear Black Bars During Videos", &config.render.clear_blackbars);
+
+#if 0
+    if (ImGui::SliderFloat ("Field of View", aspect_ratio.fov_addrs [aspect_ratio.selector], 45.0f, 90.0f)) {
+      //aspect_ratio.setFOV (fov);
+    }
+
+    ImGui::SliderInt ("Field of View Selector", &aspect_ratio.selector, 0, aspect_ratio.fov_count-1);
+    ImGui::Text ("FoV Addr: %p", aspect_ratio.fov_addrs [aspect_ratio.selector]);
+#endif
 
     ImGui::Text ("Aspect Ratio Toggle Keybinding:  %ws",  config.keyboard.aspect_ratio.human_readable.c_str ());
 
@@ -1518,25 +1531,47 @@ TBFix_DrawConfigUI (void)
   {
     ImGui::TreePush ("");
 
+    ImGui::Columns (3);
+
     ImGui::Checkbox ("Hollow Eye Mode", &config.fun_stuff.hollow_eye_mode);
     if (ImGui::IsItemHovered ())
       ImGui::SetTooltip ("The stuff nightmares are made from.");
 
-    ImGui::SameLine ();
+    ImGui::NextColumn ();
 
     ImGui::Checkbox ("Plastic Mode", &config.fun_stuff.plastic_mode);
     if (ImGui::IsItemHovered ())
       ImGui::SetTooltip ("It's fantastic.");
 
+    ImGui::NextColumn ();
+
     ImGui::Checkbox ("Disable Smoke",   &config.fun_stuff.disable_smoke);
     if (ImGui::IsItemHovered ())
       ImGui::SetTooltip ("Does not disable all smoke... just the super obnoxious concentric ring (banding from hell) variety that makes you want to gouge your eyes out in dungeons.");
 
-    ImGui::SameLine ();
+    ImGui::NextColumn ();
 
     ImGui::Checkbox ("Disable Pause Screen Dimming", &config.fun_stuff.disable_pause_dim);
     if (ImGui::IsItemHovered ())
       ImGui::SetTooltip ("Potentially useful for texture modders who need stuff to stand still but do not want the screen dimmed -- use with the mod's Auto-Pause feature.");
+
+    ImGui::NextColumn ();
+
+    float* fSpeed = (float *)(0x1409C64F0);
+
+    DWORD dwOriginal;
+    VirtualProtect ((LPVOID)fSpeed, sizeof (float), PAGE_EXECUTE_READWRITE, &dwOriginal);
+
+    bool humming_bird = *fSpeed == 12.0f;
+
+    if (ImGui::Checkbox ("Speed Run Mode", &humming_bird)) {
+      if (humming_bird) *fSpeed = 12.0f;
+      else              *fSpeed = 60.0f;
+    }
+
+    VirtualProtect((LPVOID)fSpeed, sizeof (float), dwOriginal, &dwOriginal);
+
+    ImGui::Columns (1);
 
     ImGui::TreePop  ();
   }

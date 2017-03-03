@@ -764,6 +764,54 @@ struct game_state_t {
   }
 } extern game_state;
 
+#include "config.h"
+
+struct aspect_ratio_s {
+  float* addrs [8] = { nullptr };
+  int    count     =     0;
+
+  float* fov_addrs [32] = { nullptr };
+  int    fov_count      =     0;
+  float  fov_orig       = 60.0f;
+
+  int    selector       = 0;
+
+
+  void setFOV (float fov)
+  {
+    DWORD dwOld;
+
+    //for (int i = 0; i < fov_count; i++)
+    //{
+      //if (*fov_addrs [i] == fov_orig)
+      //{
+        VirtualProtect (fov_addrs [selector], sizeof (float), PAGE_READWRITE, &dwOld);
+        *((float *)fov_addrs [selector]) = fov;
+        VirtualProtect (fov_addrs [selector], sizeof (float), dwOld,          &dwOld);
+      //}
+    //}
+
+    fov_orig = fov;
+  };
+
+  void setAspectRatio (float aspect)
+  {
+    config.render.aspect_ratio = aspect;
+
+    if (! config.render.aspect_correction)
+      return;
+
+    DWORD dwOld;
+    //for (int i = 0; i < count; i++)
+    //{
+      VirtualProtect (addrs [1], sizeof (float), PAGE_READWRITE, &dwOld);
+      *((float *)addrs [1]) = aspect;
+      VirtualProtect (addrs [1], sizeof (float), dwOld,          &dwOld);
+    //}
+  };
+} extern aspect_ratio;
+
+
 typedef HRESULT (STDMETHODCALLTYPE *BeginScene_pfn)(
   IDirect3DDevice9 *This
 );

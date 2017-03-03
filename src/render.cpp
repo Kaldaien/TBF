@@ -40,24 +40,7 @@
 tbf::RenderFix::tbf_draw_states_s
   tbf::RenderFix::draw_state;
 
-struct {
-  float* addrs [16] = { nullptr };
-  int    count      =     0;
-
-  void setAspectRatio (float aspect)
-  {
-    config.render.aspect_ratio = aspect;
-
-    DWORD dwOld;
-    for (int i = 0; i < count; i++)
-    {
-      VirtualProtect (addrs [i], sizeof (float), PAGE_READWRITE, &dwOld);
-      *((float *)addrs [i]) = aspect;
-      VirtualProtect (addrs [i], sizeof (float), dwOld,          &dwOld);
-    }
-  }
-} aspect_ratio;
-
+aspect_ratio_s aspect_ratio;
 
 struct smaa_constants_s
 {
@@ -2104,20 +2087,6 @@ __stdcall
 SK_SetPresentParamsD3D9_Detour (IDirect3DDevice9*      device,
                                  D3DPRESENT_PARAMETERS* pparams)
 {
-  ////static D3DPRESENT_PARAMETERS present_params;
-
-  //
-  // TODO: Figure out what the hell is doing this when RTSS is allowed to use
-  //         custom D3D libs. 1x1@0Hz is obviously NOT for rendering!
-  //
-  if ( pparams->BackBufferWidth            == 1 &&
-       pparams->BackBufferHeight           == 1 &&
-       pparams->FullScreen_RefreshRateInHz == 0 )
-  {
-    dll_log->Log (L"[Render Fix] * Fake D3D9Ex Device Detected... Ignoring!");
-    return SK_SetPresentParamsD3D9_Original (device, pparams);
-  }
-
   if (device != nullptr) 
   {
     dll_log->Log ( L"[Render Fix] %% Caught D3D9 Swapchain :: Fullscreen=%s "
@@ -2445,7 +2414,7 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
               //config.render.aspect_ratio < (16.0f / 9.0f) - 0.001f )
   {
     void* addr =
-      TBF_Scan (signature, sizeof (float), nullptr, 4);
+      TBF_Scan (signature, sizeof (float), nullptr, 8);
 
     do {
       if (addr == nullptr)
@@ -2463,26 +2432,35 @@ tbf::RenderFix::CommandProcessor::CommandProcessor (void)
 
         aspect_ratio.addrs [aspect_ratio.count++] = (float *)addr;
       }
-    } while (addr != nullptr && (addr = TBF_ScanEx (signature, sizeof (float), nullptr, addr, 4)));
+    } while (addr != nullptr && (addr = TBF_ScanEx (signature, sizeof (float), nullptr, addr, 8)));
   }
 
   aspect_ratio.setAspectRatio (config.render.aspect_ratio);
 
 #if 0
-    if (addr != nullptr && )
-    {
-      config.render.aspect_addr = (uintptr_t)addr;
+  uint8_t fov_sig [] = { 0x00, 0x00, 0x70, 0x42 };
+  if (true)
+  {
+    void* addr = 
+      TBF_Scan (fov_sig, sizeof (float), nullptr, 4);
 
-      char szAspectCommand [64];
-      sprintf (szAspectCommand, "AspectRatio %f", 3440.0f / 1440.0f);
-    
-      SK_GetCommandProcessor ()->ProcessCommandLine (szAspectCommand);
-      //dll_log->Log (L"[Asp. Ratio] Scanned FOVY Address: %06Xh", (float *)addr + 1);
-      //config.render.fovy_addr = (uintptr_t)((float *)addr + 1);
-    }
-    else {
-      dll_log->Log (L"[Asp. Ratio]  >> ERROR: Unable to find Aspect Ratio Address!");
-    }
+    do {
+      if (addr == nullptr)
+        break;
+
+      HMODULE hMod;
+
+      if (GetModuleHandleExW ( GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT |
+                               GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCWSTR)addr, &hMod ))
+      {
+        if (hMod != GetModuleHandle (nullptr))
+          continue;
+
+        dll_log->Log (L"[Asp. Ratio] Scanned FoV Address: %06Xh", addr);
+
+        aspect_ratio.fov_addrs [aspect_ratio.fov_count++] = (float *)addr;
+      }
+    } while (addr != nullptr && (addr = TBF_ScanEx (fov_sig, sizeof (float), nullptr, addr, 4)));
   }
 #endif
 }
